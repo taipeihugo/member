@@ -1,0 +1,4 @@
+node_modules/
+*.tmp
+.~lock.*#
+製作/test/output/
