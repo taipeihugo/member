@@ -43,7 +43,14 @@ alter table public.members add constraint members_staff_role_check
 create unique index if not exists members_email_uniq on public.members (lower(email)) where email <> '';
 -- 帳號連結是否由理事長、秘書長、總幹事（或 SQL Editor）建立或核准（v1.8）。
 -- 會計、承辦人連結的帳號，要先改由管理者重新連結，才能被指派為幹部，避免有人先把分身帳號連到日後會當幹部的會員
-alter table public.members add column if not exists linked_by_admin boolean not null default false;
+-- 第一次加這個欄位時（從 v1.7 以前升級），目前已是幹部的那幾筆視為管理者連結（舊版只有管理者或 SQL Editor 能連結幹部）
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'members' and column_name = 'linked_by_admin') then
+    alter table public.members add column linked_by_admin boolean not null default false;
+    update public.members set linked_by_admin = true where user_id is not null and staff_role <> '';
+  end if;
+end $$;
 
 -- 活動：meal_option 為 true 時，報名要選葷或素
 create table if not exists public.activities (
@@ -177,10 +184,15 @@ begin
       raise exception '只有理事長、秘書長或總幹事可以變更幹部的會籍、Email 或帳號連結';
     end if;
   end if;
+  -- 會計、承辦人改了已連結帳號那筆的姓名、Email 或員工編號：不再算管理者連結（避免把分身帳號那筆改成別人再請管理者指派）
+  if auth.uid() is not null and tg_op = 'UPDATE' and not public.is_admin() and new.user_id is not null
+      and (new.name, new.email, new.employee_no) is distinct from (old.name, lower(trim(old.email)), old.employee_no) then
+    new.linked_by_admin := false;
+  end if;
   -- 指派幹部角色時，這筆的帳號連結必須是管理者建立或核准的（SQL Editor 不受限）
   if auth.uid() is not null and tg_op = 'UPDATE' and old.staff_role = '' and new.staff_role <> ''
       and new.user_id is not null and not new.linked_by_admin then
-    raise exception '「%」的帳號是由會計或承辦人連結的，不能直接指派幹部角色。請先「解除帳號連結」，再由理事長、秘書長或總幹事產生認領碼交給本人重新連結，之後再指派', new.name;
+    raise exception '「%」的帳號連結不是由理事長、秘書長或總幹事建立的（例如由會計、承辦人連結，v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請先「解除帳號連結」，再由理事長、秘書長或總幹事產生認領碼交給本人重新連結，之後再指派', new.name;
   end if;
   return new;
 end $$;
@@ -670,8 +682,20 @@ begin
   delete from public.claim_codes where member_id = p_member;
 end $$;
 
+-- 管理者查某位會員連結的登入帳號（個人 Email），指派幹部角色前核對是不是本人
+create or replace function public.member_login_email(p_member uuid)
+returns text language plpgsql stable security definer set search_path = public as $$
+declare 信箱 text;
+begin
+  if not public.is_admin() then raise exception '只有理事長、秘書長或總幹事可以查看登入帳號'; end if;
+  select u.email into 信箱 from public.members m join auth.users u on u.id = m.user_id where m.id = p_member;
+  return coalesce(信箱, '');
+end $$;
+
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
 revoke execute on function public.claim_code_hash(text) from public, anon, authenticated;
+revoke execute on function public.member_login_email(uuid) from public, anon;
+grant execute on function public.member_login_email(uuid) to authenticated;
 revoke execute on function public.generate_claim_codes(uuid[]), public.claim_with_code(text),
   public.submit_link_request(text, text, text, text, text, text, text), public.approve_link_request(uuid, uuid),
   public.reject_link_request(uuid, text), public.unlink_member(uuid) from public, anon;

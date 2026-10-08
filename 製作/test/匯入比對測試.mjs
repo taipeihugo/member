@@ -41,7 +41,7 @@ console.log("S3 第二列的 Email 是別人（Y）的，員工編號、姓名�
 {
   const X1 = { id:"X", name:"王小明", agency:"財政部賦稅署", employee_no:"E1", email:"x@example.org" }, Y = { id:"Y", name:"李大華", agency:"財政部國稅局", email:"y@example.org" };
   const r = await run([X1, Y], [H7, ["王小明",1,"財政部賦稅署","法務組","科員","","E1"], ["王小明",1,"財政部賦稅署","法務組","科員","y@example.org","E1"]]);
-  檢查(by(r.db,"Y").name === "李大華" && by(r.db,"X").unit === "法務組" && by(r.db,"X").email === "x@example.org" && /屬於名冊上的「李大華」/.test(r.預覽), "Y 不被改名，X 的單位照樣更新，並說明略過原因");
+  檢查(by(r.db,"Y").name === "李大華" && by(r.db,"X").email === "x@example.org" && r.patches.length === 0 && /屬於名冊上的「李大華」/.test(r.預覽), "兩列（員工編號＋姓名相同）視為同一人，其 Email 卻是 Y 的：整組略過並說明，Y 不被改名");
 }
 console.log("S4 員工編號＋姓名相同、Email 換了（調職換公務信箱）");
 {
@@ -84,7 +84,7 @@ console.log("S10 名冊兩位同名同機關都沒有 Email，檔案一列沒有
 console.log("S11 檔案兩列 Email 相同、員工編號不同（新會員）");
 {
   const r = await run([], [H7, ["趙五",1,"財政部國庫署","","","q@example.org","E5"], ["趙五",1,"財政部國庫署","","","q@example.org","E6"]]);
-  檢查(r.inserts.length === 1 && /無法判斷是不是同一人/.test(r.預覽), "第二列略過");
+  檢查(r.inserts.length === 0 && /無法判斷是不是同一人/.test(r.預覽), "無法判斷，兩列都略過並說明");
 }
 console.log("S12 兩列對應到名冊同一位（一列用姓名、一列用 Email）");
 {
@@ -92,5 +92,61 @@ console.log("S12 兩列對應到名冊同一位（一列用姓名、一列用 Em
   const r = await run([Z], [H7, ["張重複",1,"財政部高雄國稅局","企劃科","科員","","E9"], ["張重複",1,"財政部高雄國稅局","企劃科","科長","z@example.org","E8"]]);
   檢查(r.patches.length === 1 && r.inserts.length === 0 && /都對應到名冊上的「張重複」/.test(r.預覽), "矛盾的第二列略過，只更新一次");
 }
+// 兩種列的順序（原順序與倒過來）都跑一次，結果（名冊最後的樣子、新增與修改的筆數）必須一樣
+async function 兩種順序(名冊, 標題, 列們) {
+  const 甲 = await run(名冊, [標題, ...列們]);
+  const 乙 = await run(名冊, [標題, ...列們.slice().reverse()]);
+  const 樣子 = (r) => JSON.stringify(r.db.map(({ id, ...m }) => (id.startsWith("N") ? m : { id, ...m })).sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
+  檢查(樣子(甲) === 樣子(乙) && 甲.計.join() === 乙.計.join(), "兩種列的順序結果相同");
+  return 甲;
+}
+const 員 = ["姓名","女0男1","服務機關","服務單位","職稱","電子郵件信箱","員工編號"];
+console.log("S13 員工編號欄有填、Email 打成別人的（名冊上本人沒有員工編號）");
+{
+  const X1 = { id:"X", name:"王小明", agency:"財政部賦稅署", email:"x@example.org" }, Y = { id:"Y", name:"李大華", agency:"財政部國稅局", email:"y@example.org" };
+  const r = await 兩種順序([X1, Y], 員, [["王小明",1,"財政部賦稅署","法務組","科員","y@example.org","E1"]]);
+  檢查(by(r.db,"Y").name === "李大華" && r.patches.length === 0 && /屬於名冊上的「李大華」/.test(r.預覽), "略過，Y 不被改成王小明");
+  const r2 = await 兩種順序([X1, { ...Y }], 員, [["王小明",1,"財政部賦稅署","法務組","科員","","E1"], ["王小明",1,"財政部賦稅署","法務組","科員","y@example.org","E1"]]);
+  檢查(by(r2.db,"Y").name === "李大華", "加上 X 自己那一列時，Y 也不被覆蓋");
+  const r3 = await 兩種順序([{ ...X1, employee_no: "e1" }, Y], 員, [["王小明",1,"財政部賦稅署","法務組","科員","y@example.org","E1"]]);
+  檢查(by(r3.db,"Y").name === "李大華" && r3.patches.length === 0, "員工編號只差大小寫（e1／E1）也視為相同，照樣略過");
+}
+console.log("S14 名冊兩位同名同機關（A 有 Email、C 沒有），檔案是 A 的兩列（一列沒填 Email，員工編號相同）");
+{
+  const A1 = { id:"A", name:"王一", agency:"財政部賦稅署", email:"a@example.org" }, C1 = { id:"C", name:"王一", agency:"財政部賦稅署", unit:"原單位" };
+  const r = await 兩種順序([A1, C1], 員, [["王一",1,"財政部賦稅署","法務組","科長","a@example.org","E1"], ["王一",1,"財政部賦稅署","法務組","科長","","E1"]]);
+  檢查(r.計.join() === "0,1" && by(r.db,"A").employee_no === "E1" && by(r.db,"C").unit === "原單位" && !by(r.db,"C").employee_no, "兩列合併成 A，C 不被動到");
+}
+console.log("S15 A 換了公務信箱（員工編號相同），檔案有 A 的新信箱列與沒有員工編號的重複列；名冊另有同名的 C");
+{
+  const A1 = { id:"A", name:"王一", agency:"財政部賦稅署", email:"a@example.org", employee_no:"E1" }, C1 = { id:"C", name:"王一", agency:"財政部賦稅署", unit:"原單位" };
+  const r = await 兩種順序([A1, C1], 員, [["王一",1,"財政部賦稅署","法務組","科長","n@example.org","E1"], ["王一",1,"財政部賦稅署","法務組","科長","n@example.org",""]]);
+  檢查(by(r.db,"A").email === "n@example.org" && by(r.db,"C").unit === "原單位" && !by(r.db,"C").email && r.inserts.length === 0, "更新 A 的信箱，C 不被動到");
+}
+console.log("S16 名冊 Z（只有 Email），檔案一列用姓名、一列用 Email 對應到 Z，員工編號不同");
+{
+  const Z = { id:"Z", name:"張重複", agency:"財政部高雄國稅局", email:"z@example.org" };
+  const r = await 兩種順序([Z], 員, [["張重複",1,"財政部高雄國稅局","企劃科","科員","","E9"], ["張重複",1,"財政部高雄國稅局","第二科","科長","z@example.org","E8"]]);
+  檢查(by(r.db,"Z").employee_no === "E8" && by(r.db,"Z").unit === "第二科" && r.inserts.length === 0 && /都對應到名冊上的「張重複」/.test(r.預覽), "以 Email 對應的那一列為準，矛盾的另一列略過");
+}
+console.log("S17 名冊 M（舊信箱、E1），檔案有 M 的新信箱兩列（一列沒填員工編號），機關也換了");
+{
+  const M = { id:"M", name:"林志明", agency:"財政部賦稅署", email:"old@example.org", employee_no:"E1" };
+  const r = await 兩種順序([M], 員, [["林志明",1,"財政部國稅局","審查科","科員","new@example.org",""], ["林志明",1,"財政部國稅局","審查科","科員","new@example.org","E1"]]);
+  檢查(r.inserts.length === 0 && by(r.db,"M").email === "new@example.org" && by(r.db,"M").agency === "財政部國稅局", "只更新 M，不新增重複的人");
+}
+console.log("S18 A 調到國稅局：檔案有 A 的列（有 Email）與沒填 Email 的重複列");
+{
+  const A1 = { id:"A", name:"王小明", agency:"財政部賦稅署", email:"a@example.org" };
+  const r = await 兩種順序([A1], 員, [["王小明",1,"財政部國稅局","審查科","科員","a@example.org","E1"], ["王小明",1,"財政部國稅局","審查科","科員","","E1"]]);
+  檢查(r.計.join() === "0,1" && r.inserts.length === 0, "有員工編號欄：合併成 A 的一筆更新");
+  const r2 = await 兩種順序([A1], H6, [["王小明",1,"財政部國稅局","審查科","科員","a@example.org"], ["王小明",1,"財政部國稅局","審查科","科員",""]]);
+  檢查(r2.計.join() === "0,1" && r2.inserts.length === 0, "沒有員工編號欄：也合併成 A 的一筆更新");
+}
+console.log("S19 先前各情境換順序");
+await 兩種順序([A, C], H6, [["王小明",1,"財政部賦稅署","稅制組","科員2","a@example.org"], ["王小明",0,"財政部賦稅署","綜所組","專員2",""]]);
+await 兩種順序([X], H6, [["陳美玲",0,"財政部賦稅署","稅制組","科員",""], ["陳美玲",0,"財政部賦稅署","法務組","科員","w@example.org"]]);
+await 兩種順序([], 員, [["趙五",1,"財政部國庫署","","","q@example.org","E5"], ["趙五",1,"財政部國庫署","","","q@example.org","E6"]]);
+
 console.log("\n匯入比對測試：通過 " + 通過 + " 項，失敗 " + 失敗 + " 項");
 process.exit(失敗 ? 1 : 0);

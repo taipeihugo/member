@@ -31,7 +31,7 @@ const 帳號們 = new Map();   // email → {id, 密碼}
 let 憑證序 = 0;
 const 憑證 = (u) => "h." + Buffer.from(JSON.stringify({ sub: u.id, email: u.email, n: ++憑證序 })).toString("base64url") + ".s";
 // 模擬異常：延長登入回 503、連線中斷、更新憑證被拒；已過期的存取憑證
-const 模擬 = { 刷新503: 0, 刷新409: 0, 刷新中斷: 0, 刷新延遲: 0, 刷新拒絕: false, 刷新次數: 0, 資料次數: 0, 過期: new Set() };
+const 模擬 = { 刷新503: 0, 刷新409: 0, 刷新中斷: 0, 刷新延遲: 0, 刷新拒絕: false, 刷新次數: 0, 資料次數: 0, 寫入者: [], 過期: new Set() };
 // 從請求標頭解出登入者
 const 解憑證 = (標頭) => {
   const t = String(標頭.authorization || "").replace(/^Bearer /, "");
@@ -87,6 +87,8 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
     }
     if (方法 === "DELETE") return (await db.query(`delete from public.${表}${條件SQL(參數, 值們)} returning *`, 值們)).rows;
     if (方法 === "PATCH") {
+      if (延遲.寫入) await new Promise((r) => setTimeout(r, 延遲.寫入));
+      模擬.寫入者.push(使用者 ? 使用者.email : "未登入");
       const 欄 = Object.keys(內容);
       欄.forEach((k) => 值們.push(內容[k]));
       return (await db.query(`update public.${表} set ${欄.map((k, i) => `"${k}" = $${i + 1}`).join(", ")}${條件SQL(參數, 值們)} returning *`, 值們)).rows;
@@ -284,8 +286,8 @@ try {
     "張重複,1,財政部高雄國稅局,企劃科,科員,,E9\n" +
     "張重複,1,財政部高雄國稅局,企劃科,科長,z@example.org,E8\n", "匯入完成：新增 4、更新 1");
   檢查(同名預覽.includes("新增 4 人、更新 1 人"), "同名同機關但 Email 不同、員工編號不同的人分別新增，不會合併");
-  檢查(/第 5 列「林無信箱」和第 4 列是同一人，已合併/.test(同名預覽), "沒有 Email、員工編號的重複列（同名同機關）合併");
-  檢查(/第 8 列「張重複」與第 7 列都對應到名冊上的「張重複」.*已略過/.test(同名預覽), "兩列對應到名冊上同一位、但員工編號矛盾時略過並說明");
+  檢查(/第 4、5 列「林無信箱」是同一人，已合併/.test(同名預覽), "沒有 Email、員工編號的重複列（同名同機關）合併");
+  檢查(/第 7 列「張重複」與第 8 列都對應到名冊上的「張重複」.*已略過/.test(同名預覽), "兩列對應到名冊上同一位、但員工編號矛盾時，以 Email 對應的那列為準，另一列略過並說明");
   const 陳們 = (await db.query("select email, unit from public.members where name = '陳同名' order by email")).rows;
   檢查(陳們.length === 2 && 陳們[0].unit === "審查科" && 陳們[1].unit === "徵收科", "兩位陳同名各自建立，資料沒有互相覆蓋");
   檢查((await db.query("select count(*)::int as n from public.members where name = '王同名'")).rows[0].n === 2, "名冊上同名同機關但員工編號不同：視為不同人新增");
@@ -393,6 +395,14 @@ try {
 
   console.log("六、幹部：審核、葷素統計、簽到、會費");
   await 登入("sec@example.org", "staffpass1");
+  // 管理者編輯會員時看得到他連結的登入帳號（指派幹部前核對）
+  await 選單("會員管理");
+  await page.fill(".表工具列 input[type=search]", "甲會員");
+  await page.locator("#內容 tbody tr", { hasText: "甲會員" }).first().click();
+  await 框().waitFor();
+  const 登入帳號欄 = await 框().locator("[data-key='登入帳號']").inputValue();
+  檢查(登入帳號欄.startsWith("jia.home@gmail.example（由理事長、秘書長或總幹事連結）"), "管理者編輯會員時看得到連結的登入帳號與連結方式（" + 登入帳號欄 + "）");
+  await page.keyboard.press("Escape");
   await 選單("申請審核");
   await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator("button", { hasText: "核准" }).click();
   檢查((await 框().locator("[data-key='member'] option:checked").innerText()).includes("乙理事長"), "核准連結時自動預選名冊上對應的會員（公務信箱相同）");
@@ -532,6 +542,29 @@ try {
   const 換人結果 = await page.evaluate(() => window.__換人結果);
   模擬.刷新延遲 = 0;
   檢查(換人結果 === "登入狀態已變更，請重新操作", "延長登入等候中登出並換人登入：前一位的請求不送出（" + 換人結果 + "）");
+  await page.click("#登出鈕");
+  await 登入("sec@example.org", "staffpass1");
+  // 匯入到一半登出、換人登入：後面的資料不會用下一位的身分寫入，結果也不顯示在下一位的畫面
+  await 選單("會員管理");
+  延遲.寫入 = 400;
+  模擬.寫入者 = [];
+  const 半途 = await (async () => {
+    const 檔 = path.join(輸出, "半途登出.csv");
+    fs.writeFileSync(檔, "\uFEFF姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱\n" + Array.from({ length: 8 }, (_, i) => "批次會員" + (i + 1) + ",1,財政部財政資訊中心,半途組,科員,batch" + (i + 1) + "@example.org\n").join(""));
+    const [選] = await Promise.all([page.waitForEvent("filechooser"), page.click("#匯入名冊鈕")]);
+    await 選.setFiles(檔);
+    await 框().waitFor();
+    await 框().locator("button", { hasText: "開始匯入" }).click();
+    await page.waitForTimeout(600);
+    await page.click("#登出鈕");
+    await page.fill("#登入信箱", "jia.home@gmail.example"); await page.fill("#登入密碼", "newpass123");
+    await page.click("#登入鈕");
+    await page.waitForSelector("#側欄 button");
+    await page.waitForTimeout(2500);
+    return { 寫入者: 模擬.寫入者.slice(), 有框: await page.locator("dialog[open]").count() };
+  })();
+  延遲.寫入 = 0;
+  檢查(半途.寫入者.length > 0 && 半途.寫入者.every((e) => e === "sec@example.org") && 半途.有框 === 0, "匯入到一半登出並換人登入：後面的資料不會用下一位的身分寫入、結果不會顯示在下一位畫面（寫入者：" + 半途.寫入者.join("、") + "）");
   await page.click("#登出鈕");
   await 登入("sec@example.org", "staffpass1");
   // 存取憑證過期：讀資料收到 401 → 自動延長後重送，畫面正常

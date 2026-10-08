@@ -281,8 +281,8 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     const 乙申 = (await 以身分(db, 分身3, () => db.query("select public.submit_link_request('將任乙', '', '', '', '', '', '') as id"))).rows[0].id;
     await 辦("select public.approve_link_request($1, $2)", [乙申, 將任乙]);
     const 長 = (sql, p) => 以身分(db, 長帳, () => db.query(sql, p));
-    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]), "會計或承辦人連結"), "承辦人發碼連結的會員，理事長不能直接指派幹部角色（防分身奪權）");
-    檢查(await 應失敗(() => 長("update public.members set staff_role = '總幹事' where id = $1", [將任乙]), "會計或承辦人連結"), "承辦人核准連結的會員，理事長不能直接指派幹部角色");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]), "不是由理事長"), "承辦人發碼連結的會員，理事長不能直接指派幹部角色（防分身奪權）");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '總幹事' where id = $1", [將任乙]), "不是由理事長"), "承辦人核准連結的會員，理事長不能直接指派幹部角色");
     檢查((await 以身分(db, 分身2, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "", "上述被擋後，分身帳號仍不是幹部");
     // 正確做法：解除連結 → 管理者發碼 → 本人認領 → 指派
     await 長("select public.unlink_member($1)", [將任甲]);
@@ -294,6 +294,19 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查((await 以身分(db, 本人, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "秘書長", "管理者發碼連結的會員可以指派幹部角色");
     檢查(!(await db.query("select has_column_privilege('authenticated', 'public.members', 'linked_by_admin', 'UPDATE') or has_column_privilege('authenticated', 'public.members', 'linked_by_admin', 'INSERT') as ok")).rows[0].ok, "登入者不能直接改「管理者連結」標記");
     檢查((await db.query("select linked_by_admin from public.members where id = $1", [長列])).rows[0].linked_by_admin === true, "make_staff 連結的帳號標記為管理者連結");
+    // 2h. 管理者核准分身的入會申請後，承辦人把那筆改成「將升任的人」的姓名、Email、員工編號 → 不再算管理者連結，指派被擋
+    const 分身4 = await 新("clerk.alt4@gmail.example");
+    const 分身申 = (await 以身分(db, 分身4, () => db.query("select public.submit_application('林新人', '', '', '財政部國庫署', '', '', '', '', 'newbie4@fia.example.gov') as id"))).rows[0].id;
+    const R列 = (await 長("select public.approve_application($1) as id", [分身申])).rows[0].id;
+    檢查((await db.query("select linked_by_admin from public.members where id = $1", [R列])).rows[0].linked_by_admin === true, "理事長核准的入會申請，帳號連結標記為管理者連結");
+    await 辦("update public.members set name = '王未來', email = 'future@fia.example.gov', employee_no = 'E123' where id = $1", [R列]);
+    檢查((await db.query("select linked_by_admin from public.members where id = $1", [R列])).rows[0].linked_by_admin === false, "承辦人改了已連結那筆的姓名、Email、員工編號後，不再算管理者連結");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [R列]), "不是由理事長"), "理事長指派那筆為幹部時被擋（防止改名冒充後奪權）");
+    檢查((await 以身分(db, 分身4, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "", "上述被擋後，分身帳號仍不是幹部");
+    await 以身分(db, 分身4, () => db.query("select public.update_my_profile('男', '財政部國庫署', '國庫組', '科員', '分機 1')"));
+    // 管理者可以看登入帳號（個人 Email）核對；其他人不行
+    檢查((await 長("select public.member_login_email($1) as e", [R列])).rows[0].e === "clerk.alt4@gmail.example", "管理者看得到某位會員連結的登入帳號");
+    檢查(await 應失敗(() => 辦("select public.member_login_email($1)", [R列]), "只有理事長"), "承辦人不能查登入帳號");
     // 3. 入會申請不依自填信箱連到既有會員
     const 冒用 = await 新("fake.applicant@gmail.example");
     const 冒申 = (await 以身分(db, 冒用, () => db.query("select public.submit_application('新人張三', '', '', '財政部賦稅署', '', '', '', '', 'bing3@fia.example.gov') as id"))).rows[0].id;
