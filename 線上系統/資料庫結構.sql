@@ -288,16 +288,18 @@ begin
   return '';
 end $$;
 
--- 線上入會申請（已是會員、或已有待審申請時不能重複送）
+-- 線上入會申請（已是會員、或已有待審申請時不能重複送）；p_email 是公務電子郵件信箱（名冊用），沒填就用登入 Email
+drop function if exists public.submit_application(text, text, text, text, text, text, text, text);
 create or replace function public.submit_application(p_name text, p_gender text, p_employee_no text, p_agency text,
-  p_unit text, p_title text, p_phone text, p_note text)
+  p_unit text, p_title text, p_phone text, p_note text, p_email text default '')
 returns uuid language plpgsql security definer set search_path = public as $$
 declare 編號 uuid; 信箱 text;
 begin
   if auth.uid() is null then raise exception '請先登入'; end if;
   if public.my_member_id() is not null then raise exception '您已經是會員'; end if;
   if exists (select 1 from public.applications where user_id = auth.uid() and status = '待審') then raise exception '您已有一件申請在審核中'; end if;
-  select lower(email) into 信箱 from auth.users where id = auth.uid();
+  信箱 := lower(trim(coalesce(p_email, '')));
+  if 信箱 = '' then select lower(email) into 信箱 from auth.users where id = auth.uid(); end if;
   insert into public.applications (user_id, name, gender, employee_no, agency, unit, title, email, phone, note)
     values (auth.uid(), trim(p_name), coalesce(p_gender, ''), coalesce(p_employee_no, ''), coalesce(p_agency, ''),
       coalesce(p_unit, ''), coalesce(p_title, ''), coalesce(信箱, ''), coalesce(p_phone, ''), coalesce(p_note, ''))
@@ -363,20 +365,26 @@ begin
   return 筆數;
 end $$;
 
--- 第一次設定用（只能在 SQL Editor 執行）：把某個 Email 設為幹部；名冊沒有這個人就先建立
--- 例：select public.make_staff('you@example.gov.tw', '秘書長', '王小明');
-create or replace function public.make_staff(p_email text, p_role text, p_name text default '')
+-- 第一次設定用（只能在 SQL Editor 執行）：把某人設為幹部
+--   p_login_email：他在會員專區註冊用的 Email（個人信箱）
+--   p_office_email：名冊上的公務信箱（可省略）；名冊已有這個公務信箱的會員就直接設定並連結，沒有就新建
+-- 例：select public.make_staff('wang@gmail.com', '秘書長', '王小明', 'wang@mail.mof.gov.tw');
+drop function if exists public.make_staff(text, text, text);
+create or replace function public.make_staff(p_login_email text, p_role text, p_name text default '', p_office_email text default '')
 returns text language plpgsql security definer set search_path = public as $$
-declare 帳號 uuid;
+declare 帳號 uuid; 名冊信箱 text := lower(trim(coalesce(nullif(p_office_email, ''), p_login_email)));
 begin
-  select id into 帳號 from auth.users where lower(email) = lower(p_email);
-  if exists (select 1 from public.members where email = lower(p_email)) then
-    update public.members set staff_role = p_role, status = '有效', user_id = coalesce(user_id, 帳號) where email = lower(p_email);
+  select id into 帳號 from auth.users where lower(email) = lower(trim(p_login_email));
+  if 帳號 is not null and exists (select 1 from public.members where user_id = 帳號 and email <> 名冊信箱) then
+    raise exception '這個登入帳號已連結其他會員資料';
+  end if;
+  if exists (select 1 from public.members where email = 名冊信箱) then
+    update public.members set staff_role = p_role, status = '有效', user_id = coalesce(user_id, 帳號) where email = 名冊信箱;
   else
     insert into public.members (user_id, name, email, staff_role, join_date)
-      values (帳號, coalesce(nullif(p_name, ''), split_part(p_email, '@', 1)), lower(p_email), p_role, current_date);
+      values (帳號, coalesce(nullif(p_name, ''), split_part(名冊信箱, '@', 1)), 名冊信箱, p_role, current_date);
   end if;
-  return '已將 ' || p_email || ' 設為' || p_role || case when 帳號 is null then '（此 Email 尚未註冊帳號，註冊後登入即自動連結）' else '' end;
+  return '已將 ' || 名冊信箱 || ' 設為' || p_role || case when 帳號 is null then '（' || p_login_email || ' 尚未註冊；請先註冊，再執行一次這行完成連結）' else '，並連結登入帳號 ' || p_login_email end;
 end $$;
 
 -- 函式執行權限：會員與幹部函式只開給登入者；make_staff 只能在 SQL Editor 用
@@ -384,10 +392,10 @@ revoke execute on all functions in schema public from public, anon;
 grant execute on function public.my_member_id(), public.my_staff_role(), public.is_staff(), public.is_admin(),
   public.link_my_member(), public.update_my_profile(text, text, text, text, text),
   public.register_activity(uuid, text, text), public.cancel_registration(uuid),
-  public.submit_application(text, text, text, text, text, text, text, text),
+  public.submit_application(text, text, text, text, text, text, text, text, text),
   public.approve_application(uuid), public.reject_application(uuid, text),
   public.record_fees(uuid[], int, text, int, date, text) to authenticated;
-revoke execute on function public.make_staff(text, text, text), public.next_member_no(), public.members_before_write() from authenticated;
+revoke execute on function public.make_staff(text, text, text, text), public.next_member_no(), public.members_before_write() from authenticated;
 
 -- 各公開活動的報名人數（只有人數，不含個資），讓會員看得到「已報名 23／40」
 create or replace function public.activity_counts()
@@ -400,3 +408,156 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke execute on function public.activity_counts() from public, anon;
 grant execute on function public.activity_counts() to authenticated;
+
+-- =====================================================================
+-- 帳號連結（v1.3）：公務信箱收不到外部信，會員改用個人 Email 註冊，
+-- 再用「認領碼」或「申請連結（幹部核對後核准）」連到名冊上的自己。
+-- =====================================================================
+
+-- 認領碼：幹部替尚未連結帳號的會員產生，一次性、30 天有效
+create table if not exists public.claim_codes (
+  member_id uuid primary key references public.members (id) on delete cascade,
+  code text not null unique,
+  expires_at timestamptz not null default now() + interval '30 days',
+  created_by text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- 連結申請：會員填寫姓名、機關、公務信箱，由幹部核對名冊後指定對應的會員
+create table if not exists public.link_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  login_email text not null default '',
+  name text not null check (length(trim(name)) > 0),
+  agency text not null default '',
+  unit text not null default '',
+  title text not null default '',
+  office_email text not null default '',
+  phone text not null default '',
+  note text not null default '',
+  status text not null default '待審' check (status in ('待審', '核准', '退回')),
+  member_id uuid references public.members (id) on delete set null,
+  review_note text not null default '',
+  reviewed_by text not null default '',
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists link_requests_one_pending on public.link_requests (user_id) where status = '待審';
+
+alter table public.claim_codes enable row level security;
+alter table public.link_requests enable row level security;
+revoke all on public.claim_codes, public.link_requests from anon;
+revoke all on public.claim_codes from authenticated;
+grant select on public.claim_codes to authenticated;
+grant select on public.link_requests to authenticated;
+
+drop policy if exists claim_codes_select on public.claim_codes;
+create policy claim_codes_select on public.claim_codes for select to authenticated using (public.is_staff());
+drop policy if exists link_requests_select on public.link_requests;
+create policy link_requests_select on public.link_requests for select to authenticated using (user_id = auth.uid() or public.is_staff());
+
+-- 幹部產生認領碼（只針對尚未連結帳號的會員；重新產生會取代舊碼）；回傳 會員id、姓名、認領碼、到期日
+create or replace function public.generate_claim_codes(p_members uuid[])
+returns table (member_id uuid, name text, code text, expires_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+declare 人 public.members; 碼 text; 我名 text;
+  -- 不用 0、O、1、I、L，避免抄錯
+  字表 constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+begin
+  if not public.is_staff() then raise exception '沒有權限'; end if;
+  select m.name into 我名 from public.members m where m.user_id = auth.uid();
+  for 人 in select * from public.members m where m.id = any(p_members) and m.user_id is null loop
+    loop
+      碼 := '';
+      for i in 1..10 loop 碼 := 碼 || substr(字表, 1 + floor(random() * length(字表))::int, 1); end loop;
+      碼 := substr(碼, 1, 5) || '-' || substr(碼, 6, 5);
+      exit when not exists (select 1 from public.claim_codes c where c.code = 碼);
+    end loop;
+    insert into public.claim_codes as c (member_id, code, expires_at, created_by)
+      values (人.id, 碼, now() + interval '30 days', coalesce(我名, ''))
+      on conflict on constraint claim_codes_pkey do update set code = excluded.code, expires_at = excluded.expires_at, created_by = excluded.created_by, created_at = now();
+    member_id := 人.id; name := 人.name; code := 碼; expires_at := now() + interval '30 days';
+    return next;
+  end loop;
+end $$;
+
+-- 會員輸入認領碼連結自己的會員資料（碼用過即作廢）
+create or replace function public.claim_with_code(p_code text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare 碼 public.claim_codes; 整理 text;
+begin
+  if auth.uid() is null then raise exception '請先登入'; end if;
+  if public.my_member_id() is not null then raise exception '您的帳號已經連結會員資料'; end if;
+  整理 := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
+  if length(整理) <> 10 then raise exception '認領碼不正確'; end if;
+  整理 := substr(整理, 1, 5) || '-' || substr(整理, 6, 5);
+  select * into 碼 from public.claim_codes where code = 整理 for update;
+  if not found or 碼.expires_at < now() then raise exception '認領碼不正確或已過期，請洽協會重新產生'; end if;
+  update public.members set user_id = auth.uid() where id = 碼.member_id and user_id is null;
+  if not found then raise exception '這筆會員資料已連結其他帳號，請洽協會'; end if;
+  delete from public.claim_codes where member_id = 碼.member_id;
+  update public.link_requests set status = '核准', member_id = 碼.member_id, reviewed_by = '認領碼', reviewed_at = now()
+    where user_id = auth.uid() and status = '待審';
+  return 碼.member_id;
+end $$;
+
+-- 會員送出連結申請（沒有認領碼時用）
+create or replace function public.submit_link_request(p_name text, p_agency text, p_unit text, p_title text,
+  p_office_email text, p_phone text, p_note text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare 編號 uuid; 登入信箱 text;
+begin
+  if auth.uid() is null then raise exception '請先登入'; end if;
+  if public.my_member_id() is not null then raise exception '您的帳號已經連結會員資料'; end if;
+  if exists (select 1 from public.link_requests where user_id = auth.uid() and status = '待審') then raise exception '您已有一件連結申請在審核中'; end if;
+  select lower(email) into 登入信箱 from auth.users where id = auth.uid();
+  insert into public.link_requests (user_id, login_email, name, agency, unit, title, office_email, phone, note)
+    values (auth.uid(), coalesce(登入信箱, ''), trim(p_name), coalesce(p_agency, ''), coalesce(p_unit, ''), coalesce(p_title, ''),
+      lower(trim(coalesce(p_office_email, ''))), coalesce(p_phone, ''), coalesce(p_note, ''))
+    returning id into 編號;
+  return 編號;
+end $$;
+
+-- 幹部核准連結申請：指定名冊上對應的會員（必須尚未連結帳號）
+create or replace function public.approve_link_request(p_request uuid, p_member uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare 申 public.link_requests; 我名 text;
+begin
+  if not public.is_staff() then raise exception '沒有權限'; end if;
+  select * into 申 from public.link_requests where id = p_request and status = '待審' for update;
+  if not found then raise exception '找不到待審的連結申請'; end if;
+  if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結其他會員資料'; end if;
+  update public.members set user_id = 申.user_id where id = p_member and user_id is null;
+  if not found then raise exception '這位會員已連結其他帳號，或找不到這位會員'; end if;
+  delete from public.claim_codes where member_id = p_member;
+  select name into 我名 from public.members where user_id = auth.uid();
+  update public.link_requests set status = '核准', member_id = p_member, reviewed_by = coalesce(我名, ''), reviewed_at = now() where id = 申.id;
+end $$;
+
+-- 幹部退回連結申請
+create or replace function public.reject_link_request(p_request uuid, p_reason text)
+returns void language plpgsql security definer set search_path = public as $$
+declare 我名 text;
+begin
+  if not public.is_staff() then raise exception '沒有權限'; end if;
+  select name into 我名 from public.members where user_id = auth.uid();
+  update public.link_requests set status = '退回', review_note = coalesce(p_reason, ''), reviewed_by = coalesce(我名, ''), reviewed_at = now()
+    where id = p_request and status = '待審';
+  if not found then raise exception '找不到待審的連結申請'; end if;
+end $$;
+
+-- 幹部解除某位會員的帳號連結（例如連錯人、會員換了個人 Email）
+create or replace function public.unlink_member(p_member uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception '只有理事長或秘書長可以解除帳號連結'; end if;
+  update public.members set user_id = null where id = p_member;
+end $$;
+
+-- 函式執行權限：只開給登入者（函式內再檢查身分）
+revoke execute on function public.generate_claim_codes(uuid[]), public.claim_with_code(text),
+  public.submit_link_request(text, text, text, text, text, text, text), public.approve_link_request(uuid, uuid),
+  public.reject_link_request(uuid, text), public.unlink_member(uuid) from public, anon;
+grant execute on function public.generate_claim_codes(uuid[]), public.claim_with_code(text),
+  public.submit_link_request(text, text, text, text, text, text, text), public.approve_link_request(uuid, uuid),
+  public.reject_link_request(uuid, text), public.unlink_member(uuid) to authenticated;

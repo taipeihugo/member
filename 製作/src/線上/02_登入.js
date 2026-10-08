@@ -3,7 +3,8 @@
 const 線上 = {
   會員: null,      // 自己的會員資料（members 一筆）；還不是會員時為 null
   幹部: "",        // 幹部角色：理事長、秘書長、會計、承辦人；一般會員為空字串
-  申請: null       // 最近一次入會申請（還不是會員時用）
+  申請: null,      // 最近一次入會申請（還不是會員時用）
+  連結申請: null   // 最近一次帳號連結申請（還沒連結會員資料時用）
 };
 
 // 是否為幹部
@@ -59,14 +60,14 @@ function 顯示登入頁(訊息) {
       h("button", { class: "鈕 主", type: "button", id: "登入鈕", onclick: 送出 }, "登入"),
       h("button", { class: "鈕 文字", type: "button", onclick: 顯示註冊頁 }, "第一次使用？註冊帳號"),
       h("button", { class: "鈕 文字", type: "button", onclick: 顯示忘記密碼頁 }, "忘記密碼")),
-    h("p", { class: "小字 次要字" }, "會員請用協會名冊上的 Email 註冊，註冊後會自動連結您的會員資料；還不是會員的同仁，註冊後可線上申請入會。為保護個資，登入資訊不會留在瀏覽器，重新整理頁面需要重新登入。")
+    h("p", { class: "小字 次要字" }, "請用您的個人 Email 註冊（公務信箱收不到外部驗證信）。註冊登入後，輸入協會給您的「認領碼」或送出「連結申請」，就能連到名冊上的會員資料；還不是會員的同仁可線上申請入會。為保護個資，登入資訊不會留在瀏覽器，重新整理頁面需要重新登入。")
   ]);
   信.欄.focus();
 }
 
 // 顯示註冊畫面
 function 顯示註冊頁() {
-  const 信 = 輸入欄("Email（請用名冊上的 Email）", { id: "註冊信箱", type: "email", autocomplete: "username" });
+  const 信 = 輸入欄("個人 Email（收得到外部信的信箱）", { id: "註冊信箱", type: "email", autocomplete: "username" });
   const 密 = 輸入欄("密碼（至少 8 個字元）", { id: "註冊密碼", type: "password", autocomplete: "new-password" });
   const 再 = 輸入欄("再輸入一次密碼", { id: "註冊再次", type: "password", autocomplete: "new-password" });
   const 錯 = h("div", { role: "alert" });
@@ -151,7 +152,7 @@ async function 登入後() {
     await 呼叫("link_my_member");
     await 重新讀取我的資料();
     更新外框();
-    前往(線上.會員 ? "我的資料" : "入會申請");
+    前往(線上.會員 ? "我的資料" : "連結會員資料");
   } catch (e) {
     清除登入();
     顯示登入頁(e.message);
@@ -164,8 +165,9 @@ async function 重新讀取我的資料() {
   線上.會員 = 我[0] || null;
   線上.幹部 = 線上.會員 && 線上.會員.status === "有效" ? 線上.會員.staff_role || "" : "";
   if (!線上.會員) {
-    const 申 = await 查詢("applications", { user_id: 連線.帳號.id }, "created_at.desc");
+    const [申, 連] = await Promise.all([查詢("applications", { user_id: 連線.帳號.id }, "created_at.desc"), 查詢("link_requests", { user_id: 連線.帳號.id }, "created_at.desc")]);
     線上.申請 = 申[0] || null;
+    線上.連結申請 = 連[0] || null;
   }
 }
 

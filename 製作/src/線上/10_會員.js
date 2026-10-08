@@ -156,6 +156,63 @@ function 報名對話框(a) {
   }
 });
 
+註冊頁面("連結會員資料", {
+  圖示: "🔗",
+  可見: function () { return !線上.會員; },
+  說明: "您的帳號（個人 Email）還沒連到名冊上的會員資料。有協會給的認領碼，輸入後立即連結；沒有的話，送出連結申請，由協會核對名冊後連結。還不是會員，請改用「入會申請」。",
+  繪製: function (容器) {
+    容器.appendChild(頁首("連結會員資料"));
+    容器.appendChild(h("p", { class: "次要字" }, "登入帳號：" + 連線.帳號.email + "。已經是協會會員的同仁，請用下面任一種方式連到名冊上的資料；還不是會員請到「入會申請」。"));
+    // 方式一：認領碼
+    const 碼 = h("input", { id: "認領碼", placeholder: "例：ABCDE-FGH23", autocomplete: "off", style: "text-transform:uppercase;max-width:220px" });
+    const 碼訊 = h("p", { class: "錯誤", role: "alert" });
+    const 用碼 = async function () {
+      碼訊.textContent = "";
+      try {
+        await 呼叫("claim_with_code", { p_code: 碼.value });
+        await 重新讀取我的資料();
+        更新外框();
+        提示("已連結您的會員資料");
+        前往("我的資料");
+      } catch (e) { 碼訊.textContent = e.message; }
+    };
+    碼.addEventListener("keydown", function (e) { if (e.key === "Enter") 用碼(); });
+    容器.appendChild(h("div", { class: "卡" }, h("h2", null, "方式一：輸入認領碼（立即連結）"),
+      h("p", { class: "次要字" }, "認領碼由協會幹部提供（10 碼英數字，30 天內有效，用一次就失效）。"),
+      h("div", { class: "表工具列" }, 碼, h("button", { class: "鈕 主", type: "button", id: "認領鈕", onclick: 用碼 }, "連結")), 碼訊));
+    // 方式二：連結申請
+    const 申 = 線上.連結申請;
+    const 卡 = h("div", { class: "卡", style: "margin-top:1rem" }, h("h2", null, "方式二：沒有認領碼，送出連結申請"));
+    容器.appendChild(卡);
+    if (申 && 申.status === "待審") {
+      卡.appendChild(h("p", null, "您於 " + 民國時間(申.created_at) + " 送出的連結申請正在審核，協會核對名冊後就會連結，屆時重新登入即可。"));
+      return;
+    }
+    if (申 && 申.status === "退回") 卡.appendChild(h("p", { class: "提醒" }, "上次的連結申請已退回" + (申.review_note ? "：" + 申.review_note : "") + "。可修正後重新送出。"));
+    const 欄位們 = [
+      { key: "name", 標題: "姓名", 必填: true }, { key: "agency", 標題: "服務機關", 類型: "選單", 選項: 預設服務機關.concat(["其他"]), 必填: true },
+      { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" },
+      { key: "office_email", 標題: "公務電子郵件信箱（名冊上的）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
+      { key: "note", 標題: "備註", 類型: "多行", 行數: 2 }
+    ];
+    const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, 申 ? 申[f.key] : ""); }));
+    const 錯 = h("p", { class: "錯誤", role: "alert" });
+    卡.appendChild(h("p", { class: "次要字" }, "請填寫和協會名冊一致的資料，協會核對後連結。"));
+    卡.appendChild(表單);
+    卡.appendChild(錯);
+    卡.appendChild(h("button", { class: "鈕", type: "button", id: "送出連結申請鈕", onclick: async function () {
+      const 值 = 讀表單(表單, 欄位們);
+      if (!值.name || !值.agency) return (錯.textContent = "請填寫姓名與服務機關");
+      try {
+        await 呼叫("submit_link_request", { p_name: 值.name, p_agency: 值.agency, p_unit: 值.unit, p_title: 值.title, p_office_email: 值.office_email, p_phone: 值.phone, p_note: 值.note });
+        await 重新讀取我的資料();
+        提示("已送出連結申請");
+        重新繪製();
+      } catch (e) { 錯.textContent = e.message; }
+    } }, "送出連結申請"));
+  }
+});
+
 註冊頁面("入會申請", {
   圖示: "✍",
   可見: function () { return !線上.會員; },
@@ -174,20 +231,21 @@ function 報名對話框(a) {
       { key: "name", 標題: "姓名", 必填: true }, { key: "gender", 標題: "性別", 類型: "選單", 選項: ["女", "男"] },
       { key: "employee_no", 標題: "員工編號" }, { key: "agency", 標題: "服務機關", 類型: "選單", 選項: 預設服務機關.concat(["其他"]), 必填: true },
       { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" }, { key: "phone", 標題: "公務電話" },
+      { key: "email", 標題: "公務電子郵件信箱", 類型: "Email", 說明: "列入名冊用；登入仍用您註冊的個人 Email" },
       { key: "note", 標題: "備註", 類型: "多行", 行數: 2 },
       { key: "同意", 標題: "個人資料告知", 類型: "勾選", 勾選文字: "我同意協會僅為辦理入會及會務蒐集、處理及利用以上資料" }
     ];
     const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, 申 ? 申[f.key] : ""); }));
     const 錯 = h("p", { class: "錯誤", role: "alert" });
     容器.appendChild(h("div", { class: "卡" },
-      h("p", null, "申請帳號：" + 連線.帳號.email + "（核准後此 Email 即為您的會員 Email）"), 表單, 錯,
+      h("p", null, "登入帳號：" + 連線.帳號.email + "。已經是會員的同仁請改用「連結會員資料」，不用重新申請。"), 表單, 錯,
       h("button", { class: "鈕 主", type: "button", id: "送出申請鈕", onclick: async function () {
         const 值 = 讀表單(表單, 欄位們);
         if (!值.name || !值.agency) return (錯.textContent = "請填寫姓名與服務機關");
         if (!值.同意) return (錯.textContent = "請勾選同意個人資料告知");
         try {
           await 呼叫("submit_application", { p_name: 值.name, p_gender: 值.gender, p_employee_no: 值.employee_no, p_agency: 值.agency,
-            p_unit: 值.unit, p_title: 值.title, p_phone: 值.phone, p_note: 值.note });
+            p_unit: 值.unit, p_title: 值.title, p_phone: 值.phone, p_note: 值.note, p_email: 值.email });
           await 重新讀取我的資料();
           提示("已送出入會申請");
           重新繪製();

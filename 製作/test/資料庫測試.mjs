@@ -137,8 +137,51 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   const 新會員 = (await 以身分(db, 帳.申請人, () => db.query("select name, status, member_no from public.members"))).rows;
   檢查(新會員.length === 1 && 新會員[0].status === "有效" && /^M\d{4}$/.test(新會員[0].member_no), "核准後成為有效會員並自動編會員編號、連結帳號");
 
-  console.log("八、未登入者");
-  for (const 表 of ["members", "activities", "registrations", "fees", "applications"]) {
+  console.log("八、個人 Email 帳號連結：認領碼與連結申請");
+  // 名冊上的公務信箱收不到外部信；會員用個人信箱註冊
+  const 丁id = (await 秘("insert into public.members (name, agency, email) values ('丁會員', '財政部賦稅署', 'ding@mail.mof.gov.tw') returning id")).rows[0].id;
+  const 戊id = (await 秘("insert into public.members (name, agency, email) values ('戊會員', '財政部關務署', 'wu@mail.mof.gov.tw') returning id")).rows[0].id;
+  const 新帳 = async (email) => { const u = { id: crypto.randomUUID(), email }; await db.query("insert into auth.users values ($1, $2, now())", [u.id, email]); return u; };
+  const 丁帳 = await 新帳("ding.personal@gmail.example"), 戊帳 = await 新帳("wu.personal@gmail.example"), 冒充 = await 新帳("fake@gmail.example");
+  檢查((await 以身分(db, 丁帳, () => db.query("select public.link_my_member() as id"))).rows[0].id === null, "個人 Email 與名冊不同時，不會自動連結");
+  檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select * from public.generate_claim_codes(array[$1::uuid])", [丁id])), "沒有權限"), "會員不能自己產生認領碼");
+  const 碼們 = (await 秘("select * from public.generate_claim_codes(array[$1::uuid, $2::uuid, $3::uuid])", [丁id, 戊id, 甲id])).rows;
+  檢查(碼們.length === 2 && 碼們.every((c) => /^[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/.test(c.code)), "幹部產生認領碼（已連結帳號的人略過，格式 XXXXX-XXXXX）");
+  檢查((await 以身分(db, 丁帳, () => db.query("select count(*)::int as n from public.claim_codes"))).rows[0].n === 0, "會員看不到認領碼表");
+  const 丁碼 = 碼們.find((c) => c.member_id === 丁id).code;
+  檢查(await 應失敗(() => 以身分(db, 冒充, () => db.query("select public.claim_with_code('ABCDE-FGHJK')")), "不正確"), "亂猜的認領碼無效");
+  await 以身分(db, 丁帳, () => db.query("select public.claim_with_code($1)", [丁碼.toLowerCase().replace("-", " ")]));
+  檢查((await 以身分(db, 丁帳, () => db.query("select name from public.members"))).rows.map((r) => r.name).join() === "丁會員", "輸入認領碼（大小寫、空格不拘）後連結成功，只看得到自己");
+  檢查(await 應失敗(() => 以身分(db, 冒充, () => db.query("select public.claim_with_code($1)", [丁碼])), "不正確"), "認領碼用過即作廢");
+  await db.query("update public.claim_codes set expires_at = now() - interval '1 day' where member_id = $1", [戊id]);
+  檢查(await 應失敗(() => 以身分(db, 戊帳, () => db.query("select public.claim_with_code($1)", [碼們.find((c) => c.member_id === 戊id).code])), "過期"), "過期的認領碼無效");
+  // 沒有認領碼：送連結申請，幹部核准
+  const 申請id = (await 以身分(db, 戊帳, () => db.query("select public.submit_link_request('戊會員', '財政部關務署', '稽查組', '科員', 'wu@mail.mof.gov.tw', '', '') as id"))).rows[0].id;
+  檢查(await 應失敗(() => 以身分(db, 戊帳, () => db.query("select public.submit_link_request('戊會員', '', '', '', '', '', '')")), "審核中"), "連結申請審核中不能重複送");
+  檢查((await 以身分(db, 冒充, () => db.query("select count(*)::int as n from public.link_requests"))).rows[0].n === 0, "其他人看不到別人的連結申請");
+  檢查(await 應失敗(() => 以身分(db, 戊帳, () => db.query("select public.approve_link_request($1, $2)", [申請id, 戊id])), "沒有權限"), "申請人不能自己核准連結");
+  檢查(await 應失敗(() => 秘("select public.approve_link_request($1, $2)", [申請id, 丁id]), "已連結"), "不能把申請連到已有帳號的會員");
+  await 秘("select public.approve_link_request($1, $2)", [申請id, 戊id]);
+  檢查((await 以身分(db, 戊帳, () => db.query("select name, email from public.members"))).rows.map((r) => r.name + r.email).join() === "戊會員wu@mail.mof.gov.tw", "幹部核准後連結成功，名冊公務信箱不變");
+  檢查((await db.query("select count(*)::int as n from public.claim_codes where member_id = $1", [戊id])).rows[0].n === 0, "核准連結後舊認領碼作廢");
+  檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select public.unlink_member($1)", [丁id])), "只有理事長或秘書長"), "一般會員不能解除連結");
+  await 秘("select public.unlink_member($1)", [丁id]);
+  檢查((await 以身分(db, 丁帳, () => db.query("select count(*)::int as n from public.members"))).rows[0].n === 0, "秘書長解除連結後，該帳號看不到會員資料");
+  // 入會申請可填公務信箱
+  const 己帳 = await 新帳("ji.personal@gmail.example");
+  const 己申 = (await 以身分(db, 己帳, () => db.query("select public.submit_application('己同仁', '男', '', '財政部國庫署', '', '', '', '', 'JI@mail.mof.gov.tw') as id"))).rows[0].id;
+  await 秘("select public.approve_application($1)", [己申]);
+  檢查((await 以身分(db, 己帳, () => db.query("select email from public.members"))).rows[0].email === "ji@mail.mof.gov.tw", "入會申請填的公務信箱寫入名冊，帳號用個人信箱登入");
+
+  // 第一位幹部用個人信箱登入、名冊用公務信箱
+  const 庚帳 = await 新帳("geng.personal@gmail.example");
+  await 秘("insert into public.members (name, email) values ('庚理事長', 'geng@mail.mof.gov.tw')");
+  console.log("  " + (await db.query("select public.make_staff('geng.personal@gmail.example', '理事長', '', 'geng@mail.mof.gov.tw') as r")).rows[0].r);
+  const 庚 = (await 以身分(db, 庚帳, () => db.query("select name, email, staff_role from public.members where user_id = auth.uid()"))).rows[0];
+  檢查(庚 && 庚.name === "庚理事長" && 庚.email === "geng@mail.mof.gov.tw" && 庚.staff_role === "理事長", "make_staff 可用個人登入信箱＋名冊公務信箱設定幹部（不重複建立）");
+
+  console.log("九、未登入者");
+  for (const 表 of ["members", "activities", "registrations", "fees", "applications", "claim_codes", "link_requests"]) {
     檢查(await 應失敗(() => 以身分(db, null, () => db.query("select * from public." + 表))), "未登入者不能讀 " + 表);
   }
   檢查(await 應失敗(() => 以身分(db, null, () => db.query("select public.register_activity($1, '葷', '')", [活]))), "未登入者不能呼叫報名函式");

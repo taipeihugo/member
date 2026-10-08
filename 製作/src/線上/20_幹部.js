@@ -5,7 +5,7 @@
   圖示: "👥",
   分隔: true,
   可見: 是幹部,
-  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長能指派。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同的會員會更新資料，其他新增。會員用名冊上的 Email 註冊帳號後，就會自動連結。",
+  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長能指派。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同的會員會更新資料，其他新增。會員用個人 Email 註冊後，有兩種連結方式：勾選會員按「產生認領碼」交給本人輸入，或由會員送「連結申請」再到「申請審核」核准。「帳號」欄可篩出還沒連結的人。",
   繪製: async function (容器) {
     let 名冊 = await 查詢("members", null, "member_no.asc");
     const 統計 = h("p", { class: "次要字" });
@@ -37,7 +37,10 @@
         { 標題: "帳號", 選項: ["已註冊", "未註冊"], 取值: function (r) { return r.user_id ? "已註冊" : "未註冊"; } }
       ],
       點列: function (r) { 編輯線上會員(r, 機關們(), 重載); },
-      批次: [{ 文字: "複製 Email 收件者", 動作: function (列) { 顯示信箱(列); } }]
+      批次: [
+        { 文字: "產生認領碼", 動作: function (列) { 產生認領碼(列); } },
+        { 文字: "複製 Email 收件者", 動作: function (列) { 顯示信箱(列); } }
+      ]
     });
     容器.appendChild(頁首("會員管理", [
       h("button", { class: "鈕 主", type: "button", id: "新增會員鈕", onclick: function () { 編輯線上會員(null, 機關們(), 重載); } }, "＋ 新增會員"),
@@ -75,10 +78,15 @@ function 編輯線上會員(原, 機關們, 完成後) {
   const 初值 = 原 ? Object.assign({}, 原, { 理監事: 原.board_role ? 原.board_role + "|" + (原.board_title || 原.board_role) : "" }) : { status: "有效", join_date: 今天(), 理監事: "" };
   const 選項 = {};
   if (原 && 是管理者()) {
-    選項.額外按鈕 = [{ 文字: "刪除會員", 危: true, 動作: async function (關) {
+    選項.額外按鈕 = [];
+    if (原.user_id) 選項.額外按鈕.push({ 文字: "解除帳號連結", 動作: async function (關) {
+      if (!(await 確認("解除「" + 原.name + "」的帳號連結？他之後要重新用認領碼或連結申請連結。", "解除連結"))) return false;
+      try { await 呼叫("unlink_member", { p_member: 原.id }); 關(null); 提示("已解除連結"); 完成後(); } catch (e) { 提示(e.message, true); return false; }
+    } });
+    選項.額外按鈕.push({ 文字: "刪除會員", 危: true, 動作: async function (關) {
       if (!(await 確認("確定刪除「" + 原.name + "」？報名與繳費紀錄會一併刪除。建議改用會籍「退會」保留紀錄。", "刪除"))) return false;
       try { await 刪除("members", { id: 原.id }); 關(null); 提示("已刪除"); 完成後(); } catch (e) { 提示(e.message, true); return false; }
-    } }];
+    } });
   }
   return 表單對話框(原 ? "編輯會員：" + 原.name : "新增會員", 欄位們, 初值, async function (值) {
     const [角, 稱] = (值.理監事 || "|").split("|");
@@ -176,45 +184,129 @@ async function 匯入線上名冊(名冊, 完成後) {
   完成後();
 }
 
-// ===== 入會審核 =====
-註冊頁面("入會審核", {
+// ===== 認領碼 =====
+
+// 替勾選的會員產生認領碼（已連結帳號的人略過），顯示清單並可列印紙條、匯出
+async function 產生認領碼(列) {
+  const 未連 = 列.filter(function (m) { return !m.user_id; });
+  if (!未連.length) return 提示("勾選的會員都已連結帳號", true);
+  if (!(await 確認("替 " + 未連.length + " 位尚未連結帳號的會員產生認領碼？（30 天有效；已有的舊碼會作廢）", "產生"))) return;
+  let 碼們;
+  try { 碼們 = await 呼叫("generate_claim_codes", { p_members: 未連.map(function (m) { return m.id; }) }); } catch (e) { return 提示(e.message, true); }
+  const 依編號 = {};
+  未連.forEach(function (m) { 依編號[m.id] = m; });
+  const 列們 = 碼們.map(function (c) { const m = 依編號[c.member_id] || {}; return { 姓名: c.name, 機關: m.agency || "", 單位: m.unit || "", 碼: c.code, 到期: 民國(String(c.expires_at).slice(0, 10)) }; });
+  const 網址 = location.origin + location.pathname;
+  // 一張紙條：給會員的認領碼與操作步驟
+  const 紙條 = function (r) {
+    return h("div", { style: "border:1px dashed #555;padding:5mm;margin-bottom:4mm;page-break-inside:avoid" },
+      h("strong", null, "財政部公務人員協會　會員專區認領碼"),
+      h("p", { style: "margin:2mm 0" }, r.姓名 + "　" + r.機關 + " " + r.單位),
+      h("p", { style: "margin:2mm 0;font-size:16pt;letter-spacing:2px" }, r.碼),
+      h("p", { style: "margin:0;font-size:9pt" }, "1. 到 " + 網址 + " 用個人 Email 註冊並驗證　2. 登入後在「連結會員資料」輸入認領碼　（" + r.到期 + " 前有效，請勿交給他人）"));
+  };
+  對話框("認領碼（" + 列們.length + " 人）", [
+    h("p", { class: "提醒" }, "認領碼等同開門鑰匙，請只交給會員本人（當面、紙條或私訊），不要張貼在群組。關閉這個視窗後無法再看到，需要時可重新產生。"),
+    h("div", { class: "表捲" }, h("table", { class: "表", id: "認領碼表" },
+      h("thead", null, h("tr", null, ["姓名", "服務機關", "服務單位", "認領碼", "有效期限"].map(function (t) { return h("th", null, t); }))),
+      h("tbody", null, 列們.map(function (r) { return h("tr", null, h("td", null, r.姓名), h("td", null, r.機關), h("td", null, r.單位), h("td", { style: "font-family:monospace;font-size:1.05rem" }, r.碼), h("td", null, r.到期)); }))))
+  ], [
+    { 文字: "匯出 Excel", 動作: function () { 匯出表格("認領碼_" + 今天(), [["姓名", "服務機關", "服務單位", "認領碼", "有效期限"]].concat(列們.map(function (r) { return [r.姓名, r.機關, r.單位, r.碼, r.到期]; })), "xlsx"); return false; } },
+    { 文字: "列印紙條", 動作: function () { 列印(h("div", null, 列們.map(紙條)), false); return false; } },
+    { 文字: "關閉", 主: true }
+  ], { 寬: true });
+}
+
+// ===== 申請審核（入會申請、帳號連結申請）=====
+註冊頁面("申請審核", {
   圖示: "✅",
   可見: 是幹部,
-  說明: "同仁在會員專區註冊帳號後送出的入會申請。按「核准」會建立會員資料並連結他的帳號（名冊已有相同 Email 的會員時直接連結）；按「退回」可填寫原因，申請人登入後看得到。",
-  繪製: async function (容器) {
-    const 申們 = await 查詢("applications", null, "created_at.desc");
-    const 重整 = function () { 重新繪製(); };
-    容器.appendChild(頁首("入會審核"));
-    const 待 = 申們.filter(function (a) { return a.status === "待審"; });
-    容器.appendChild(h("p", { class: "次要字" }, "待審 " + 待.length + " 件"));
-    const 表 = 資料表({
-      匯出檔名: "入會申請",
-      資料: function () { return 申們; },
-      預設排序: { key: "created_at", 反向: true },
-      欄位: [
-        { key: "created_at", 標題: "申請時間", 顯示: function (r) { return 民國時間(r.created_at); } },
-        { key: "name", 標題: "姓名" }, { key: "gender", 標題: "性別" }, { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" },
-        { key: "title", 標題: "職稱" }, { key: "email", 標題: "Email" },
-        { key: "status", 標題: "狀態", 顯示: function (r) { return h("span", { class: "標記 " + ({ 待審: "金", 核准: "成", 退回: "危" }[r.status]) }, r.status); } },
-        { key: "操作", 標題: "", 不排序: true, 不匯出: true, 顯示: function (r) {
-          if (r.status !== "待審") return h("span", { class: "小字 次要字" }, (r.reviewed_by || "") + " " + 民國時間(r.reviewed_at));
-          return [h("button", { class: "鈕 小 主", type: "button", onclick: async function (e) {
-            e.stopPropagation();
-            if (!(await 確認("核准「" + r.name + "」入會？", "核准"))) return;
-            try { await 呼叫("approve_application", { p_application: r.id }); 提示("已核准"); 重整(); } catch (err) { 提示(err.message, true); }
-          } }, "核准"), " ", h("button", { class: "鈕 小 危", type: "button", onclick: function (e) {
-            e.stopPropagation();
-            表單對話框("退回申請：" + r.name, [{ key: "原因", 標題: "退回原因（申請人看得到）", 類型: "多行", 行數: 3, 必填: true }], {}, async function (值) {
-              try { await 呼叫("reject_application", { p_application: r.id, p_reason: 值.原因 }); 提示("已退回"); 重整(); } catch (err) { return err.message; }
-            });
-          } }, "退回")];
-        } }
-      ],
-      篩選: [{ 標題: "狀態", 選項: ["待審", "核准", "退回"], 取值: function (r) { return r.status; } }]
+  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後建立會員資料並連結帳號（名冊已有相同公務信箱的會員時直接連結）。退回時填寫原因，申請人登入後看得到。",
+  繪製: async function (容器, 參數) {
+    const [申們, 連們, 名冊] = await Promise.all([查詢("applications", null, "created_at.desc"), 查詢("link_requests", null, "created_at.desc"), 查詢("members", null, "member_no.asc")]);
+    const 待連 = 連們.filter(function (a) { return a.status === "待審"; }).length;
+    const 待入 = 申們.filter(function (a) { return a.status === "待審"; }).length;
+    容器.appendChild(頁首("申請審核"));
+    const 頁籤 = 建立頁籤(["帳號連結（待審 " + 待連 + "）", "入會申請（待審 " + 待入 + "）"], 參數.頁籤, function (名, 區) {
+      if (名.indexOf("帳號連結") === 0) 繪製連結審核(區, 連們, 名冊);
+      else 繪製入會審核(區, 申們);
     });
-    容器.appendChild(表.元素);
+    容器.appendChild(頁籤.元素);
   }
 });
+
+// 狀態標記
+function 審核狀態(r) {
+  return h("span", { class: "標記 " + ({ 待審: "金", 核准: "成", 退回: "危" }[r.status]) }, r.status);
+}
+
+// 「帳號連結」頁籤
+function 繪製連結審核(區, 連們, 名冊) {
+  區.appendChild(資料表({
+    匯出檔名: "帳號連結申請",
+    資料: function () { return 連們; },
+    預設排序: { key: "created_at", 反向: true },
+    欄位: [
+      { key: "created_at", 標題: "申請時間", 顯示: function (r) { return 民國時間(r.created_at); } },
+      { key: "name", 標題: "姓名" }, { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" },
+      { key: "office_email", 標題: "公務信箱" }, { key: "login_email", 標題: "登入 Email（個人）" },
+      { key: "status", 標題: "狀態", 顯示: 審核狀態 },
+      { key: "操作", 標題: "", 不排序: true, 不匯出: true, 顯示: function (r) {
+        if (r.status !== "待審") return h("span", { class: "小字 次要字" }, (r.reviewed_by || "") + " " + 民國時間(r.reviewed_at));
+        return [h("button", { class: "鈕 小 主", type: "button", onclick: function (e) { e.stopPropagation(); 核准連結(r, 名冊); } }, "核准"), " ",
+          h("button", { class: "鈕 小 危", type: "button", onclick: function (e) { e.stopPropagation(); 退回申請("reject_link_request", r); } }, "退回")];
+      } }
+    ],
+    篩選: [{ 標題: "狀態", 選項: ["待審", "核准", "退回"], 取值: function (r) { return r.status; } }],
+    空白文字: "沒有帳號連結申請"
+  }).元素);
+}
+
+// 核准連結：選名冊上對應的會員（預先選公務信箱相同、或姓名相同的人）
+function 核准連結(r, 名冊) {
+  const 可選 = 名冊.filter(function (m) { return !m.user_id; });
+  const 建議 = 可選.find(function (m) { return r.office_email && m.email === r.office_email; }) ||
+    可選.find(function (m) { return m.name === r.name && m.agency === r.agency; }) || 可選.find(function (m) { return m.name === r.name; });
+  表單對話框("核准帳號連結：" + r.name, [
+    { key: "member", 標題: "對應到名冊上的會員（只列出尚未連結帳號的人）", 類型: "選單", 必填: true, 寬: true,
+      選項: 可選.map(function (m) { return { 值: m.id, 字: m.member_no + " " + m.name + "（" + (m.agency || "") + " " + (m.unit || "") + "，" + (m.email || "無信箱") + "）" }; }) }
+  ], { member: 建議 ? 建議.id : "" }, async function (值) {
+    try { await 呼叫("approve_link_request", { p_request: r.id, p_member: 值.member }); 提示("已連結：" + r.name); 重新繪製(); } catch (e) { return e.message; }
+  }, { 儲存文字: "核准連結" });
+}
+
+// 退回申請（入會或連結），需填原因
+function 退回申請(函式, r) {
+  表單對話框("退回申請：" + r.name, [{ key: "原因", 標題: "退回原因（申請人看得到）", 類型: "多行", 行數: 3, 必填: true }], {}, async function (值) {
+    const 參 = 函式 === "reject_application" ? { p_application: r.id, p_reason: 值.原因 } : { p_request: r.id, p_reason: 值.原因 };
+    try { await 呼叫(函式, 參); 提示("已退回"); 重新繪製(); } catch (err) { return err.message; }
+  });
+}
+
+// 「入會申請」頁籤
+function 繪製入會審核(區, 申們) {
+  區.appendChild(資料表({
+    匯出檔名: "入會申請",
+    資料: function () { return 申們; },
+    預設排序: { key: "created_at", 反向: true },
+    欄位: [
+      { key: "created_at", 標題: "申請時間", 顯示: function (r) { return 民國時間(r.created_at); } },
+      { key: "name", 標題: "姓名" }, { key: "gender", 標題: "性別" }, { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" },
+      { key: "title", 標題: "職稱" }, { key: "email", 標題: "公務信箱" },
+      { key: "status", 標題: "狀態", 顯示: 審核狀態 },
+      { key: "操作", 標題: "", 不排序: true, 不匯出: true, 顯示: function (r) {
+        if (r.status !== "待審") return h("span", { class: "小字 次要字" }, (r.reviewed_by || "") + " " + 民國時間(r.reviewed_at));
+        return [h("button", { class: "鈕 小 主", type: "button", onclick: async function (e) {
+          e.stopPropagation();
+          if (!(await 確認("核准「" + r.name + "」入會？", "核准"))) return;
+          try { await 呼叫("approve_application", { p_application: r.id }); 提示("已核准"); 重新繪製(); } catch (err) { 提示(err.message, true); }
+        } }, "核准"), " ", h("button", { class: "鈕 小 危", type: "button", onclick: function (e) { e.stopPropagation(); 退回申請("reject_application", r); } }, "退回")];
+      } }
+    ],
+    篩選: [{ 標題: "狀態", 選項: ["待審", "核准", "退回"], 取值: function (r) { return r.status; } }],
+    空白文字: "沒有入會申請"
+  }).元素);
+}
 
 // ===== 活動管理 =====
 註冊頁面("活動管理", {

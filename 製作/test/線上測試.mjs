@@ -186,7 +186,7 @@ try {
   await 截圖("專區_登入");
   await 註冊並登入("sec@example.org", "staffpass1");
   const 選單項 = (await page.locator("#側欄 button").allInnerTexts()).join();
-  檢查(選單項.includes("會員管理") && 選單項.includes("入會審核") && 選單項.includes("活動管理") && 選單項.includes("會費管理"), "秘書長登入後看得到幹部功能");
+  檢查(選單項.includes("會員管理") && 選單項.includes("申請審核") && 選單項.includes("活動管理") && 選單項.includes("會費管理"), "秘書長登入後看得到幹部功能");
 
   console.log("三、會員管理：匯入標準名冊（含理監事、會員代表）");
   await 選單("會員管理");
@@ -223,13 +223,37 @@ try {
   const 出 = path.join(輸出, "下載", "線上匯出.csv");
   fs.mkdirSync(path.dirname(出), { recursive: true });
   await dl.saveAs(出);
-  檢查(fs.readFileSync(出, "utf8").replace(/^﻿/, "").startsWith("姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱"), "匯出標準格式名冊");
+  檢查(fs.readFileSync(出, "utf8").replace(/^\uFEFF/, "").startsWith("姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱"), "匯出標準格式名冊");
+  // 產生認領碼（甲；秘書長已連結帳號會被略過）
+  await page.locator(".表工具列 select").nth(4).selectOption("未註冊");
+  await page.locator("#內容 tbody tr", { hasText: "甲會員" }).locator(".勾 input").check();
+  await page.locator(".批次列 button", { hasText: "產生認領碼" }).click();
+  await 框().locator("button", { hasText: "產生" }).click();
+  await page.waitForSelector("#認領碼表");
+  const 甲碼 = (await page.locator("#認領碼表 tbody td:nth-child(4)").first().innerText()).trim();
+  檢查(/^[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(甲碼), "幹部替會員產生認領碼（" + 甲碼 + "）");
+  await 截圖("專區_認領碼");
+  await 框().locator("button", { hasText: "列印紙條" }).click();
+  檢查((await page.evaluate(() => window.__T.狀態.最後列印 || "")).includes(甲碼), "可列印認領碼紙條");
+  await 框().locator("button", { hasText: "關閉" }).last().click();
   await page.click("#登出鈕");
 
-  console.log("四、一般會員：自動連結、我的資料、報名（葷素）");
-  await 註冊並登入("jia@example.org", "memberpass1");
+  console.log("四、一般會員：個人 Email 註冊、認領碼連結、我的資料、報名（葷素）");
+  await 註冊並登入("jia.home@gmail.example", "memberpass1");
+  await page.waitForSelector("#認領碼");
+  檢查((await page.locator("#側欄").innerText()).includes("連結會員資料"), "個人 Email 登入後先到「連結會員資料」");
+  await 截圖("專區_連結會員資料");
+  // 故意輸入錯的認領碼：伺服器回 400，瀏覽器會記一筆網路錯誤，這一筆是預期的
+  const 錯誤數 = 主控台錯誤.length;
+  await page.fill("#認領碼", "abcde-fghjk");
+  await page.click("#認領鈕");
+  await page.waitForSelector("text=認領碼不正確");
+  const 新增錯誤 = 主控台錯誤.splice(錯誤數);
+  檢查(新增錯誤.every((e) => /status of 400/.test(e)), "錯誤的認領碼被拒絕並顯示提示");
+  await page.fill("#認領碼", 甲碼.toLowerCase());
+  await page.click("#認領鈕");
   await page.waitForSelector("text=常務理事");
-  檢查((await page.locator("#內容").innerText()).includes("會員代表"), "會員登入後自動連結名冊，看得到自己的職務（常務理事、會員代表）");
+  檢查((await page.locator("#內容").innerText()).includes("會員代表"), "輸入認領碼後連結名冊，看得到自己的職務（常務理事、會員代表）");
   const 會員選單 = (await page.locator("#側欄 button").allInnerTexts()).join();
   檢查(!會員選單.includes("會員管理") && 會員選單.includes("活動報名") && 會員選單.includes("繳費紀錄"), "一般會員看不到幹部功能");
   const 可見會員 = await page.evaluate(async () => {
@@ -253,9 +277,20 @@ try {
   await 截圖("專區_活動報名");
   await page.click("#登出鈕");
 
-  console.log("五、非會員：線上入會申請");
-  await 註冊並登入("newbie@example.org", "newbiepass1");
+  console.log("五、沒有認領碼：送連結申請；非會員：線上入會申請");
+  await 註冊並登入("yi.home@gmail.example", "memberpass2");
+  await page.waitForSelector("#送出連結申請鈕");
+  await page.locator("[data-key='name']").fill("乙理事長");
+  await page.locator("[data-key='agency']").selectOption("財政部關務署");
+  await page.locator("[data-key='office_email']").fill("yi@example.org");
+  await page.click("#送出連結申請鈕");
+  await page.waitForSelector("text=連結申請正在審核");
+  檢查(true, "送出連結申請後顯示審核中");
+  await page.click("#登出鈕");
+  await 註冊並登入("newbie@gmail.example", "newbiepass1");
+  await 選單("入會申請");
   await page.waitForSelector("#送出申請鈕");
+  await page.locator("[data-key='email']").fill("newbie@mail.example.gov");
   await page.locator("[data-key='name']").fill("新進同仁");
   await page.locator("[data-key='agency']").selectOption("財政部財政資訊中心");
   await page.locator("[data-key='同意']").check();
@@ -267,8 +302,14 @@ try {
 
   console.log("六、幹部：審核、葷素統計、簽到、會費");
   await 登入("sec@example.org", "staffpass1");
-  await 選單("入會審核");
-  page.once("dialog", () => {});
+  await 選單("申請審核");
+  await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator("button", { hasText: "核准" }).click();
+  檢查((await 框().locator("[data-key='member'] option:checked").innerText()).includes("乙理事長"), "核准連結時自動預選名冊上對應的會員（公務信箱相同）");
+  await 截圖("專區_核准連結");
+  await 框().locator("button", { hasText: "核准連結" }).click();
+  await page.waitForSelector("text=已連結：乙理事長");
+  檢查((await db.query("select u.email from public.members m join auth.users u on u.id = m.user_id where m.email = 'yi@example.org'")).rows[0].email === "yi.home@gmail.example", "核准後乙的個人帳號連到名冊（公務信箱不變）");
+  await page.locator(".頁籤 button", { hasText: "入會申請" }).click();
   await page.locator("#內容 tbody tr", { hasText: "新進同仁" }).locator("button", { hasText: "核准" }).click();
   await 框().locator("button", { hasText: "核准" }).click();
   await page.waitForSelector("text=已核准");
@@ -300,14 +341,19 @@ try {
   await page.click("#登出鈕");
 
   console.log("七、會員看繳費紀錄、新會員登入");
-  await 登入("jia@example.org", "memberpass1");
+  await 登入("jia.home@gmail.example", "memberpass1");
   await 選單("繳費紀錄");
   await page.waitForSelector("text=115-0001");
   檢查(true, "會員看得到自己的繳費紀錄與收據號");
   await page.click("#登出鈕");
-  await 登入("newbie@example.org", "newbiepass1");
+  await 登入("yi.home@gmail.example", "memberpass2");
+  await page.waitForSelector("text=理事長");
+  檢查(true, "連結申請核准後，乙重新登入看到自己的資料");
+  await page.click("#登出鈕");
+  await 登入("newbie@gmail.example", "newbiepass1");
   await page.waitForSelector("text=新進同仁");
   檢查((await page.locator("#側欄").innerText()).includes("活動報名"), "核准後申請人重新登入即為會員");
+  檢查((await page.locator("#內容").innerText()).includes("newbie@mail.example.gov"), "名冊上記錄的是申請時填的公務信箱");
   // 手機寬度
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(200);
