@@ -81,11 +81,19 @@ function 顯示註冊頁() {
         if (密.欄.value.length < 8) return 錯.appendChild(h("p", { class: "錯誤" }, "密碼至少 8 個字元"));
         if (密.欄.value !== 再.欄.value) return 錯.appendChild(h("p", { class: "錯誤" }, "兩次輸入的密碼不一樣"));
         try {
-          const 已登入 = await 註冊帳號(email, 密.欄.value);
-          if (已登入) return 登入後();
+          const 結果 = await 註冊帳號(email, 密.欄.value);
+          if (結果 === "已登入") return 登入後();
+          if (結果 === "已註冊") {
+            置中卡片("這個 Email 已經註冊過了", [
+              h("p", null, email + " 已經註冊並完成驗證，請直接登入。忘記密碼可以用「忘記密碼」重設。"),
+              h("div", { class: "表工具列" },
+                h("button", { class: "鈕 主", type: "button", onclick: function () { 顯示登入頁(); } }, "去登入"),
+                h("button", { class: "鈕", type: "button", onclick: 顯示忘記密碼頁 }, "忘記密碼"))]);
+            return;
+          }
           置中卡片("請到信箱收驗證信", [
             h("p", null, "驗證信已寄到 " + email + "，請點信中的連結完成驗證，再回來登入。"),
-            h("p", { class: "小字 次要字" }, "沒收到？請看垃圾郵件匣，或幾分鐘後再試。"),
+            h("p", { class: "小字 次要字" }, "沒收到？請看垃圾郵件匣，或幾分鐘後再試。如果您之前已經註冊過，請直接登入或使用「忘記密碼」。"),
             h("button", { class: "鈕 主", type: "button", onclick: function () { 顯示登入頁(); } }, "回登入畫面")]);
         } catch (e) { 錯.appendChild(h("p", { class: "錯誤" }, e.message)); }
       } }, "註冊"),
@@ -112,44 +120,56 @@ function 顯示忘記密碼頁() {
   ]);
 }
 
-// 從信中連結回來：設定新密碼
+// 從重設密碼信的連結回來：設定新密碼。畫面明顯標出是哪個帳號；設定完要用新密碼重新登入
 function 顯示設定新密碼頁() {
   const 密 = 輸入欄("新密碼（至少 8 個字元）", { id: "新密碼", type: "password", autocomplete: "new-password" });
   const 再 = 輸入欄("再輸入一次", { id: "新密碼再次", type: "password", autocomplete: "new-password" });
   const 錯 = h("p", { class: "錯誤", role: "alert" });
   置中卡片("設定新密碼", [
+    h("p", { class: "提醒" }, "正在為 " + (連線.帳號 ? 連線.帳號.email : "") + " 設定新密碼。如果這不是您的 Email，請直接關閉這個頁面。"),
     h("div", { class: "表單" }, 密.元素, 再.元素), 錯,
-    h("button", { class: "鈕 主", type: "button", onclick: async function () {
+    h("button", { class: "鈕 主", type: "button", id: "儲存新密碼鈕", onclick: async function () {
       if (密.欄.value.length < 8) return (錯.textContent = "密碼至少 8 個字元");
       if (密.欄.value !== 再.欄.value) return (錯.textContent = "兩次輸入的密碼不一樣");
-      try { await 改密碼(密.欄.value); 提示("密碼已更新"); await 登入後(); } catch (e) { 錯.textContent = e.message; }
+      try {
+        await 改密碼(密.欄.value);
+        await 登出帳號();
+        顯示登入頁("密碼已更新，請用新密碼登入");
+      } catch (e) { 錯.textContent = e.message; }
     } }, "儲存新密碼")
   ]);
 }
 
-// 處理信中連結帶回來的憑證（網址 # 後面），處理完就從網址列移除
+// 處理信中連結帶回來的結果（網址 # 或 ? 後面），處理完就從網址列移除。
+// 為防止有人把「自己的登入憑證」做成連結騙別人點（之後輸入的認領碼就會連到對方帳號），
+// 驗證信連結一律不直接登入，只告知驗證完成、請用密碼登入；只有重設密碼連結會暫時使用憑證來設定新密碼。
 async function 處理信件連結() {
   const 參 = new URLSearchParams(location.hash.replace(/^#/, ""));
-  if (參.get("error_description")) {
+  const 查 = new URLSearchParams(location.search);
+  const 錯誤說明 = 參.get("error_description") || 查.get("error_description");
+  if (錯誤說明) {
     history.replaceState(null, "", 回到網址());
-    顯示登入頁("連結無效或已過期：" + 參.get("error_description"));
+    const 代碼 = 參.get("error_code") || 查.get("error_code") || "";
+    顯示登入頁(/otp_expired/.test(代碼) ? "連結已失效（可能已用過或超過時間），請重新寄送" : "連結無效：" + 錯誤說明);
     return true;
   }
   if (!參.get("access_token")) return false;
   const 類型 = 參.get("type");
-  設定憑證({ access_token: 參.get("access_token"), refresh_token: 參.get("refresh_token"), expires_in: 參.get("expires_in") });
   history.replaceState(null, "", 回到網址());
-  try { await 取得帳號(); } catch (e) { 顯示登入頁(e.message); return true; }
-  if (類型 === "recovery") 顯示設定新密碼頁();
-  else { 提示("Email 驗證完成"); await 登入後(); }
+  if (類型 !== "recovery") {
+    顯示登入頁("Email 驗證完成，請用 Email 與密碼登入");
+    return true;
+  }
+  設定憑證({ access_token: 參.get("access_token"), refresh_token: 參.get("refresh_token"), expires_in: 參.get("expires_in") });
+  try { await 取得帳號(); } catch (e) { 清除登入(); 顯示登入頁(e.message); return true; }
+  顯示設定新密碼頁();
   return true;
 }
 
-// 登入後：連結名冊、讀取自己的會員資料與幹部角色、入會申請狀態，然後進首頁
+// 登入後：讀取自己的會員資料與幹部角色、申請狀態，然後進首頁
 async function 登入後() {
   try {
     if (!連線.帳號) await 取得帳號();
-    await 呼叫("link_my_member");
     await 重新讀取我的資料();
     更新外框();
     前往(線上.會員 ? "我的資料" : "連結會員資料");
@@ -171,8 +191,12 @@ async function 重新讀取我的資料() {
   }
 }
 
-// 登出並回到登入畫面
+// 登出並回到登入畫面（先清掉畫面與記憶體中的資料，再通知伺服器）
 async function 登出() {
-  await 登出帳號();
+  const 舊憑證 = 連線.憑證;
+  清除登入();
   顯示登入頁("已登出");
+  if (舊憑證) {
+    try { await 請求("/auth/v1/logout", { 方法: "POST", 標頭: { Authorization: "Bearer " + 舊憑證 }, 不帶憑證: true }); } catch (e) { /* 已失效也沒關係 */ }
+  }
 }

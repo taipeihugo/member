@@ -13,6 +13,8 @@ const 輸出 = path.join(根目錄, "製作", "test", "output");
 const 截圖夾 = path.join(輸出, "截圖");
 const 專區夾 = path.join(輸出, "官網", "portal");
 const 網址 = "https://test.supabase.co";
+const 最多列數 = 25;      // 模擬 Supabase 的 Max rows（正式預設 1000，測試用小一點才測得到分頁）
+const 延遲 = {};          // 指定某個資料表回應延遲幾毫秒（測試換頁競態用）
 
 let 通過 = 0;
 const 失敗 = [];
@@ -40,7 +42,7 @@ const 帳號回應 = (u) => ({ access_token: 憑證(u), refresh_token: "r-" + u.
 function 條件SQL(參數, 值們) {
   const 條 = [];
   for (const [k, v] of 參數) {
-    if (k === "select" || k === "order") continue;
+    if (k === "select" || k === "order" || k === "limit" || k === "offset") continue;
     if (!/^[a-z_]+$/.test(k)) throw new Error("不支援的欄位 " + k);
     if (v.startsWith("eq.")) { 值們.push(v.slice(3)); 條.push(`"${k}" = $${值們.length}`); }
     else if (v.startsWith("in.(")) { 值們.push(JSON.parse("[" + v.slice(4, -1) + "]")); 條.push(`"${k}"::text = any($${值們.length})`); }
@@ -70,7 +72,15 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
     }
     const 表 = 路徑.match(/^\/rest\/v1\/([a-z_]+)$/)[1];
     const 值們 = [];
-    if (方法 === "GET") return (await db.query(`select * from public.${表}${條件SQL(參數, 值們)}${排序SQL(參數)}`, 值們)).rows;
+    if (方法 === "GET") {
+      // 比照 Supabase：一次最多回「最多列數」筆，超過的部分要用 limit／offset 分頁；Content-Range 告知總數
+      if (延遲[表]) await new Promise((r) => setTimeout(r, 延遲[表]));
+      const 全部 = (await db.query(`select * from public.${表}${條件SQL(參數, 值們)}${排序SQL(參數)}`, 值們)).rows;
+      const 起 = Number(參數.get("offset")) || 0;
+      const 筆 = Math.min(Number(參數.get("limit")) || 最多列數, 最多列數);
+      const 頁 = 全部.slice(起, 起 + 筆);
+      return { __列: 頁, __範圍: (頁.length ? 起 + "-" + (起 + 頁.length - 1) : "*") + "/" + 全部.length };
+    }
     if (方法 === "DELETE") return (await db.query(`delete from public.${表}${條件SQL(參數, 值們)} returning *`, 值們)).rows;
     if (方法 === "PATCH") {
       const 欄 = Object.keys(內容);
@@ -79,6 +89,9 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
     }
     if (方法 === "POST") {
       const 列 = [].concat(內容);
+      // 比照 PostgREST：一次新增多筆時，每筆的欄位必須完全相同
+      const 第一 = Object.keys(列[0] || {}).sort().join(",");
+      if (列.some((r) => Object.keys(r).sort().join(",") !== 第一)) throw Object.assign(new Error("All object keys must match"), { 狀態: 400 });
       const 結果 = [];
       for (const 筆 of 列) {
         const 欄 = Object.keys(筆);
@@ -93,7 +106,8 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
 // 處理登入 API（/auth/v1/…）
 async function 登入API(方法, 路徑, 參數, 內容, 使用者) {
   if (路徑 === "/auth/v1/signup") {
-    if (帳號們.has(內容.email)) throw Object.assign(new Error("User already registered"), { 狀態: 422 });
+    // 比照開啟 Email 驗證的 Supabase：已註冊的 Email 回一個沒有身分資料的假使用者（不報錯、不寄信）
+    if (帳號們.has(內容.email)) return { id: crypto.randomUUID(), email: 內容.email, identities: [] };
     const u = { id: crypto.randomUUID(), email: 內容.email, 密碼: 內容.password };
     帳號們.set(內容.email, u);
     // 模擬「使用者已點驗證信」：直接標記已驗證；註冊回應不含登入憑證（需驗證 Email 的設定）
@@ -127,14 +141,17 @@ async function 攔截(route) {
   try {
     const 結果 = u.pathname.startsWith("/auth/") ? await 登入API(req.method(), u.pathname, u.searchParams, 內容, 使用者)
       : await 資料API(req.method(), u.pathname, u.searchParams, 內容, 使用者);
-    await route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(結果) });
+    if (結果 && 結果.__列) {
+      await route.fulfill({ status: 200, headers: Object.assign({ "Content-Range": 結果.__範圍, "Access-Control-Expose-Headers": "Content-Range" }, cors), contentType: "application/json", body: JSON.stringify(結果.__列) });
+    } else {
+      await route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(結果) });
+    }
   } catch (e) {
     await route.fulfill({ status: e.狀態 || 400, headers: cors, contentType: "application/json", body: JSON.stringify({ message: e.message }) });
   }
 }
 
 // ===== 測試資料 =====
-await db.query("select public.make_staff('sec@example.org', '秘書長', '陳秘書')");
 await db.query(`insert into public.members (name, gender, agency, unit, title, email) values
   ('甲會員', '女', '財政部賦稅署', '稅制組', '科員', 'jia@example.org')`);
 await db.query(`insert into public.activities (name, date, deadline, capacity, waitlist, meal_option, location) values
@@ -181,10 +198,18 @@ try {
   檢查(!/gsscloud|叡揚|\bgss\b/i.test(html), "不含參考廠商名稱");
   檢查(fs.readFileSync(path.join(根目錄, "官網", "index.html"), "utf8").includes('href="portal/index.html"'), "官網選單有「會員專區」連結");
 
-  console.log("二、幹部第一次登入（make_staff 設定的 Email）");
+  console.log("二、第一位幹部：先註冊，再在 SQL Editor 執行 make_staff");
   await page.goto("file://" + path.join(專區夾, "index.html"));
   await 截圖("專區_登入");
   await 註冊並登入("sec@example.org", "staffpass1");
+  console.log("  " + (await db.query("select public.make_staff('sec@example.org', '秘書長', '陳秘書', 'sec@fia.example.gov') as r")).rows[0].r);
+  await page.click("#登出鈕");
+  // 同一個 Email 再註冊一次：開啟 Email 驗證時 Supabase 不報錯也不寄信，畫面要提醒直接登入
+  await page.click("text=第一次使用？註冊帳號");
+  await page.fill("#註冊信箱", "sec@example.org"); await page.fill("#註冊密碼", "whatever12"); await page.fill("#註冊再次", "whatever12");
+  await page.click("#註冊鈕");
+  檢查(await page.waitForSelector("text=這個 Email 已經註冊過了", { timeout: 5000 }).then(() => true, () => false), "已註冊的 Email 再註冊時，提示直接登入（不會誤以為有寄信）");
+  await 登入("sec@example.org", "staffpass1");
   const 選單項 = (await page.locator("#側欄 button").allInnerTexts()).join();
   檢查(選單項.includes("會員管理") && 選單項.includes("申請審核") && 選單項.includes("活動管理") && 選單項.includes("會費管理"), "秘書長登入後看得到幹部功能");
 
@@ -194,19 +219,26 @@ try {
   fs.writeFileSync(csv, "﻿姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱,理監事,會員代表\n" +
     "甲會員,0,財政部賦稅署,稽核組,專員,JIA@example.org,,是\n" +
     "乙理事長,1,財政部關務署,稽查組,科長,yi@example.org,理事長,是\n" +
-    "丙監事,0,財政部國庫署,國庫管理組,科員,bing@example.org,監事,\n");
+    "丙監事,0,財政部國庫署,國庫管理組,科員,bing@example.org,監事,\n" +
+    "丁候補,1,財政部國庫署,國庫管理組,科員,ding@example.org,候補理事,\n" +
+    "丙監事,0,財政部國庫署,國庫管理組,科員,BING@example.org,監事,\n" +
+    Array.from({ length: 30 }, (_, i) => "批次會員" + (i + 1) + ",1,財政部財政資訊中心,系統組,科員,batch" + (i + 1) + "@example.org,,\n").join(""));
   const [fc] = await Promise.all([page.waitForEvent("filechooser"), page.click("#匯入名冊鈕")]);
   await fc.setFiles(csv);
   await 框().waitFor();
-  檢查((await 框().innerText()).includes("新增 2 人、更新 1 人"), "Email 相同者更新、其他新增");
+  const 預覽 = await 框().innerText();
+  檢查(預覽.includes("新增 33 人、更新 1 人"), "Email 相同者更新、其他新增（檔案內重複的人合併）");
+  檢查(預覽.includes("候補理事") && 預覽.includes("已合併"), "預覽列出看不懂的理監事與檔案內重複的列");
   await 框().locator("button", { hasText: "開始匯入" }).click();
-  await page.waitForSelector("text=匯入完成");
+  await page.waitForSelector("text=匯入完成：新增 33、更新 1");
+  檢查(true, "混有看不懂理監事的列時，整批照樣匯入成功（欄位一致）");
   const 乙 = (await db.query("select board_role, board_title, is_representative from public.members where email = 'yi@example.org'")).rows[0];
   const 丙 = (await db.query("select board_role, is_representative from public.members where email = 'bing@example.org'")).rows[0];
   檢查(乙.board_role === "理事" && 乙.board_title === "理事長" && 乙.is_representative, "匯入：理事長＋會員代表");
   檢查(丙.board_role === "監事" && !丙.is_representative, "匯入：監事");
   await page.waitForTimeout(300);
-  檢查((await page.locator("#內容").innerText()).includes("理事 1 人、監事 1 人、會員代表 2 人"), "匯入後人數統計即時更新");
+  檢查((await page.locator("#內容").innerText()).includes("有效會員 35 人；理事 1 人、監事 1 人、會員代表 2 人"), "匯入後人數統計即時更新（超過單次回傳上限仍完整讀取）");
+  檢查((await page.locator(".分頁列").innerText()).includes("共 35 筆"), "會員列表分頁讀取全部 35 筆（模擬上限 25 筆）");
   await 截圖("專區_會員管理");
   // 編輯甲：設為常務理事＋會員代表
   await page.fill(".表工具列 input[type=search]", "甲會員");
@@ -307,6 +339,7 @@ try {
   檢查((await 框().locator("[data-key='member'] option:checked").innerText()).includes("乙理事長"), "核准連結時自動預選名冊上對應的會員（公務信箱相同）");
   await 截圖("專區_核准連結");
   await 框().locator("button", { hasText: "核准連結" }).click();
+  await 框().locator("button", { hasText: "確定連結" }).click();
   await page.waitForSelector("text=已連結：乙理事長");
   檢查((await db.query("select u.email from public.members m join auth.users u on u.id = m.user_id where m.email = 'yi@example.org'")).rows[0].email === "yi.home@gmail.example", "核准後乙的個人帳號連到名冊（公務信箱不變）");
   await page.locator(".頁籤 button", { hasText: "入會申請" }).click();
@@ -354,10 +387,48 @@ try {
   await page.waitForSelector("text=新進同仁");
   檢查((await page.locator("#側欄").innerText()).includes("活動報名"), "核准後申請人重新登入即為會員");
   檢查((await page.locator("#內容").innerText()).includes("newbie@mail.example.gov"), "名冊上記錄的是申請時填的公務信箱");
-  // 手機寬度
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(200);
-  檢查(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "手機寬度沒有左右捲動");
+  // 手機寬度（360px 窄手機，活動報名頁）
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.click("#選單鈕");   // 手機版選單收在左側，先打開
+  await 選單("活動報名");
+  await page.waitForSelector("text=年終會員聯誼餐敘");
+  檢查(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "360px 手機寬度的活動報名頁沒有左右捲動");
+  await 截圖("專區_手機");
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.click("#登出鈕");
+
+  console.log("八、信件連結的安全處理");
+  const 甲帳 = 帳號們.get("jia.home@gmail.example");
+  // 別人做的「驗證完成」連結夾帶他自己的登入憑證：不可以直接登入
+  await page.goto("about:blank");
+  await page.goto("file://" + path.join(專區夾, "index.html") + "#access_token=" + 憑證(甲帳) + "&refresh_token=r-" + 甲帳.id + "&expires_in=3600&type=signup");
+  await page.waitForSelector("text=Email 驗證完成，請用 Email 與密碼登入");
+  檢查((await page.evaluate(() => window.__T.連線.憑證)) === "" && !(await page.evaluate(() => location.hash)), "驗證信連結不會直接登入（防止被塞別人的帳號），網址上的憑證已清除");
+  // 重設密碼連結：顯示是哪個帳號，設定完要用新密碼重新登入
+  await page.goto("about:blank");
+  await page.goto("file://" + path.join(專區夾, "index.html") + "#access_token=" + 憑證(甲帳) + "&refresh_token=r-" + 甲帳.id + "&expires_in=3600&type=recovery");
+  await page.waitForSelector("text=正在為 jia.home@gmail.example 設定新密碼");
+  await page.fill("#新密碼", "newpass123"); await page.fill("#新密碼再次", "newpass123");
+  await page.click("#儲存新密碼鈕");
+  await page.waitForSelector("text=密碼已更新，請用新密碼登入");
+  檢查((await page.evaluate(() => window.__T.連線.憑證)) === "", "重設密碼後回到登入畫面，不沿用連結裡的憑證");
+  await 登入("jia.home@gmail.example", "newpass123");
+  檢查(true, "用新密碼可以登入");
+  await page.click("#登出鈕");
+  // 過期的連結
+  await page.goto("about:blank");
+  await page.goto("file://" + path.join(專區夾, "index.html") + "#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired");
+  檢查(await page.isVisible("text=連結已失效"), "過期的信件連結顯示「連結已失效」");
+
+  console.log("九、登出時還在讀取的畫面不會蓋過登入畫面");
+  await 登入("sec@example.org", "staffpass1");
+  延遲.members = 1500;
+  await page.locator("#側欄 button", { hasText: "會員管理" }).first().click();
+  await page.waitForTimeout(100);
+  await page.click("#登出鈕");
+  await page.waitForTimeout(2200);
+  延遲.members = 0;
+  檢查(await page.isVisible("#登入信箱") && (await page.locator("#內容 tbody tr").count()) === 0, "登出後，前一位使用者還在讀取的名冊不會出現在畫面上");
   await 截圖("專區_手機");
 } catch (e) {
   失敗.push("測試中斷：" + (e.stack || e.message));

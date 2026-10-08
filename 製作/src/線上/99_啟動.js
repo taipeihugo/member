@@ -5,6 +5,9 @@ async function 前往(名稱, 參數) {
   const 頁 = 頁面表[名稱];
   if (!頁 || !連線.帳號) return;
   if (頁.可見 && !頁.可見()) { 提示("沒有這個功能的權限", true); return; }
+  // 每次換頁給一個序號；讀取完成時序號變了（又換頁、登出或換人登入）就丟掉這次的結果
+  const 序 = 狀態.導覽序 = (狀態.導覽序 || 0) + 1;
+  const 仍有效 = function () { return 序 === 狀態.導覽序 && !!連線.帳號; };
   狀態.目前頁 = 名稱;
   狀態.頁參數 = 參數 || null;
   繪製側欄();
@@ -14,11 +17,12 @@ async function 前往(名稱, 參數) {
   const 暫存 = h("div");
   try {
     await 頁.繪製(暫存, 參數 || {});
-    if (狀態.目前頁 !== 名稱) return;
+    if (!仍有效()) return;
     清空(內容).appendChild(暫存);
   } catch (e) {
+    if (!仍有效()) return;
     清空(內容).appendChild(h("p", { class: "錯誤" }, "讀取失敗：" + e.message));
-    if (/逾時|JWT/.test(e.message)) { 清除登入(); 顯示登入頁(e.message); }
+    if (e.狀態碼 === 401 || /逾時|JWT/.test(e.message)) { 清除登入(); 顯示登入頁("登入已逾時，請重新登入"); }
   }
   window.scrollTo(0, 0);
 }

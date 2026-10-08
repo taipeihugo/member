@@ -147,7 +147,8 @@ $$;
 
 -- ---------- 觸發程序 ----------
 
--- 會員資料存檔前：整理理監事職稱、更新修改時間、只有理事長／秘書長能改幹部角色
+-- 會員資料存檔前：整理理監事職稱、更新修改時間；
+-- 非管理者（理事長、秘書長、總幹事以外）不能指派幹部角色，也不能變更幹部那幾筆的會籍、Email、帳號連結
 create or replace function public.members_before_write() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
@@ -166,6 +167,10 @@ begin
       raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
     elsif tg_op = 'UPDATE' and new.staff_role is distinct from old.staff_role then
       raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
+    elsif tg_op = 'UPDATE' and old.staff_role <> '' and (
+        new.status is distinct from old.status or new.email is distinct from lower(trim(old.email))
+        or (new.user_id is distinct from old.user_id and new.user_id is distinct from auth.uid())) then
+      raise exception '只有理事長、秘書長或總幹事可以變更幹部的會籍、Email 或帳號連結';
     end if;
   end if;
   return new;
@@ -182,10 +187,19 @@ alter table public.fees enable row level security;
 alter table public.applications enable row level security;
 
 -- 未登入（anon）一律不能碰任何資料表
-revoke all on public.members, public.activities, public.registrations, public.fees, public.applications from anon;
-grant select, insert, update, delete on public.members, public.activities, public.registrations, public.fees to authenticated;
+-- 權限：先全部收回，再只給需要的（Supabase 預設會把新資料表的全部權限給 anon、authenticated）
+revoke all on public.members, public.activities, public.registrations, public.fees, public.applications from anon, authenticated;
+grant select, insert, update, delete on public.activities, public.fees to authenticated;
+-- 會員表：帳號連結（user_id）只能經由函式（認領碼、核准連結、核准入會、解除連結）修改，幹部直接改資料表碰不到
+grant select, delete on public.members to authenticated;
+grant insert (member_no, name, gender, employee_no, agency, unit, title, email, phone, join_date, category, status,
+  board_role, board_title, is_representative, staff_role, note) on public.members to authenticated;
+grant update (member_no, name, gender, employee_no, agency, unit, title, email, phone, join_date, category, status,
+  board_role, board_title, is_representative, staff_role, note) on public.members to authenticated;
+-- 報名：新增只能經由 register_activity（會員）或 staff_register（幹部），兩者都會檢查名額
+grant select, update, delete on public.registrations to authenticated;
+-- 入會申請：新增只能經由 submit_application
 grant select, update, delete on public.applications to authenticated;
-revoke insert on public.applications from authenticated;
 
 drop policy if exists members_select on public.members;
 create policy members_select on public.members for select to authenticated using (user_id = auth.uid() or public.is_staff());
@@ -220,21 +234,12 @@ create policy applications_delete on public.applications for delete to authentic
 
 -- ---------- 會員自己能做的事（透過函式，只能動自己的資料） ----------
 
--- 登入後把帳號連到名冊：名冊裡 Email 相同、且尚未連結的會員（Email 必須已驗證）
+-- 回傳目前帳號連結的會員（不再依 Email 自動連結：名冊上的公務信箱收不到外部信，
+-- 自動連結反而會讓人冒用別人的公務信箱註冊來取得資料）。保留這個函式，舊版網頁呼叫時不會出錯。
 create or replace function public.link_my_member() returns uuid
-language plpgsql security definer set search_path = public as $$
-declare 已有 uuid; 信箱 text; 已驗證 boolean;
-begin
-  if auth.uid() is null then raise exception '請先登入'; end if;
-  select id into 已有 from public.members where user_id = auth.uid();
-  if 已有 is not null then return 已有; end if;
-  select lower(email), email_confirmed_at is not null into 信箱, 已驗證 from auth.users where id = auth.uid();
-  if not coalesce(已驗證, false) or coalesce(信箱, '') = '' then return null; end if;
-  update public.members set user_id = auth.uid()
-    where id = (select id from public.members where user_id is null and email = 信箱 limit 1)
-    returning id into 已有;
-  return 已有;
-end $$;
+language sql stable security definer set search_path = public as $$
+  select public.my_member_id()
+$$;
 
 -- 會員修改自己的資料（只能改這幾欄；理監事、幹部角色、會籍由幹部維護）
 create or replace function public.update_my_profile(p_gender text, p_agency text, p_unit text, p_title text, p_phone text)
@@ -271,25 +276,55 @@ begin
   return 狀;
 end $$;
 
--- 取消報名（本人或幹部）：取消的是正取時，最早報名的候補自動遞補
+-- 取消報名（本人或幹部）：取消的是正取時，最早報名的候補自動遞補（先鎖住活動再讀報名，避免同時取消時遞補兩人）
 create or replace function public.cancel_registration(p_registration uuid)
 returns text language plpgsql security definer set search_path = public as $$
-declare 報 public.registrations; 活 public.activities; 遞補 public.registrations;
+declare 活動 uuid; 報 public.registrations; 活 public.activities; 遞補 public.registrations; 正取數 int;
 begin
-  select * into 報 from public.registrations where id = p_registration;
+  select activity_id into 活動 from public.registrations where id = p_registration;
+  if not found then raise exception '找不到可以取消的報名'; end if;
+  select * into 活 from public.activities where id = 活動 for update;
+  select * into 報 from public.registrations where id = p_registration for update;
   if not found or 報.status = '取消' then raise exception '找不到可以取消的報名'; end if;
   if 報.member_id is distinct from public.my_member_id() and not public.is_staff() then raise exception '沒有權限'; end if;
-  select * into 活 from public.activities where id = 報.activity_id for update;
   if not public.is_staff() and 活.date < current_date then raise exception '活動已結束，無法取消'; end if;
-  update public.registrations set status = '取消', checked_in_at = null where id = 報.id;
+  update public.registrations set status = '取消', checked_in_at = null where id = 報.id and status <> '取消';
+  if not found then raise exception '找不到可以取消的報名'; end if;
   if 報.status = '正取' then
-    select * into 遞補 from public.registrations where activity_id = 報.activity_id and status = '候補' order by created_at limit 1;
-    if found then
-      update public.registrations set status = '正取' where id = 遞補.id;
-      return 遞補.id::text;
+    select count(*) into 正取數 from public.registrations where activity_id = 活動 and status = '正取';
+    if 活.capacity = 0 or 正取數 < 活.capacity then
+      select * into 遞補 from public.registrations where activity_id = 活動 and status = '候補' order by created_at limit 1 for update;
+      if found then
+        update public.registrations set status = '正取' where id = 遞補.id;
+        return 遞補.id::text;
+      end if;
     end if;
   end if;
   return '';
+end $$;
+
+-- 幹部代會員報名：與會員自己報名相同的名額與葷素檢查（鎖住活動後重新計數），不受截止日限制
+create or replace function public.staff_register(p_activity uuid, p_member uuid, p_meal text, p_note text)
+returns text language plpgsql security definer set search_path = public as $$
+declare 活 public.activities; 正取數 int; 候補數 int; 狀 text;
+begin
+  if not public.is_staff() then raise exception '沒有權限'; end if;
+  select * into 活 from public.activities where id = p_activity for update;
+  if not found then raise exception '找不到這個活動'; end if;
+  if not exists (select 1 from public.members where id = p_member and status = '有效') then raise exception '只有有效會員可以報名'; end if;
+  if 活.meal_option and coalesce(p_meal, '') not in ('葷', '素') then raise exception '請選擇葷食或素食'; end if;
+  if exists (select 1 from public.registrations where activity_id = p_activity and member_id = p_member and status <> '取消') then
+    raise exception '這位會員已經報名過了';
+  end if;
+  select count(*) filter (where status = '正取'), count(*) filter (where status = '候補')
+    into 正取數, 候補數 from public.registrations where activity_id = p_activity;
+  if 活.capacity = 0 or 正取數 < 活.capacity then 狀 := '正取';
+  elsif 候補數 < 活.waitlist then 狀 := '候補';
+  else raise exception '名額與候補都已額滿';
+  end if;
+  insert into public.registrations (activity_id, member_id, status, meal, note)
+    values (p_activity, p_member, 狀, case when 活.meal_option then p_meal else '' end, coalesce(p_note, ''));
+  return 狀;
 end $$;
 
 -- 線上入會申請（已是會員、或已有待審申請時不能重複送）；p_email 是公務電子郵件信箱（名冊用），沒填就用登入 Email
@@ -313,25 +348,26 @@ end $$;
 
 -- ---------- 幹部用的函式 ----------
 
--- 核准入會：建立會員並連結申請人的帳號
+-- 核准入會：建立新會員並連結申請人的帳號。
+-- 申請人自填的公務信箱無法驗證，所以名冊已有相同信箱時不自動連結，請改走「帳號連結」由幹部人工核對。
 create or replace function public.approve_application(p_application uuid)
 returns uuid language plpgsql security definer set search_path = public as $$
-declare 申 public.applications; 新 uuid; 我名 text;
+declare 申 public.applications; 新 uuid; 我名 text; 既有 text; 編號 text;
 begin
   if not public.is_staff() then raise exception '沒有權限'; end if;
   select * into 申 from public.applications where id = p_application and status = '待審' for update;
   if not found then raise exception '找不到待審的申請'; end if;
-  select name into 我名 from public.members where user_id = auth.uid();
-  -- 名冊裡已有同 Email、尚未連結的會員：直接連結，不重複建立
-  update public.members set user_id = 申.user_id, status = '有效'
-    where id = (select id from public.members where user_id is null and email = lower(申.email) and 申.email <> '' limit 1)
-    returning id into 新;
-  if 新 is null then
-    insert into public.members (user_id, name, gender, employee_no, agency, unit, title, email, phone, join_date, note)
-      values (申.user_id, 申.name, 申.gender, 申.employee_no, 申.agency, 申.unit, 申.title, 申.email, 申.phone, current_date, 申.note)
-      returning id into 新;
+  if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結會員資料'; end if;
+  select name into 既有 from public.members where 申.email <> '' and email = lower(申.email) limit 1;
+  if 既有 is not null then
+    raise exception '名冊已有公務信箱 % 的會員「%」。請退回這件申請，並請申請人改用「連結會員資料」（認領碼或連結申請），由幹部核對後連結', 申.email, 既有;
   end if;
-  update public.applications set status = '核准', reviewed_by = coalesce(我名, ''), reviewed_at = now() where id = 申.id;
+  select name into 我名 from public.members where user_id = auth.uid();
+  insert into public.members (user_id, name, gender, employee_no, agency, unit, title, email, phone, join_date, note)
+    values (申.user_id, 申.name, 申.gender, 申.employee_no, 申.agency, 申.unit, 申.title, 申.email, 申.phone, current_date, 申.note)
+    returning id, member_no into 新, 編號;
+  update public.applications set status = '核准', review_note = '新建會員 ' || coalesce(編號, ''), reviewed_by = coalesce(我名, ''), reviewed_at = now()
+    where id = 申.id;
   return 新;
 end $$;
 
@@ -377,21 +413,32 @@ drop function if exists public.make_staff(text, text, text);
 create or replace function public.make_staff(p_login_email text, p_role text, p_name text default '', p_office_email text default '')
 returns text language plpgsql security definer set search_path = public as $$
 declare 帳號 uuid; 名冊信箱 text := lower(trim(coalesce(nullif(p_office_email, ''), p_login_email)));
+  列 public.members; 已連信箱 text; 他列 text;
 begin
   if p_role not in ('理事長', '秘書長', '總幹事', '會計', '承辦人') then
     raise exception '角色只能是：理事長、秘書長、總幹事、會計、承辦人（您填的是「%」）', p_role;
   end if;
   select id into 帳號 from auth.users where lower(email) = lower(trim(p_login_email));
-  if 帳號 is not null and exists (select 1 from public.members where user_id = 帳號 and email <> 名冊信箱) then
-    raise exception '這個登入帳號已連結其他會員資料';
+  if 帳號 is null then
+    raise exception '% 還沒有註冊。請先用這個 Email 到會員專區註冊並完成驗證，再執行這一行', p_login_email;
   end if;
-  if exists (select 1 from public.members where email = 名冊信箱) then
-    update public.members set staff_role = p_role, status = '有效', user_id = coalesce(user_id, 帳號) where email = 名冊信箱;
+  select email into 他列 from public.members where user_id = 帳號 and email <> 名冊信箱 limit 1;
+  if 他列 is not null then
+    raise exception '登入帳號 % 已連結名冊上另一筆會員資料（%），請先解除那筆的帳號連結', p_login_email, 他列;
+  end if;
+  select * into 列 from public.members where email = 名冊信箱;
+  if found and 列.user_id is not null and 列.user_id <> 帳號 then
+    select email into 已連信箱 from auth.users where id = 列.user_id;
+    raise exception '名冊上 % 已連結另一個登入帳號（%）。請先解除帳號連結（SQL：update public.members set user_id = null where email = ''%'';），再執行一次',
+      名冊信箱, coalesce(已連信箱, '已刪除的帳號'), 名冊信箱;
+  end if;
+  if found then
+    update public.members set staff_role = p_role, status = '有效', user_id = 帳號 where id = 列.id;
   else
     insert into public.members (user_id, name, email, staff_role, join_date)
       values (帳號, coalesce(nullif(p_name, ''), split_part(名冊信箱, '@', 1)), 名冊信箱, p_role, current_date);
   end if;
-  return '已將 ' || 名冊信箱 || ' 設為' || p_role || case when 帳號 is null then '（' || p_login_email || ' 尚未註冊；請先註冊，再執行一次這行完成連結）' else '，並連結登入帳號 ' || p_login_email end;
+  return '已將 ' || 名冊信箱 || ' 設為' || p_role || '，並連結登入帳號 ' || p_login_email || '。請在會員專區登出後重新登入';
 end $$;
 
 -- 函式執行權限：會員與幹部函式只開給登入者；make_staff 只能在 SQL Editor 用
@@ -400,7 +447,7 @@ grant execute on function public.my_member_id(), public.my_staff_role(), public.
   public.link_my_member(), public.update_my_profile(text, text, text, text, text),
   public.register_activity(uuid, text, text), public.cancel_registration(uuid),
   public.submit_application(text, text, text, text, text, text, text, text, text),
-  public.approve_application(uuid), public.reject_application(uuid, text),
+  public.approve_application(uuid), public.reject_application(uuid, text), public.staff_register(uuid, uuid, text, text),
   public.record_fees(uuid[], int, text, int, date, text) to authenticated;
 revoke execute on function public.make_staff(text, text, text, text), public.next_member_no(), public.members_before_write() from authenticated;
 
@@ -453,10 +500,8 @@ create unique index if not exists link_requests_one_pending on public.link_reque
 
 alter table public.claim_codes enable row level security;
 alter table public.link_requests enable row level security;
-revoke all on public.claim_codes, public.link_requests from anon;
-revoke all on public.claim_codes from authenticated;
-grant select on public.claim_codes to authenticated;
-grant select on public.link_requests to authenticated;
+revoke all on public.claim_codes, public.link_requests from anon, authenticated;
+grant select on public.claim_codes, public.link_requests to authenticated;
 
 drop policy if exists claim_codes_select on public.claim_codes;
 create policy claim_codes_select on public.claim_codes for select to authenticated using (public.is_staff());
@@ -491,7 +536,9 @@ declare 人 public.members; 碼 text; 我名 text;
 begin
   if not public.is_staff() then raise exception '沒有權限'; end if;
   select m.name into 我名 from public.members m where m.user_id = auth.uid();
-  for 人 in select * from public.members m where m.id = any(p_members) and m.user_id is null loop
+  -- 幹部那幾筆（有幹部角色）只有理事長、秘書長、總幹事能產生認領碼
+  for 人 in select * from public.members m where m.id = any(p_members) and m.user_id is null
+      and (m.staff_role = '' or public.is_admin()) loop
     loop
       碼 := '';
       for i in 1..10 loop 碼 := 碼 || substr(字表, 1 + floor(random() * length(字表))::int, 1); end loop;

@@ -47,8 +47,8 @@
 .頁籤 button[aria-selected="true"] { color: var(--text); font-weight: 700; border-bottom-color: var(--gold); }
 
 /* 首頁統計格 */
-.格 { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
-.格2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.格 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); gap: 1rem; }
+.格2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 1rem; margin-top: 1rem; }
 .數字卡 .數字 { font-size: 2rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .數字卡 .標 { color: var(--muted); font-size: .9rem; }
 .數字卡 { border-top: 4px solid var(--gold); }

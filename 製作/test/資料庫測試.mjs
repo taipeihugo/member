@@ -17,6 +17,10 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 grant usage on schema public to anon, authenticated; grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
+-- 與 Supabase 相同：public 裡新建的資料表、函式、序列，預設把全部權限給 anon、authenticated
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
 `;
 
 // 建立一個已載入資料庫結構的 PGlite
@@ -66,11 +70,15 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   // 名冊先有甲、乙（例如從 Excel 匯入），尚未連結帳號
   await db.query(`insert into public.members (name, gender, agency, unit, title, email) values
     ('甲會員', '女', '財政部賦稅署', '稅制組', '科員', 'JIA@example.org'), ('乙會員', '男', '財政部關務署', '稽查組', '專員', $1)`, [帳.乙.email]);
-  檢查((await 以身分(db, 帳.未驗證, () => db.query("select public.link_my_member() as id"))).rows[0].id === null, "Email 未驗證的帳號不能認領會員資料");
+  檢查((await 以身分(db, 帳.未驗證, () => db.query("select public.link_my_member() as id"))).rows[0].id === null, "Email 未驗證的帳號不會連結");
+  檢查((await 以身分(db, 帳.甲, () => db.query("select public.link_my_member() as id"))).rows[0].id === null, "Email 與名冊相同、已驗證也不會自動連結（避免冒用公務信箱）");
+  // 甲、乙用秘書長產生的認領碼連結
+  const 起始碼 = (await 以身分(db, 帳.秘書長, () => db.query("select m.email, c.code from public.generate_claim_codes(array(select id from public.members where staff_role = '')) c join public.members m on m.id = c.member_id"))).rows;
+  for (const [名, 信箱] of [["甲", "jia@example.org"], ["乙", 帳.乙.email]]) {
+    await 以身分(db, 帳[名], () => db.query("select public.claim_with_code($1)", [起始碼.find((c) => c.email === 信箱).code]));
+  }
   const 甲id = (await 以身分(db, 帳.甲, () => db.query("select public.link_my_member() as id"))).rows[0].id;
-  檢查(!!甲id, "會員登入後依已驗證 Email 自動連結到名冊（大小寫不拘）");
-  await 以身分(db, 帳.乙, () => db.query("select public.link_my_member()"));
-  await 以身分(db, 帳.秘書長, () => db.query("select public.link_my_member()"));
+  檢查(!!甲id, "會員用認領碼連結後，link_my_member 回傳自己的會員資料");
 
   console.log("二、會員只看得到自己");
   檢查((await 以身分(db, 帳.甲, () => db.query("select name from public.members"))).rows.map((r) => r.name).join() === "甲會員", "會員查名冊只看到自己一筆");
@@ -213,6 +221,78 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   }
   檢查(await 應失敗(() => 以身分(db, null, () => db.query("select public.register_activity($1, '葷', '')", [活]))), "未登入者不能呼叫報名函式");
   檢查(await 應失敗(() => 以身分(db, 帳.甲, () => db.query("select public.make_staff('x@example.org', '秘書長')"))), "登入者不能呼叫 make_staff（只能在 SQL Editor 用）");
+
+  console.log("十、資安強化（審查發現的問題）");
+  {
+    const 新 = async (email) => { const u = { id: crypto.randomUUID(), email }; await db.query("insert into auth.users values ($1, $2, now())", [u.id, email]); return u; };
+    const 長帳 = await 新("chair@gmail.example"), 辦帳 = await 新("clerk@gmail.example"), 分身 = await 新("clerk.alt@gmail.example"), 預建帳 = await 新("pre@gmail.example");
+    await db.query("select public.make_staff('chair@gmail.example', '理事長', '測試理事長', 'chair@fia.example.gov')");
+    await db.query("select public.make_staff('clerk@gmail.example', '承辦人', '測試承辦人', 'clerk@fia.example.gov')");
+    const 長列 = (await db.query("select id from public.members where email = 'chair@fia.example.gov'")).rows[0].id;
+    const 辦 = (sql, p) => 以身分(db, 辦帳, () => db.query(sql, p));
+    // 1. 幹部不能直接改帳號連結
+    檢查(await 應失敗(() => 辦("update public.members set user_id = $1 where id = $2", [分身.id, 長列])), "承辦人不能把理事長那筆改連到自己的分身帳號");
+    檢查(await 應失敗(() => 辦("update public.members set user_id = null where id = $1", [長列])), "承辦人不能直接解除別人的帳號連結");
+    檢查(await 應失敗(() => 辦("insert into public.members (name, user_id) values ('偷連', $1)", [分身.id])), "承辦人新增會員時不能指定帳號連結");
+    檢查(await 應失敗(() => 辦("update public.members set status = '停權' where id = $1", [長列]), "只有理事長"), "承辦人不能把理事長停權");
+    檢查(await 應失敗(() => 辦("update public.members set email = 'x@gmail.example' where id = $1", [長列]), "只有理事長"), "承辦人不能改幹部的 Email");
+    檢查((await 以身分(db, 長帳, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "理事長", "上述攻擊後理事長權限不變");
+    const 一般列 = (await db.query("insert into public.members (name, email) values ('一般會員丙', 'bing3@fia.example.gov') returning id")).rows[0].id;
+    await 辦("update public.members set phone = '分機 9', status = '停權' where id = $1", [一般列]);
+    檢查((await db.query("select phone, status from public.members where id = $1", [一般列])).rows[0].status === "停權", "承辦人仍可正常編輯一般會員（電話、會籍）");
+    // 2. 預先建立、尚未連結的幹部列：非管理者不能替它發認領碼或核准連結
+    await db.query("insert into public.members (name, email, staff_role) values ('預建秘書長', 'pre@fia.example.gov', '秘書長')");
+    const 預建列 = (await db.query("select id from public.members where email = 'pre@fia.example.gov'")).rows[0].id;
+    檢查((await 辦("select * from public.generate_claim_codes(array[$1::uuid])", [預建列])).rows.length === 0, "承辦人不能替未連結的幹部列產生認領碼");
+    const 分身申請 = (await 以身分(db, 分身, () => db.query("select public.submit_link_request('預建秘書長', '', '', '', 'pre@fia.example.gov', '', '') as id"))).rows[0].id;
+    檢查(await 應失敗(() => 辦("select public.approve_link_request($1, $2)", [分身申請, 預建列]), "只有理事長"), "承辦人不能把連結申請核准到幹部列");
+    檢查((await 以身分(db, 長帳, () => db.query("select * from public.generate_claim_codes(array[$1::uuid])", [預建列]))).rows.length === 1, "理事長可以替未連結的幹部列產生認領碼");
+    // 3. 入會申請不依自填信箱連到既有會員
+    const 冒用 = await 新("fake.applicant@gmail.example");
+    const 冒申 = (await 以身分(db, 冒用, () => db.query("select public.submit_application('新人張三', '', '', '財政部賦稅署', '', '', '', '', 'bing3@fia.example.gov') as id"))).rows[0].id;
+    檢查(await 應失敗(() => 辦("select public.approve_application($1)", [冒申]), "名冊已有公務信箱"), "入會申請填了名冊上已有的公務信箱時，核准會被擋下並提示改走帳號連結");
+    檢查((await db.query("select user_id, status from public.members where id = $1", [一般列])).rows[0].user_id === null, "被冒用信箱的會員資料沒有被連走");
+    const 正常申 = (await 以身分(db, await 新("newcomer@gmail.example"), () => db.query("select public.submit_application('新進丁', '', '', '財政部國庫署', '', '', '', '', 'ding4@fia.example.gov') as id"))).rows[0].id;
+    await 辦("select public.approve_application($1)", [正常申]);
+    const 備註 = (await db.query("select review_note from public.applications where id = $1", [正常申])).rows[0].review_note;
+    檢查(/^新建會員 M\d{4}$/.test(備註), "核准入會的審核備註記錄新建的會員編號（" + 備註 + "）");
+    // 4. make_staff 的防呆
+    檢查(await 應失敗(() => db.query("select public.make_staff('nobody@gmail.example', '秘書長', 'X', 'nobody@fia.example.gov')"), "還沒有註冊"), "make_staff：登入 Email 還沒註冊時拒絕，不先建立未連結的幹部列");
+    const 換信箱 = await 新("chair.new@gmail.example");
+    檢查(await 應失敗(() => db.query("select public.make_staff('chair.new@gmail.example', '秘書長', '', 'chair@fia.example.gov')"), "已連結另一個登入帳號"), "make_staff：名冊那筆已連到別的帳號時拒絕，並說明怎麼處理");
+    檢查((await db.query("select staff_role from public.members where id = $1", [長列])).rows[0].staff_role === "理事長", "上述被拒後，原本的角色不變");
+    // 5. 代為報名走 staff_register，名額由資料庫判斷
+    const 活 = (await db.query("insert into public.activities (name, date, capacity, waitlist) values ('名額測試', current_date + 5, 1, 0) returning id")).rows[0].id;
+    檢查(await 應失敗(() => 辦("insert into public.registrations (activity_id, member_id) values ($1, $2)", [活, 一般列])), "幹部不能繞過名額檢查直接新增報名");
+    const 人們 = (await db.query("select id from public.members where status = '有效' limit 2")).rows.map((r) => r.id);
+    檢查((await 辦("select public.staff_register($1, $2, '', '') as s", [活, 人們[0]])).rows[0].s === "正取", "staff_register 代為報名（正取）");
+    檢查(await 應失敗(() => 辦("select public.staff_register($1, $2, '', '')", [活, 人們[1]]), "額滿"), "staff_register 名額已滿時擋下（不會超收）");
+    // 6. 同一筆報名取消兩次：第二次被拒、不會再遞補
+    const 活2 = (await db.query("insert into public.activities (name, date, capacity, waitlist) values ('取消測試', current_date + 5, 1, 2) returning id")).rows[0].id;
+    const 三人 = (await db.query("select id from public.members where status = '有效' limit 3")).rows.map((r) => r.id);
+    for (const 人 of 三人) await 辦("select public.staff_register($1, $2, '', '')", [活2, 人]);
+    const 正取報名 = (await db.query("select id from public.registrations where activity_id = $1 and status = '正取'", [活2])).rows[0].id;
+    await 辦("select public.cancel_registration($1)", [正取報名]);
+    檢查(await 應失敗(() => 辦("select public.cancel_registration($1)", [正取報名]), "找不到可以取消"), "同一筆報名第二次取消被拒");
+    檢查((await db.query("select count(*)::int as n from public.registrations where activity_id = $1 and status = '正取'", [活2])).rows[0].n === 1, "取消後只遞補一位，正取不超過名額");
+    // 7. Supabase 預設權限下，未登入者不能執行任何函式、不能寫任何資料表
+    const 函式們 = (await db.query("select p.oid::regprocedure::text as f from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'")).rows.map((r) => r.f);
+    const anon可執行 = [];
+    for (const f of 函式們) if ((await db.query("select has_function_privilege('anon', $1, 'execute') as ok", [f])).rows[0].ok) anon可執行.push(f);
+    檢查(anon可執行.length === 0, "未登入者（anon）不能執行任何函式" + (anon可執行.length ? "（" + anon可執行.join("、") + "）" : ""));
+    const 表們 = ["members", "activities", "registrations", "fees", "applications", "claim_codes", "link_requests"];
+    const anon可寫 = [];
+    for (const t of 表們) for (const 權 of ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"]) if ((await db.query("select has_table_privilege('anon', $1, $2) as ok", ["public." + t, 權])).rows[0].ok) anon可寫.push(t + ":" + 權);
+    檢查(anon可寫.length === 0, "未登入者（anon）對資料表沒有任何權限" + (anon可寫.length ? "（" + anon可寫.join("、") + "）" : ""));
+    const 登入可截斷 = [];
+    for (const t of 表們) if ((await db.query("select has_table_privilege('authenticated', $1, 'TRUNCATE') as ok", ["public." + t])).rows[0].ok) 登入可截斷.push(t);
+    檢查(登入可截斷.length === 0, "登入者不能 TRUNCATE 任何資料表");
+    const 可改連結 = (await db.query("select has_column_privilege('authenticated', 'public.members', 'user_id', 'UPDATE') or has_column_privilege('authenticated', 'public.members', 'user_id', 'INSERT') as ok")).rows[0].ok;
+    檢查(!可改連結, "登入者對 members.user_id 沒有直接寫入權限");
+    // 8. 整份結構重新執行一次（模擬程式更新），權限仍正確
+    await db.exec(fs.readFileSync(path.join(根目錄, "線上系統", "資料庫結構.sql"), "utf8"));
+    檢查(await 應失敗(() => 辦("update public.members set user_id = $1 where id = $2", [分身.id, 長列])), "重新執行結構後，幹部仍不能改帳號連結");
+  }
 
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");
   失敗.forEach((f) => console.log("  ✘ " + f));

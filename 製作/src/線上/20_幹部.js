@@ -70,7 +70,7 @@ function 編輯線上會員(原, 機關們, 完成後) {
     { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" },
     { key: "email", 標題: "Email（會員用這個 Email 註冊）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
     { key: "join_date", 標題: "入會日期", 類型: "日期" }, { key: "status", 標題: "會籍", 類型: "選單", 選項: ["有效", "停權", "退會"], 必填: true },
-    { key: "理監事", 標題: "理監事職稱（理事、監事只能擇一）", 類型: "選單", 選項: 理監事選項, 必填: true },
+    { key: "理監事", 標題: "理監事職稱（理事、監事只能擇一）", 類型: "選單", 選項: 理監事選項, 不加空白: true },
     { key: "is_representative", 標題: "會員代表", 類型: "勾選", 勾選文字: "是會員代表（可同時為理事或監事）" },
     { key: "staff_role", 標題: "幹部角色（可使用管理功能）", 類型: "選單", 選項: ["理事長", "秘書長", "總幹事", "會計", "承辦人"], 唯讀: !是管理者(), 說明: 是管理者() ? "" : "只有理事長、秘書長或總幹事可以指派" },
     { key: "note", 標題: "備註", 類型: "多行", 行數: 2 }
@@ -150,37 +150,80 @@ async function 匯入線上名冊(名冊, 完成後) {
     if (i >= 0) 對應[k] = i;
   });
   if (對應.name == null) return 提示("找不到「姓名」欄", true);
-  const 依信箱 = {};
-  名冊.forEach(function (m) { if (m.email) 依信箱[m.email.toLowerCase()] = m; });
+  // 比對名冊上既有的人：先比 Email，再比員工編號，最後比「姓名＋服務機關」（唯一才算）
+  const 依信箱 = {}, 依員編 = {}, 依姓名機關 = {};
+  名冊.forEach(function (m) {
+    if (m.email) 依信箱[m.email.toLowerCase()] = m;
+    if (m.employee_no) 依員編[m.employee_no] = m;
+    const k = m.name + "｜" + (m.agency || "");
+    (依姓名機關[k] = 依姓名機關[k] || []).push(m);
+  });
   const 新增們 = [], 更新們 = [], 問題 = [];
+  const 檔內 = {};   // 檔案裡已經出現過的人（Email、員工編號或姓名＋機關）→ 待新增或待更新的那一筆
   列.slice(1).forEach(function (r, i) {
+    const 列號 = i + 2;
     const 取 = function (k) { return 對應[k] == null ? "" : String(r[對應[k]] == null ? "" : r[對應[k]]).trim(); };
     const 資料 = { name: 取("name") };
     if (!資料.name) return;
     if (對應.gender != null) { const g = 取("gender"); 資料.gender = g === "0" || g === "女" ? "女" : g === "1" || g === "男" ? "男" : ""; }
     ["agency", "unit", "title", "phone", "employee_no"].forEach(function (k) { if (對應[k] != null) 資料[k] = 取(k); });
     if (對應.email != null) 資料.email = 取("email").toLowerCase();
+    let 理監事看不懂 = false;
     if (對應.理監事 != null) {
       const 理 = 轉理監事(取("理監事"));
-      if (!理) { 問題.push("第 " + (i + 2) + " 列「" + 資料.name + "」理監事欄看不懂（" + 取("理監事") + "），已略過這一欄"); }
+      if (!理) { 理監事看不懂 = true; 問題.push("第 " + 列號 + " 列「" + 資料.name + "」理監事欄看不懂（" + 取("理監事") + "）：新增者設為「無」，既有會員保留原值"); }
       else { 資料.board_role = 理[0]; 資料.board_title = 理[1]; }
     }
     if (對應.會員代表 != null) 資料.is_representative = /^(1|是|y|yes|v|✔|ｖ)$/i.test(取("會員代表"));
-    const 原 = 資料.email && 依信箱[資料.email];
-    if (原) 更新們.push({ id: 原.id, 資料: 資料 });
-    else { 新增們.push(Object.assign({ status: "有效", join_date: 今天() }, 資料)); if (資料.email) 依信箱[資料.email] = 資料; }
+    // 檔案內重複的人：合併到前面那一筆
+    const 鍵們 = [資料.email ? "信:" + 資料.email : "", 資料.employee_no ? "編:" + 資料.employee_no : "", "名:" + 資料.name + "｜" + (資料.agency || "")].filter(Boolean);
+    const 前筆 = 鍵們.map(function (k) { return 檔內[k]; }).find(Boolean);
+    if (前筆) {
+      Object.keys(資料).forEach(function (k) { if (資料[k] !== "" && !(k === "board_role" && 理監事看不懂)) 前筆[k] = 資料[k]; });
+      問題.push("第 " + 列號 + " 列「" + 資料.name + "」和檔案前面的列是同一人，已合併");
+      return;
+    }
+    // 名冊上既有的人
+    let 原 = (資料.email && 依信箱[資料.email]) || (資料.employee_no && 依員編[資料.employee_no]) || null;
+    if (!原) {
+      const 同名 = 依姓名機關[資料.name + "｜" + (資料.agency || "")] || [];
+      if (同名.length === 1 && (!資料.email || !同名[0].email)) 原 = 同名[0];
+      else if (同名.length > 1) { 問題.push("第 " + 列號 + " 列「" + 資料.name + "」名冊上有 " + 同名.length + " 位同名同機關的會員，無法判斷是誰，已略過"); return; }
+    }
+    let 目標;
+    if (原) { 目標 = 資料; 更新們.push({ id: 原.id, 資料: 目標 }); }
+    else {
+      目標 = Object.assign({ status: "有效", join_date: 今天() }, 對應.理監事 != null ? { board_role: "", board_title: "" } : {}, 資料);
+      新增們.push(目標);
+    }
+    鍵們.forEach(function (k) { 檔內[k] = 目標; });
   });
   const 好 = await 對話框("匯入名冊：" + f.name, [
-    h("p", null, "新增 " + 新增們.length + " 人、更新 " + 更新們.length + " 人（Email 相同的視為同一人）。"),
+    h("p", null, "新增 " + 新增們.length + " 人、更新 " + 更新們.length + " 人（Email、員工編號或姓名＋服務機關相同的視為同一人）。"),
     h("p", { class: "次要字 小字" }, "對應到的欄位：" + Object.keys(對應).map(function (k) { return 列[0][對應[k]]; }).join("、")),
-    問題.length ? h("ul", { class: "錯誤" }, 問題.slice(0, 10).map(function (p) { return h("li", null, p); })) : null
+    問題.length ? h("ul", { class: "錯誤" }, 問題.slice(0, 15).map(function (p) { return h("li", null, p); }), 問題.length > 15 ? h("li", null, "…等共 " + 問題.length + " 項") : null) : null
   ], [{ 文字: "取消" }, { 文字: "開始匯入", 主: true, 值: true }]);
   if (!好) return;
-  try {
-    for (let i = 0; i < 新增們.length; i += 200) await 新增("members", 新增們.slice(i, i + 200));
-    for (const u of 更新們) await 修改("members", { id: u.id }, u.資料);
-    提示("匯入完成：新增 " + 新增們.length + "、更新 " + 更新們.length);
-  } catch (e) { 提示("匯入中斷：" + e.message, true); }
+  const 失敗 = [];
+  let 已新增 = 0, 已更新 = 0;
+  for (let i = 0; i < 新增們.length; i += 200) {
+    const 批 = 新增們.slice(i, i + 200);
+    try { await 新增("members", 批); 已新增 += 批.length; }
+    catch (e) {
+      // 整批失敗時改成一筆一筆新增，找出是哪幾筆有問題
+      for (const 筆 of 批) {
+        try { await 新增("members", [筆]); 已新增++; } catch (e2) { 失敗.push(筆.name + "：" + e2.message); }
+      }
+    }
+  }
+  for (const u of 更新們) {
+    try { await 修改("members", { id: u.id }, u.資料); 已更新++; } catch (e) { 失敗.push(u.資料.name + "：" + e.message); }
+  }
+  if (失敗.length) {
+    對話框("匯入完成（有 " + 失敗.length + " 筆沒有成功）", [
+      h("p", null, "新增 " + 已新增 + " 人、更新 " + 已更新 + " 人。下列資料沒有匯入，請修正後再匯入一次："),
+      h("ul", { class: "錯誤" }, 失敗.slice(0, 30).map(function (x) { return h("li", null, x); }))]);
+  } else 提示("匯入完成：新增 " + 已新增 + "、更新 " + 已更新);
   完成後();
 }
 
@@ -229,7 +272,7 @@ async function 產生認領碼(列) {
     容器.appendChild(頁首("申請審核"));
     const 頁籤 = 建立頁籤(["帳號連結（待審 " + 待連 + "）", "入會申請（待審 " + 待入 + "）"], 參數.頁籤, function (名, 區) {
       if (名.indexOf("帳號連結") === 0) 繪製連結審核(區, 連們, 名冊);
-      else 繪製入會審核(區, 申們);
+      else 繪製入會審核(區, 申們, 名冊);
     });
     容器.appendChild(頁籤.元素);
   }
@@ -267,24 +310,31 @@ function 核准連結(r, 名冊) {
   const 可選 = 名冊.filter(function (m) { return !m.user_id; });
   const 建議 = 可選.find(function (m) { return r.office_email && m.email === r.office_email; }) ||
     可選.find(function (m) { return m.name === r.name && m.agency === r.agency; }) || 可選.find(function (m) { return m.name === r.name; });
+  const 說明 = function (m) { return m.member_no + " " + m.name + "（" + (m.agency || "") + " " + (m.unit || "") + "，" + (m.email || "無信箱") + "）" + (m.staff_role ? "【幹部：" + m.staff_role + "】" : ""); };
   表單對話框("核准帳號連結：" + r.name, [
     { key: "member", 標題: "對應到名冊上的會員（只列出尚未連結帳號的人）", 類型: "選單", 必填: true, 寬: true,
-      選項: 可選.map(function (m) { return { 值: m.id, 字: m.member_no + " " + m.name + "（" + (m.agency || "") + " " + (m.unit || "") + "，" + (m.email || "無信箱") + "）" }; }) }
+      說明: 建議 ? "已預選姓名或公務信箱相符的會員，請再確認一次" : "名冊上找不到明顯相符的人，請仔細核對後再選",
+      選項: 可選.map(function (m) { return { 值: m.id, 字: 說明(m) }; }) }
   ], { member: 建議 ? 建議.id : "" }, async function (值) {
+    const m = 可選.find(function (x) { return x.id === 值.member; });
+    const 好 = await 確認("申請人「" + r.name + "」（" + (r.agency || "") + "，公務信箱 " + (r.office_email || "未填") + "，登入 Email " + r.login_email + "）\n將連結到名冊上的：" + (m ? 說明(m) : "") + "\n確定是同一人嗎？", "確定連結");
+    if (!好) return "已取消，請重新選擇";
     try { await 呼叫("approve_link_request", { p_request: r.id, p_member: 值.member }); 提示("已連結：" + r.name); 重新繪製(); } catch (e) { return e.message; }
   }, { 儲存文字: "核准連結" });
 }
 
 // 退回申請（入會或連結），需填原因
-function 退回申請(函式, r) {
-  表單對話框("退回申請：" + r.name, [{ key: "原因", 標題: "退回原因（申請人看得到）", 類型: "多行", 行數: 3, 必填: true }], {}, async function (值) {
+function 退回申請(函式, r, 預設原因) {
+  表單對話框("退回申請：" + r.name, [{ key: "原因", 標題: "退回原因（申請人看得到）", 類型: "多行", 行數: 3, 必填: true }], { 原因: 預設原因 || "" }, async function (值) {
     const 參 = 函式 === "reject_application" ? { p_application: r.id, p_reason: 值.原因 } : { p_request: r.id, p_reason: 值.原因 };
     try { await 呼叫(函式, 參); 提示("已退回"); 重新繪製(); } catch (err) { return err.message; }
   });
 }
 
 // 「入會申請」頁籤
-function 繪製入會審核(區, 申們) {
+function 繪製入會審核(區, 申們, 名冊) {
+  const 名冊信箱 = {};
+  (名冊 || []).forEach(function (m) { if (m.email) 名冊信箱[m.email.toLowerCase()] = m; });
   區.appendChild(資料表({
     匯出檔名: "入會申請",
     資料: function () { return 申們; },
@@ -296,9 +346,14 @@ function 繪製入會審核(區, 申們) {
       { key: "status", 標題: "狀態", 顯示: 審核狀態 },
       { key: "操作", 標題: "", 不排序: true, 不匯出: true, 顯示: function (r) {
         if (r.status !== "待審") return h("span", { class: "小字 次要字" }, (r.reviewed_by || "") + " " + 民國時間(r.reviewed_at));
+        const 撞名冊 = r.email && 名冊信箱[r.email.toLowerCase()];
+        if (撞名冊) {
+          return [h("span", { class: "標記 警", title: "名冊已有這個公務信箱：" + 撞名冊.member_no + " " + 撞名冊.name }, "名冊已有此信箱（" + 撞名冊.name + "）"), " ",
+            h("button", { class: "鈕 小 危", type: "button", onclick: function (e) { e.stopPropagation(); 退回申請("reject_application", r, "名冊上已有您的資料，請改用「連結會員資料」（輸入協會給的認領碼，或送出連結申請）"); } }, "退回")];
+        }
         return [h("button", { class: "鈕 小 主", type: "button", onclick: async function (e) {
           e.stopPropagation();
-          if (!(await 確認("核准「" + r.name + "」入會？", "核准"))) return;
+          if (!(await 確認("核准「" + r.name + "」入會？（會建立一筆新的會員資料）", "核准"))) return;
           try { await 呼叫("approve_application", { p_application: r.id }); 提示("已核准"); 重新繪製(); } catch (err) { 提示(err.message, true); }
         } }, "核准"), " ", h("button", { class: "鈕 小 危", type: "button", onclick: function (e) { e.stopPropagation(); 退回申請("reject_application", r); } }, "退回")];
       } }
@@ -426,13 +481,10 @@ function 代為報名(a, 名冊, 有效報名) {
   const 欄位們 = [{ key: "member", 標題: "會員", 類型: "選單", 必填: true, 選項: 可選.map(function (m) { return { 值: m.id, 字: m.member_no + " " + m.name + "（" + (m.agency || "") + "）" }; }) }];
   if (a.meal_option) 欄位們.push({ key: "meal", 標題: "用餐", 類型: "選單", 選項: [{ 值: "葷", 字: "葷食" }, { 值: "素", 字: "素食" }], 必填: true });
   欄位們.push({ key: "note", 標題: "備註" });
+  // 正取或候補由資料庫依「當下」的名額決定（鎖住活動後重新計數），不用畫面上可能已過時的人數
   表單對話框("代會員報名：" + a.name, 欄位們, {}, async function (值) {
-    const 正取 = 有效報名.filter(function (r) { return r.status === "正取"; }).length;
-    const 候補 = 有效報名.filter(function (r) { return r.status === "候補"; }).length;
-    let 狀 = "正取";
-    if (a.capacity && 正取 >= a.capacity) { if (候補 >= a.waitlist) return "名額與候補都已額滿"; 狀 = "候補"; }
     try {
-      await 新增("registrations", { activity_id: a.id, member_id: 值.member, status: 狀, meal: 值.meal || "", note: 值.note || "" });
+      const 狀 = await 呼叫("staff_register", { p_activity: a.id, p_member: 值.member, p_meal: 值.meal || "", p_note: 值.note || "" });
       提示("已代為報名（" + 狀 + "）");
       重新繪製();
     } catch (e) { return e.message; }

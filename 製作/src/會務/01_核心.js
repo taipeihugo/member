@@ -184,8 +184,10 @@ function 表單欄位(f, 值) {
       輸入.value = v;
       break;
     case "選單":
+      // 必填且還沒有值時放一個「請選擇」佔位（不能選回來），避免瀏覽器自動選第一項、讓必填檢查失效；
+      // 選項本身已含空值（例如「無」）的欄位設 不加空白
       輸入 = h("select", { id: id },
-        f.必填 ? null : h("option", { value: "" }, "（未選）"),
+        f.不加空白 ? null : f.必填 ? (v === "" || v == null ? h("option", { value: "", disabled: true, selected: true, hidden: true }, "請選擇") : null) : h("option", { value: "" }, "（未選）"),
         (typeof f.選項 === "function" ? f.選項() : f.選項 || []).map(function (o) {
           const 值o = typeof o === "object" ? o.值 : o;
           const 字 = typeof o === "object" ? o.字 : o;
