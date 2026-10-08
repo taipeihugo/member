@@ -463,6 +463,24 @@ create policy claim_codes_select on public.claim_codes for select to authenticat
 drop policy if exists link_requests_select on public.link_requests;
 create policy link_requests_select on public.link_requests for select to authenticated using (user_id = auth.uid() or public.is_staff());
 
+-- 帳號一連結到會員資料（不論透過認領碼、核准連結、核准入會或 make_staff），
+-- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請
+create or replace function public.members_after_link() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.user_id is not null and (tg_op = 'INSERT' or new.user_id is distinct from old.user_id) then
+    update public.link_requests set status = '核准', member_id = new.id, reviewed_by = '系統（帳號已連結）', reviewed_at = now()
+      where user_id = new.user_id and status = '待審';
+    update public.applications set status = '核准', review_note = '帳號已連結既有會員資料', reviewed_by = '系統（帳號已連結）', reviewed_at = now()
+      where user_id = new.user_id and status = '待審';
+  end if;
+  return null;
+end $$;
+drop trigger if exists members_after_link on public.members;
+create trigger members_after_link after insert or update of user_id on public.members
+  for each row execute function public.members_after_link();
+revoke execute on function public.members_after_link() from public, anon, authenticated;
+
 -- 幹部產生認領碼（只針對尚未連結帳號的會員；重新產生會取代舊碼）；回傳 會員id、姓名、認領碼、到期日
 create or replace function public.generate_claim_codes(p_members uuid[])
 returns table (member_id uuid, name text, code text, expires_at timestamptz)

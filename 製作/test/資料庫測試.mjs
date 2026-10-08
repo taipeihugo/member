@@ -37,7 +37,11 @@ export async function 以身分(db, 使用者, 動作) {
     await db.query("select set_config('request.jwt.claim.sub', '', false), set_config('request.jwt.claims', '', false)");
     await db.exec("set role anon");
   }
-  try { return await 動作(); } finally { await db.exec("reset role"); }
+  try { return await 動作(); } finally {
+    // 恢復成「SQL Editor」身分：沒有登入者（auth.uid() 為 null）
+    await db.exec("reset role");
+    await db.query("select set_config('request.jwt.claim.sub', '', false), set_config('request.jwt.claims', '', false)");
+  }
 }
 
 // 直接執行測試（被其他測試 import 時不執行）
@@ -185,6 +189,23 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   await db.query("select public.make_staff('xin.personal@gmail.example', '總幹事', '辛總幹事', 'xin@fia.example.gov')");
   await 以身分(db, 辛帳, () => db.query("update public.members set staff_role = '承辦人' where email = 'geng@mail.mof.gov.tw'"));
   檢查((await db.query("select staff_role from public.members where email = 'geng@mail.mof.gov.tw'")).rows[0].staff_role === "承辦人", "總幹事可以指派幹部角色");
+
+  // 先送了連結申請、之後被 make_staff（或認領碼）連結：待審申請自動結案
+  const 壬帳 = await 新帳("ren.personal@gmail.example");
+  await 以身分(db, 壬帳, () => db.query("select public.submit_link_request('壬總幹事', '財政部賦稅署', '', '', 'ren@fia.example.gov', '', '')"));
+  await 以身分(db, 壬帳, () => db.query("select public.submit_application('壬總幹事', '', '', '財政部賦稅署', '', '', '', '', 'ren@fia.example.gov')"));
+  await db.query("select public.make_staff('ren.personal@gmail.example', '總幹事', '壬總幹事', 'ren@fia.example.gov')");
+  const 壬申 = (await db.query("select (select status from public.link_requests where login_email = 'ren.personal@gmail.example') as l, (select status from public.applications where user_id = $1) as a", [壬帳.id])).rows[0];
+  檢查(壬申.l === "核准" && 壬申.a === "核准", "帳號被 make_staff 連結後，原本待審的連結申請與入會申請自動結案");
+  const 壬 = (await 以身分(db, 壬帳, () => db.query("select staff_role from public.members where user_id = auth.uid()"))).rows[0];
+  檢查(壬 && 壬.staff_role === "總幹事", "先註冊、送過申請的人，執行 make_staff 後成為總幹事");
+  // 認領碼路徑也會結案
+  const 癸id = (await 秘("insert into public.members (name, email) values ('癸會員', 'gui@fia.example.gov') returning id")).rows[0].id;
+  const 癸帳 = await 新帳("gui.personal@gmail.example");
+  await 以身分(db, 癸帳, () => db.query("select public.submit_link_request('癸會員', '', '', '', '', '', '')"));
+  const 癸碼 = (await 秘("select code from public.generate_claim_codes(array[$1::uuid])", [癸id])).rows[0].code;
+  await 以身分(db, 癸帳, () => db.query("select public.claim_with_code($1)", [癸碼]));
+  檢查((await db.query("select status from public.link_requests where user_id = $1", [癸帳.id])).rows[0].status === "核准", "用認領碼連結後，原本待審的連結申請也自動結案");
 
   console.log("九、未登入者");
   for (const 表 of ["members", "activities", "registrations", "fees", "applications", "claim_codes", "link_requests"]) {
