@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+<meta name="app-version" content="{{版本}}">
+<meta name="referrer" content="no-referrer">
+<title>會務管理系統 {{版本}}</title>
+<link rel="icon" href="{{會徽}}">
+<style>
+{{樣式}}
+</style>
+</head>
+<body>
+<div id="應用">
+  <header class="表頭">
+    <button class="鈕 文字 選單鈕" id="選單鈕" type="button" aria-label="開關選單">☰</button>
+    <img class="會徽" src="{{會徽}}" alt="" width="36" height="36">
+    <div class="表頭名">
+      <div class="協會名" id="協會名">會務管理系統</div>
+      <div class="小字 次要字">會務管理系統 <span id="版號">{{版本}}</span></div>
+    </div>
+    <div class="表頭右">
+      <span id="存檔狀態" class="標記"></span>
+      <button class="鈕 小" id="存檔鈕" type="button" title="存檔（Ctrl+S）">存檔</button>
+      <button class="鈕 小" id="主題鈕" type="button" title="切換深色／淺色">深淺色</button>
+      <button class="鈕 小" id="說明鈕" type="button">說明</button>
+      <span id="使用者區" class="小字"></span>
+    </div>
+  </header>
+  <div class="主體">
+    <nav id="側欄" class="側欄" aria-label="功能選單"></nav>
+    <main id="內容" class="內容" tabindex="-1">
+      <noscript>本系統需要啟用 JavaScript。</noscript>
+    </main>
+  </div>
+</div>
+<div id="提示區" class="提示區" role="status" aria-live="polite"></div>
+<div id="列印區" class="列印區"></div>
+<script>
+{{程式}}
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+/* 會務系統版面：表頭、側欄、內容區、對話框、資料表、列印 */
+
+/* 整體框架 */
+#應用 { min-height: 100vh; display: flex; flex-direction: column; }
+.表頭 {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: .7rem;
+  padding: .45rem 1rem; background: var(--navy); color: #fff;
+  border-bottom: 3px solid var(--gold);
+}
+.表頭 .會徽 { flex: none; }
+.表頭名 { min-width: 0; }
+.表頭名 .協會名 { font-weight: 700; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.表頭名 .次要字 { color: #cfcde6; }
+.表頭右 { margin-left: auto; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.表頭 .鈕 { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+.表頭 .鈕:hover { border-color: var(--gold); }
+.表頭 #使用者區 { color: #e8e6f6; }
+.選單鈕 { display: none; color: #fff !important; font-size: 1.3rem; }
+.主體 { flex: 1; display: flex; min-height: 0; }
+.側欄 {
+  flex: none; width: 210px; padding: .8rem .5rem; background: var(--surface);
+  border-right: 1px solid var(--line); overflow-y: auto;
+}
+.側欄 button {
+  display: flex; align-items: center; gap: .6em; width: 100%;
+  padding: .55em .8em; margin-bottom: 2px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.側欄 button:hover { background: var(--surface-2); }
+.側欄 button[aria-current="page"] { background: var(--navy); color: #fff; box-shadow: inset 4px 0 0 var(--gold); }
+.側欄 .圖示 { width: 1.4em; text-align: center; }
+.側欄 .分隔 { height: 1px; background: var(--line); margin: .6rem .4rem; }
+.內容 { flex: 1; min-width: 0; padding: 1.2rem 1.4rem 3rem; outline: none; }
+
+/* 頁面標題列 */
+.頁首 { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.頁首 h1 { font-size: 1.45rem; margin: 0; }
+.頁首 .工具 { margin-left: auto; display: flex; gap: .5rem; flex-wrap: wrap; }
+
+/* 分頁籤 */
+.頁籤 { display: flex; gap: .3rem; border-bottom: 2px solid var(--line); margin-bottom: 1rem; flex-wrap: wrap; }
+.頁籤 button {
+  border: 0; background: none; font: inherit; padding: .5em 1em; cursor: pointer; color: var(--muted);
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+}
+.頁籤 button[aria-selected="true"] { color: var(--text); font-weight: 700; border-bottom-color: var(--gold); }
+
+/* 首頁統計格 */
+.格 { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+.格2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.數字卡 .數字 { font-size: 2rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.數字卡 .標 { color: var(--muted); font-size: .9rem; }
+.數字卡 { border-top: 4px solid var(--gold); }
+.卡 h2 { font-size: 1.05rem; }
+.清單 { list-style: none; margin: 0; padding: 0; }
+.清單 li { padding: .45em 0; border-bottom: 1px dashed var(--line); display: flex; gap: .6em; align-items: baseline; }
+.清單 li:last-child { border-bottom: 0; }
+.條圖 { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding-top: .5rem; }
+.條圖 .柱 { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; font-size: .75rem; color: var(--muted); }
+.條圖 .柱 i { display: block; width: 100%; max-width: 28px; background: var(--navy); border-radius: 4px 4px 0 0; min-height: 2px; }
+:root[data-theme="dark"] .條圖 .柱 i { background: var(--gold); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .條圖 .柱 i { background: var(--gold); } }
+
+/* 資料表元件 */
+.表工具列 { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .6rem; }
+.表工具列 input[type="search"] { min-width: 220px; flex: 1 1 220px; max-width: 360px; }
+.表工具列 .右側 { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap; }
+.表 th.可排序 { cursor: pointer; user-select: none; }
+.表 th.可排序::after { content: " ↕"; color: var(--muted); font-weight: 400; }
+.表 th[aria-sort="ascending"]::after { content: " ▲"; color: var(--gold); }
+.表 th[aria-sort="descending"]::after { content: " ▼"; color: var(--gold); }
+.表 tbody tr.可點 { cursor: pointer; }
+.表 tbody tr:hover { background: var(--surface-2); }
+.表 tbody tr.已選 { background: var(--gold-soft); }
+.表 .勾 { width: 2.2em; }
+.分頁列 { display: flex; gap: .4rem; align-items: center; justify-content: flex-end; margin-top: .6rem; flex-wrap: wrap; }
+.批次列 { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; padding: .4rem .6rem; background: var(--gold-soft); border-radius: 8px; margin-bottom: .6rem; }
+.空 { padding: 1.5rem; text-align: center; color: var(--muted); }
+
+/* 表單 */
+.表單 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .8rem 1rem; }
+.表單 .欄 { display: flex; flex-direction: column; gap: .25rem; }
+.表單 .欄.寬 { grid-column: 1 / -1; }
+.表單 .欄 > span { font-size: .88rem; color: var(--muted); }
+.表單 .欄 .必填::after { content: " *"; color: var(--danger); }
+.表單 .欄 small { color: var(--muted); }
+.標籤組 { display: flex; flex-wrap: wrap; gap: .3rem .8rem; }
+.標籤組 label { display: inline-flex; gap: .3em; align-items: center; }
+.錯誤 { color: var(--danger); }
+
+/* 對話框 */
+dialog.對話框 {
+  border: 0; border-radius: 14px; padding: 0; width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px); background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+dialog.對話框.寬 { width: min(1080px, calc(100vw - 32px)); }
+dialog.對話框::backdrop { background: rgba(14, 12, 40, .55); }
+.對話框 .框頭 { display: flex; align-items: center; gap: .5rem; padding: .8rem 1.2rem; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.對話框 .框頭 h2 { margin: 0; font-size: 1.1rem; }
+.對話框 .框頭 .關 { margin-left: auto; }
+.對話框 .框身 { padding: 1rem 1.2rem; overflow-y: auto; max-height: calc(100vh - 180px); }
+.對話框 .框尾 { display: flex; gap: .5rem; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--line); }
+
+/* 提示訊息 */
+.提示區 { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column; gap: .5rem; }
+.提示 { background: var(--navy); color: #fff; padding: .6em 1em; border-radius: 8px; box-shadow: var(--shadow); border-left: 4px solid var(--gold); max-width: 420px; }
+.提示.錯 { border-left-color: #ff6b5b; }
+
+/* 歡迎與登入畫面 */
+.歡迎 { max-width: 640px; margin: 2rem auto; }
+.歡迎 .會徽大 { display: block; margin: 0 auto 1rem; width: 96px; height: 96px; }
+.歡迎 h1 { text-align: center; }
+.歡迎 .卡 { margin-top: 1rem; }
+.提醒 { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: .6em .9em; font-size: .9rem; }
+
+/* 衝突對照 */
+.衝突 { border: 1px solid var(--line); border-radius: 10px; padding: .8rem; margin-bottom: .8rem; }
+.衝突 table td:nth-child(2), .衝突 table td:nth-child(3) { width: 38%; }
+.衝突 .不同 { background: var(--warn-soft); }
+
+/* 簽到 */
+.簽到輸入 { font-size: 1.3rem; padding: .5em .8em; width: 100%; max-width: 420px; }
+.相片牆 { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .6rem; }
+.相片牆 figure { margin: 0; }
+.相片牆 img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+
+/* 會員挑選清單 */
+.挑選清單 { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.挑選清單 button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: .45em .7em; font: inherit; color: var(--text); cursor: pointer; }
+.挑選清單 button:hover { background: var(--surface-2); }
+
+/* 手機與窄螢幕 */
+@media (max-width: 860px) {
+  .選單鈕 { display: inline-flex; }
+  .側欄 { position: fixed; top: 58px; bottom: 0; left: 0; z-index: 30; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow); }
+  .側欄.開 { transform: none; }
+  .內容 { padding: 1rem; }
+  .表頭右 #使用者區 { display: none; }
+}
+
+/* 列印：只印列印區，A4 直式 */
+.列印區 { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+  body { background: #fff; color: #000; }
+  #應用, .提示區 { display: none !important; }
+  .列印區 { display: block; }
+  .列印區.標楷 { font-family: var(--font-kai); }
+  .列印頁 { page-break-after: always; break-after: page; }
+  .列印頁:last-child { page-break-after: auto; break-after: auto; }
+}
+.列印區 .表 th { background: #eee; color: #000; }
+.列印區 .表 th, .列印區 .表 td { border: 1px solid #555; }
+.列印頁 h1 { text-align: center; font-size: 20pt; margin-bottom: .3em; }
+.列印頁 .副標 { text-align: center; margin-bottom: 1em; }
+.收據 { border: 2px solid #000; padding: 10mm; margin-bottom: 8mm; }
+.收據 table { width: 100%; border-collapse: collapse; }
+.收據 td { border: 1px solid #000; padding: 3mm; font-size: 13pt; }
+.收據 .聯別 { text-align: right; font-size: 10pt; }
+.簽名列 { display: flex; justify-content: space-around; margin-top: 12mm; }
