@@ -232,18 +232,20 @@ function 較新(a, b) {
 // 衝突對照對話框：每筆衝突列出兩邊不同的欄位，讓使用者選保留哪一邊；回傳 {索引: "我的"|"對方"} 或 null
 async function 衝突對話框(衝突們) {
   const 區 = h("div", null,
-    h("p", null, "您和其他人同時修改了下列資料。請逐筆選擇要保留哪一個版本（預設已選修改時間較新的）。"));
+    h("p", null, "您和其他人同時修改了下列資料（只列出兩邊不同的欄位）。請逐筆選擇要保留哪一個版本（預設已選修改時間較新的）。"));
   衝突們.forEach(function (c, i) {
     const 欄位 = new Set(Object.keys(c.我的 || {}).concat(Object.keys(c.對方 || {})));
     const 列 = [];
+    // 只列出兩邊不同的欄位（修改時間以民國年顯示）
     欄位.forEach(function (k) {
-      if (k === "id" || k === "建立時間") return;
-      const a = c.我的 ? 顯示值(c.我的[k]) : "（已刪除）", b = c.對方 ? 顯示值(c.對方[k]) : "（已刪除）";
-      列.push(h("tr", { class: a !== b ? "不同" : "" }, h("th", null, k), h("td", null, a), h("td", null, b)));
+      if (k === "id" || k === "建立時間" || k === "鹽" || k === "雜湊") return;
+      const 轉 = function (r) { return r ? (k === "修改時間" ? 民國時間(r[k]) : 顯示值(r[k])) : "（已刪除）"; };
+      const a = 轉(c.我的), b = 轉(c.對方);
+      if (a !== b) 列.push(h("tr", { class: "不同" }, h("th", null, k), h("td", null, a), h("td", null, b)));
     });
     const 預設對方 = 較新(c.我的, c.對方) === c.對方;
     區.appendChild(h("div", { class: "衝突", dataset: { index: i } },
-      h("h3", null, c.集合 + "：" + (紀錄名稱(c.集合, c.我的 || c.對方 || {}))),
+      h("h3", null, 紀錄名稱(c.集合, c.我的 || c.對方 || {})),
       h("div", { class: "表捲" }, h("table", { class: "表" },
         h("thead", null, h("tr", null, h("th", null, "欄位"), h("th", null, "我的版本"), h("th", null, "其他人的版本"))),
         h("tbody", null, 列))),
@@ -302,10 +304,19 @@ async function 讀附件(路徑) {
   try {
     const 段 = 路徑.split("/");
     const 夾 = await 取子資料夾(段.slice(0, -1), false);
-    return await (await 夾.getFileHandle(段[段.length - 1])).getFile();
+    const f = await (await 夾.getFileHandle(段[段.length - 1])).getFile();
+    // 有些環境讀出的檔案沒有類型，依副檔名補上（圖片才顯示得出來）
+    return f.type ? f : new File([f], f.name, { type: 副檔名類型(f.name), lastModified: f.lastModified });
   } catch (e) {
     return null;
   }
+}
+
+// 依副檔名猜檔案類型
+function 副檔名類型(檔名) {
+  const 副 = String(檔名).split(".").pop().toLowerCase();
+  return { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+    pdf: "application/pdf", txt: "text/plain", csv: "text/csv", json: "application/json" }[副] || "application/octet-stream";
 }
 
 // 刪除附件檔（找不到就略過）
@@ -321,20 +332,13 @@ async function 刪附件(路徑) {
 // ===== 單檔模式（瀏覽器不支援資料夾功能時）=====
 
 // 讓使用者選一個協會資料.json 檔讀入
-function 開啟資料檔() {
-  return new Promise(function (完成, 失敗) {
-    const 選 = h("input", { type: "file", accept: ".json,application/json" });
-    選.addEventListener("change", async function () {
-      try {
-        const f = 選.files[0];
-        if (!f) return 完成(undefined);
-        狀態.模式 = "單檔";
-        狀態.檔名 = f.name;
-        完成(補齊資料(JSON.parse(await f.text())));
-      } catch (e) { 失敗(e); }
-    });
-    選.click();
-  });
+async function 開啟資料檔() {
+  const f = (await 選擇檔案(".json,application/json"))[0];
+  if (!f) return undefined;
+  const 資料 = 補齊資料(JSON.parse(await f.text()));
+  狀態.模式 = "單檔";
+  狀態.檔名 = f.name;
+  return 資料;
 }
 
 // 單檔模式存檔：下載整份資料檔，請使用者放回原位置

@@ -302,9 +302,8 @@ function 猜欄位(標題) {
 
 // 匯入名冊：選檔 → 對應欄位 → 比對重複 → 匯入
 function 匯入會員(完成後) {
-  const 選 = h("input", { type: "file", accept: ".xlsx,.ods,.csv", id: "匯入檔案" });
-  選.addEventListener("change", async function () {
-    const f = 選.files[0];
+  選擇檔案(".xlsx,.ods,.csv").then(async function (檔們) {
+    const f = 檔們[0];
     if (!f) return;
     try {
       const 列 = await 讀試算表(f);
@@ -314,8 +313,6 @@ function 匯入會員(完成後) {
       提示("讀取失敗：" + e.message, true);
     }
   });
-  if (測試模式) 狀態.匯入選檔 = 選;
-  選.click();
 }
 
 // 欄位對應對話框：每個檔案欄位選要對應到哪個會員欄位，並選重複時怎麼處理
@@ -386,10 +383,10 @@ function 執行匯入(資料列, 對應, 重複處理) {
 
 // 匯入官網產生的入會申請資料檔（可一次選多個），建立「申請中」的會員
 function 匯入入會申請(完成後) {
-  const 選 = h("input", { type: "file", accept: ".json", multiple: true, id: "匯入申請檔" });
-  選.addEventListener("change", async function () {
+  選擇檔案(".json", true).then(async function (檔們) {
+    if (!檔們.length) return;
     let 新增 = 0, 重複 = 0, 錯誤 = 0;
-    for (const f of Array.from(選.files)) {
+    for (const f of 檔們) {
       try {
         const j = JSON.parse(await f.text());
         if (j.格式 !== "協會申請資料" || j.類型 !== "入會申請" || !j.資料 || !j.資料.姓名) { 錯誤++; continue; }
@@ -406,6 +403,4 @@ function 匯入入會申請(完成後) {
       h("li", null, "與既有會員重複 " + 重複 + " 件（未匯入）"), h("li", null, "不是入會申請檔 " + 錯誤 + " 件")));
     if (完成後) 完成後();
   });
-  if (測試模式) 狀態.匯入選檔 = 選;
-  選.click();
 }

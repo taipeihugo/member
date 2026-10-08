@@ -70,8 +70,8 @@ function 資料表(設定) {
     const 頁數 = Math.max(1, Math.ceil(列.length / 每頁));
     if (狀.頁 >= 頁數) 狀.頁 = 頁數 - 1;
     const 本頁 = 列.slice(狀.頁 * 每頁, 狀.頁 * 每頁 + 每頁);
-    // 已選的只保留仍存在的
-    const 存在 = new Set(設定.資料().map(function (r) { return r.id; }));
+    // 已選的只保留目前篩選結果裡看得到的（避免勾了看不到的資料還被批次處理）
+    const 存在 = new Set(列.map(function (r) { return r.id; }));
     狀.已選.forEach(function (id) { if (!存在.has(id)) 狀.已選.delete(id); });
     const 有勾選 = !!(設定.批次 && 設定.批次.length);
     const 全選 = h("input", { type: "checkbox", "aria-label": "全選本頁", checked: 本頁.length > 0 && 本頁.every(function (r) { return 狀.已選.has(r.id); }),

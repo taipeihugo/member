@@ -272,6 +272,24 @@ function 表單對話框(標題, 欄位們, 初值, 儲存, 選項) {
   ]), 選項);
 }
 
+// ===== 選檔 =====
+
+// 跳出選檔視窗，回傳使用者選的檔案陣列；暫時把選檔元素放進頁面，選完就移除（使用者按取消時不會回傳）
+function 選擇檔案(接受, 多選) {
+  // 清掉上次按取消而留下的選檔元素
+  document.querySelectorAll("input.暫用選檔").forEach(function (el) { el.remove(); });
+  return new Promise(function (完成) {
+    const 選 = h("input", { type: "file", accept: 接受 || null, multiple: !!多選, class: "隱藏 暫用選檔" });
+    選.addEventListener("change", function () {
+      const 檔們 = Array.from(選.files || []);
+      選.remove();
+      if (檔們.length) 完成(檔們);
+    });
+    document.body.appendChild(選);
+    選.click();
+  });
+}
+
 // ===== 列印 =====
 
 // 把內容放到列印區後呼叫瀏覽器列印（A4 直式；可選標楷體）

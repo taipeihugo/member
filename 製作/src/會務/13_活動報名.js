@@ -250,10 +250,10 @@ function 非會員報名(a, 完成後) {
 
 // 匯入官網產生的報名資料檔（可多選）；活動 為 null 時依檔案裡的活動編號對應
 function 匯入報名檔(活動, 完成後) {
-  const 選 = h("input", { type: "file", accept: ".json", multiple: true, id: "匯入報名檔" });
-  選.addEventListener("change", async function () {
+  選擇檔案(".json", true).then(async function (檔們) {
+    if (!檔們.length) return;
     const 結果 = { 正取: 0, 候補: 0, 重複或額滿: [], 無法辨識: 0 };
-    for (const f of Array.from(選.files)) {
+    for (const f of 檔們) {
       try {
         const j = JSON.parse(await f.text());
         if (j.格式 !== "協會申請資料" || j.類型 !== "活動報名" || !j.資料 || !j.資料.姓名) { 結果.無法辨識++; continue; }
@@ -275,7 +275,6 @@ function 匯入報名檔(活動, 完成後) {
       h("li", null, "無法辨識或找不到對應活動 " + 結果.無法辨識 + " 個檔案")));
     if (完成後) 完成後();
   });
-  選.click();
 }
 
 // 列印簽到表（正取名單＋簽名欄）
