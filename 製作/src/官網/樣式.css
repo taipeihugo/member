@@ -1,0 +1,111 @@
+/* 官網版面：站頭選單、首頁主視覺、卡片、列表、表單、組織圖、手機版、列印申請書 */
+
+.寬度 { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+.跳至內容 { position: absolute; left: -9999px; top: 0; background: var(--gold); color: #000; padding: .5em 1em; z-index: 100; }
+.跳至內容:focus { left: 8px; top: 8px; }
+
+/* 站頭 */
+.站頭 { background: var(--navy); color: #fff; border-bottom: 4px solid var(--gold); position: sticky; top: 0; z-index: 20; }
+.站頭列 { display: flex; align-items: center; gap: 1rem; min-height: 68px; flex-wrap: wrap; }
+.站名 { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; font-weight: 700; font-size: 1.15rem; min-width: 0; }
+.站名 span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.主選單 { display: flex; gap: .1rem; margin-left: auto; flex-wrap: wrap; order: 2; }
+.主題鈕 { order: 3; padding: .2em .6em !important; font-size: .85rem !important; white-space: nowrap; }
+.主選單 a { color: #e9e8f7; text-decoration: none; padding: .45em .55em; border-radius: 6px; font-size: .95rem; }
+.主選單 a:hover { background: rgba(255,255,255,.1); color: #fff; }
+.主選單 a[aria-current="page"] { color: #fff; box-shadow: inset 0 -3px 0 var(--gold); }
+.站頭 .鈕 { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); min-height: 34px; }
+.選單鈕 { display: none; order: 3; }
+
+/* 內容 */
+.內容 { padding-top: 1.6rem; padding-bottom: 3rem; min-height: 60vh; outline: none; }
+.內容 > h1 { font-size: 1.7rem; border-left: 6px solid var(--gold); padding-left: .6rem; }
+.段 { margin-top: 2rem; }
+.段 > h2 { font-size: 1.3rem; display: flex; align-items: baseline; gap: .6rem; }
+.段 > h2 a { font-size: .9rem; font-weight: 400; margin-left: auto; }
+.格 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.卡 h3 { margin-bottom: .3em; font-size: 1.1rem; }
+.卡 p { margin: .3em 0; }
+.日期 { color: var(--muted); font-size: .88rem; font-variant-numeric: tabular-nums; }
+.內文 { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 首頁主視覺 */
+.主視覺 { background: linear-gradient(135deg, #2a2854 0%, #3c3a78 60%, #2a2854 100%); color: #fff; border-radius: 16px; padding: 2.4rem 1.6rem; display: flex; gap: 1.6rem; align-items: center; flex-wrap: wrap; border-bottom: 5px solid var(--gold); }
+.主視覺 img { width: 110px; height: 110px; flex: none; }
+.主視覺 h1 { font-size: 2rem; margin: 0 0 .2em; }
+.主視覺 p { color: #e2e0f5; font-size: 1.1rem; margin: 0 0 1rem; }
+.主視覺 .鈕 { margin: .2rem .4rem .2rem 0; }
+.主視覺 .鈕:not(.金) { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }
+
+/* 快速連結 */
+.快速 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.快速 a { display: block; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; border-top: 4px solid var(--gold); box-shadow: var(--shadow); }
+.快速 a strong { display: block; font-size: 1.1rem; }
+.快速 a span { color: var(--muted); font-size: .9rem; }
+.快速 a:hover { border-color: var(--gold); }
+
+/* 消息列表 */
+.消息列 { list-style: none; margin: 0; padding: 0; }
+.消息列 li { display: flex; gap: .8rem; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.消息列 li a { font-weight: 600; flex: 1 1 260px; overflow-wrap: anywhere; }
+.分類鈕 { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.分類鈕 button[aria-pressed="true"] { background: var(--brand); color: var(--brand-text); border-color: var(--brand); }
+
+/* 組織架構圖 */
+.組織圖 { display: flex; flex-direction: column; align-items: center; gap: .9rem; }
+.組織圖 .層 { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; position: relative; }
+.組織圖 .節點 { background: var(--surface); border: 2px solid var(--navy); border-radius: 10px; padding: .45em 1em; font-weight: 600; text-align: center; }
+:root[data-theme="dark"] .組織圖 .節點 { border-color: var(--gold); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .組織圖 .節點 { border-color: var(--gold); } }
+.組織圖 .節點.頂 { background: var(--navy); color: #fff; }
+.組織圖 .線 { width: 2px; height: 16px; background: var(--gold); }
+.組織圖 .節點.小 { font-weight: 400; font-size: .92rem; border-width: 1px; }
+
+/* 問答 */
+details.問答 { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .2rem 1rem; margin-bottom: .6rem; }
+details.問答 summary { cursor: pointer; font-weight: 600; padding: .6rem 0; }
+details.問答[open] summary { border-bottom: 1px dashed var(--line); margin-bottom: .5rem; }
+
+/* 表單 */
+.表單 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .8rem 1rem; }
+.表單 .欄 { display: flex; flex-direction: column; gap: .25rem; }
+.表單 .欄.寬 { grid-column: 1 / -1; }
+.表單 .欄 > label { font-size: .9rem; color: var(--muted); }
+.表單 .必填::after { content: " *"; color: var(--danger); }
+.錯誤 { color: var(--danger); }
+.完成訊息 { background: var(--ok-soft); color: var(--ok); border-radius: 8px; padding: .8rem 1rem; }
+
+/* 照片 */
+.相片牆 { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .6rem; }
+.相片牆 img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; }
+
+/* 站尾 */
+.站尾 { background: var(--navy); color: #d6d4ee; padding: 1.6rem 0; font-size: .9rem; border-top: 4px solid var(--gold); }
+.站尾 a { color: #fff; }
+.站尾 strong { color: #fff; }
+
+/* 手機版 */
+@media (max-width: 900px) {
+  .選單鈕 { display: inline-flex; }
+  .主選單 { display: none; width: 100%; flex-direction: column; padding-bottom: .6rem; order: 4; }
+  .主選單.開 { display: flex; }
+  .主選單 a { padding: .6em .4em; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .主題鈕 { margin-left: auto; }
+  .站頭列 { gap: .5rem; }
+  .主視覺 { padding: 1.6rem 1.1rem; }
+  .主視覺 h1 { font-size: 1.5rem; }
+  .主視覺 img { width: 72px; height: 72px; }
+}
+
+/* 列印入會申請書 */
+.列印區 { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 18mm; }
+  body { background: #fff; color: #000; }
+  .站頭, .站尾, .內容, #範例條, .跳至內容 { display: none !important; }
+  .列印區 { display: block; font-family: var(--font-kai); }
+}
+.申請書 h1 { text-align: center; font-size: 20pt; }
+.申請書 table { width: 100%; border-collapse: collapse; }
+.申請書 th, .申請書 td { border: 1px solid #000; padding: 3mm; text-align: left; font-size: 12pt; }
+.申請書 th { width: 25%; background: #f2f2f2; }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{CSP}}">
+<meta name="app-version" content="{{版本}}">
+<meta name="referrer" content="no-referrer">
+<title>{{標題}}</title>
+<link rel="icon" href="{{會徽}}">
+<style>
+{{樣式}}
+</style>
+</head>
+<body data-page="{{頁}}">
+<a class="跳至內容" href="#內容">跳至主要內容</a>
+<header class="站頭">
+  <div class="寬度 站頭列">
+    <a class="站名" href="index.html"><img src="{{會徽}}" alt="" width="44" height="44"><span id="站名">協會官網</span></a>
+    <button class="鈕 主題鈕" id="主題鈕" type="button" title="切換深色／淺色" >深淺色</button>
+    <button class="鈕 選單鈕" id="選單鈕" type="button" aria-expanded="false" aria-controls="主選單">選單</button>
+    <nav class="主選單" id="主選單" aria-label="主選單">
+        {{選單}}
+    </nav>
+  </div>
+</header>
+<div id="範例條"></div>
+<main id="內容" class="寬度 內容" tabindex="-1">
+  <h1>{{標題}}</h1>
+  <noscript><p>請啟用 JavaScript 以顯示網站內容。</p></noscript>
+</main>
+<footer class="站尾">
+  <div class="寬度" id="站尾"></div>
+</footer>
+<div id="列印區" class="列印區"></div>
+<script src="資料/site-data.js"></script>
+<script>
+{{程式}}
+</script>
+</body>
+</html>
