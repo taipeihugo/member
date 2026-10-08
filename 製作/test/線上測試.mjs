@@ -416,7 +416,7 @@ try {
   await page.locator("#內容 tbody tr", { hasText: "甲會員" }).first().click();
   await 框().waitFor();
   const 登入帳號欄 = await 框().locator("[data-key='登入帳號']").inputValue();
-  檢查(登入帳號欄.startsWith("jia.home@gmail.example（由具管理權限的幹部建立或連結）"), "管理者編輯會員時看得到連結的登入帳號與連結方式（" + 登入帳號欄 + "）");
+  檢查(登入帳號欄.startsWith("jia.home@gmail.example（已經具管理權限的幹部建立或核對）"), "管理者編輯會員時看得到連結的登入帳號與連結方式（" + 登入帳號欄 + "）");
   await page.keyboard.press("Escape");
   // 連點兩下：只開一個編輯視窗
   延遲["rpc:member_login_email"] = 300;
@@ -680,6 +680,36 @@ try {
   await page.waitForTimeout(500);
   檢查((await db.query("select is_admin from public.staff_roles where name = '會計'")).rows[0].is_admin === false, "也可以再取消");
   檢查((await page.locator("#幹部表 tbody tr").count()) >= 1, "系統設定列出目前的幹部名單");
+  // 唯一的管理者不能把自己卸任（會鎖住系統），畫面顯示原因（以下兩次被伺服器拒絕的儲存，瀏覽器各記一筆 400，是預期的）
+  const 拒絕起點 = 主控台錯誤.length;
+  await page.locator("#幹部表 tbody tr", { hasText: "陳秘書" }).click();
+  await 框().waitFor();
+  await 框().locator("[data-key='agency']").selectOption("財政部（部本部）");
+  await 框().locator("[data-key='staff_role']").selectOption("會計");
+  await 框().locator("button", { hasText: "儲存" }).click();
+  await page.waitForSelector("dialog[open] >> text=沒有任何人具管理權限");
+  檢查((await db.query("select staff_role from public.members where email = 'sec@fia.example.gov'")).rows[0].staff_role === "秘書長", "唯一的管理者不能把自己改成不具管理權限的角色（顯示原因，角色不變）");
+  await page.keyboard.press("Escape");
+  // 會計、承辦人改過的會員：管理者建立帳號後不能直接指派幹部，勾選「已向本人核對」後才可以
+  await db.query("update public.members set identity_by_staff = true where email = 'bing@example.org'");
+  await 選單("會員管理");
+  await 建帳號("丙監事", "bing.home@gmail.example", "bingpass1");
+  檢查((await db.query("select linked_by_admin from public.members where email = 'bing@example.org'")).rows[0].linked_by_admin === false, "這種會員建立帳號後不算管理者連結");
+  await page.fill(".表工具列 input[type=search]", "丙監事");
+  await page.locator("#內容 tbody tr", { hasText: "丙監事" }).first().click();
+  await 框().waitFor();
+  await 框().locator("[data-key='staff_role']").selectOption("會計");
+  await 框().locator("button", { hasText: "儲存" }).click();
+  await page.waitForSelector("dialog[open] >> text=還沒經具管理權限的幹部核對");
+  檢查(true, "未核對就指派幹部時被擋，並說明要先核對");
+  await 框().locator("[data-key='核對']").check();
+  await 框().locator("button", { hasText: "儲存" }).click();
+  await page.waitForTimeout(600);
+  const 丙核 = (await db.query("select staff_role, linked_by_admin, identity_by_staff from public.members where email = 'bing@example.org'")).rows[0];
+  檢查(丙核.staff_role === "會計" && 丙核.linked_by_admin && !丙核.identity_by_staff, "勾選「已向本人核對」後同一次儲存就能指派幹部");
+  const 拒絕錯誤 = 主控台錯誤.splice(拒絕起點);
+  檢查(拒絕錯誤.length === 2 && 拒絕錯誤.every((e) => /status of 400/.test(e)), "上述被拒絕的儲存只產生預期的 400（" + 拒絕錯誤.length + " 筆）");
+  await page.fill(".表工具列 input[type=search]", "");
 } catch (e) {
   失敗.push("測試中斷：" + (e.stack || e.message));
   console.error(e);

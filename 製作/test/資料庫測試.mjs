@@ -22,6 +22,7 @@ create table auth.identities (id uuid primary key default gen_random_uuid(), use
   provider_id text not null, identity_data jsonb not null, provider text not null, last_sign_in_at timestamptz,
   created_at timestamptz, updated_at timestamptz, email text generated always as (lower(identity_data ->> 'email')) stored,
   unique (provider_id, provider));
+create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users (id) on delete cascade, created_at timestamptz default now());
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 grant usage on schema public to anon, authenticated; grant usage on schema auth to anon, authenticated;
@@ -67,7 +68,8 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   const db = await 建立資料庫();
   // 帳號：秘書長、承辦人、會員甲、會員乙、申請人（尚非會員）、未驗證者
   const 帳 = {};
-  for (const [名, 驗證] of [["秘書長", true], ["承辦人", true], ["甲", true], ["乙", true], ["申請人", true], ["未驗證", false]]) {
+  // 甲、乙註冊了但還沒收到驗證信（未驗證）：秘書長直接替他們建立（接管）帳號
+  for (const [名, 驗證] of [["秘書長", true], ["承辦人", true], ["甲", false], ["乙", false], ["申請人", true], ["未驗證", false]]) {
     帳[名] = { id: crypto.randomUUID(), email: 名 === "未驗證" ? "unverified@example.org" : "u" + Object.keys(帳).length + "@example.org" };
     await db.query("insert into auth.users values ($1, $2, $3)", [帳[名].id, 帳[名].email, 驗證 ? new Date().toISOString() : null]);
   }
@@ -83,7 +85,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   // 秘書長替甲、乙「建立登入帳號」：兩人已註冊過，直接改成秘書長設定的密碼並連結
   for (const [名, 信箱] of [["甲", "jia@example.org"], ["乙", 帳.乙.email]]) {
     const r = (await 以身分(db, 帳.秘書長, () => db.query("select public.create_member_login((select id from public.members where email = $1), $2, 'pass12345') as r", [信箱.toLowerCase() === "jia@example.org" ? "jia@example.org" : 信箱, 帳[名].email]))).rows[0].r;
-    檢查(r === "已存在", "建立登入帳號：Email 已註冊過時直接接管（" + 名 + "）");
+    檢查(r === "已存在", "建立登入帳號：Email 已註冊但未驗證時直接接管（" + 名 + "）");
   }
   檢查((await db.query("select count(*)::int as n from auth.users where id = $1 and encrypted_password = extensions.crypt('pass12345', encrypted_password)", [帳.甲.id])).rows[0].n === 1, "接管後密碼改成秘書長設定的（bcrypt 雜湊，不存明碼）");
   const 甲id = (await 以身分(db, 帳.甲, () => db.query("select public.link_my_member() as id"))).rows[0].id;
@@ -185,8 +187,12 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'not-an-email', 'abcd1234')", [戊id]), "格式不正確"), "Email 格式不對被擋");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'y@gmail.example', 'abcd1234')", [丁id]), "已經有登入帳號"), "已有帳號的會員不能再建立");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'ding.personal@gmail.example', 'abcd1234')", [戊id]), "已經是名冊上「丁會員」的登入帳號"), "已連結別人的 Email 不能拿來建立");
-  // 管理者重設密碼
+  // 已註冊並驗證的帳號不能接管（避免改掉別人正在用的密碼）：請本人送連結申請
+  檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'wu.personal@gmail.example', 'abcd1234')", [戊id]), "已經有人註冊並完成驗證"), "已驗證的帳號不能被「建立登入帳號」接管");
+  // 管理者重設密碼：原本的登入工作階段全部失效
+  await db.query("insert into auth.sessions (user_id) values ($1), ($1)", [丁帳.id]);
   await 秘("select public.set_member_password($1, 'newding99')", [丁id]);
+  檢查((await db.query("select count(*)::int as n from auth.sessions where user_id = $1", [丁帳.id])).rows[0].n === 0, "重設密碼後，這個帳號原本的登入全部失效");
   檢查((await db.query("select encrypted_password = extensions.crypt('newding99', encrypted_password) as ok from auth.users where id = $1", [丁帳.id])).rows[0].ok, "管理者可替會員重設密碼");
   檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select public.set_member_password($1, 'abcd1234')", [丁id])), "只有具管理權限"), "一般會員不能用這個函式重設密碼");
   檢查(await 應失敗(() => 秘("select public.set_member_password($1, 'abcd1234')", [戊id]), "還沒有登入帳號"), "還沒有帳號的會員不能重設密碼");
@@ -231,7 +237,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查(壬 && 壬.staff_role === "總幹事", "先註冊、送過申請的人，執行 make_staff 後成為總幹事");
   // 管理者建立帳號（接管已註冊的帳號）也會結案
   const 癸id = (await 秘("insert into public.members (name, email) values ('癸會員', 'gui@fia.example.gov') returning id")).rows[0].id;
-  const 癸帳 = await 新帳("gui.personal@gmail.example");
+  const 癸帳 = await 新帳("gui.personal@gmail.example", false);
   await 以身分(db, 癸帳, () => db.query("select public.submit_link_request('癸會員', '', '', '', '', '', '')"));
   await 秘("select public.create_member_login($1, 'gui.personal@gmail.example', 'guipass12')", [癸id]);
   檢查((await db.query("select status from public.link_requests where user_id = $1", [癸帳.id])).rows[0].status === "核准", "管理者建立帳號連結後，原本待審的連結申請也自動結案");
@@ -247,6 +253,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   {
     const 新 = async (email) => { const u = { id: crypto.randomUUID(), email }; await db.query("insert into auth.users values ($1, $2, now())", [u.id, email]); return u; };
     const 長帳 = await 新("chair@gmail.example"), 辦帳 = await 新("clerk@gmail.example"), 分身 = await 新("clerk.alt@gmail.example"), 預建帳 = await 新("pre@gmail.example");
+    await db.query("update auth.users set email_confirmed_at = null where id = $1", [預建帳.id]);
     await db.query("select public.make_staff('chair@gmail.example', '理事長', '測試理事長', 'chair@fia.example.gov')");
     await db.query("select public.make_staff('clerk@gmail.example', '承辦人', '測試承辦人', 'clerk@fia.example.gov')");
     const 長列 = (await db.query("select id from public.members where email = 'chair@fia.example.gov'")).rows[0].id;
@@ -284,8 +291,8 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     const 乙申 = (await 以身分(db, 分身3, () => db.query("select public.submit_link_request('將任乙', '', '', '', '', '', '') as id"))).rows[0].id;
     await 辦("select public.approve_link_request($1, $2)", [乙申, 將任乙]);
     const 長 = (sql, p) => 以身分(db, 長帳, () => db.query(sql, p));
-    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]), "不是由具管理權限"), "承辦人核准連結的會員，理事長不能直接指派幹部角色（防分身奪權）");
-    檢查(await 應失敗(() => 長("update public.members set staff_role = '總幹事' where id = $1", [將任乙]), "不是由具管理權限"), "同上（另一位）");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]), "還沒經具管理權限"), "承辦人核准連結的會員，理事長不能直接指派幹部角色（防分身奪權）");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '總幹事' where id = $1", [將任乙]), "還沒經具管理權限"), "同上（另一位）");
     檢查((await 以身分(db, 分身2, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "", "上述被擋後，分身帳號仍不是幹部");
     // 正確做法：解除連結 → 管理者替本人建立帳號 → 指派
     await 長("select public.unlink_member($1)", [將任甲]);
@@ -303,7 +310,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查((await db.query("select linked_by_admin from public.members where id = $1", [R列])).rows[0].linked_by_admin === true, "理事長核准的入會申請，帳號連結標記為管理者連結");
     await 辦("update public.members set name = '王未來', email = 'future@fia.example.gov', employee_no = 'E123' where id = $1", [R列]);
     檢查((await db.query("select linked_by_admin from public.members where id = $1", [R列])).rows[0].linked_by_admin === false, "承辦人改了已連結那筆的姓名、Email、員工編號後，不再算管理者連結");
-    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [R列]), "不是由具管理權限"), "理事長指派那筆為幹部時被擋（防止改名冒充後奪權）");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [R列]), "還沒經具管理權限"), "理事長指派那筆為幹部時被擋（防止改名冒充後奪權）");
     檢查((await 以身分(db, 分身4, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "", "上述被擋後，分身帳號仍不是幹部");
     await 以身分(db, 分身4, () => db.query("select public.update_my_profile('男', '財政部國庫署', '國庫組', '科員', '分機 1')"));
     // 2i. 已是幹部的會計把自己那筆改成將升任者的姓名、員工編號 → 理事長把那筆從會計改成秘書長時被擋
@@ -311,9 +318,27 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     await db.query("select public.make_staff('acct@gmail.example', '會計', '測試會計', 'acct@fia.example.gov')");
     const 計列 = (await db.query("select id from public.members where email = 'acct@fia.example.gov'")).rows[0].id;
     await 以身分(db, 計帳, () => db.query("update public.members set name = '王將任', employee_no = 'E777' where id = $1", [計列]));
-    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [計列]), "不是由具管理權限"), "會計改了自己那筆的姓名、員工編號後，不能被直接改指派為秘書長");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [計列]), "還沒經具管理權限"), "會計改了自己那筆的姓名、員工編號後，不能被直接改指派為秘書長");
     await 長("update public.members set staff_role = '' where id = $1", [計列]);
     檢查((await db.query("select staff_role from public.members where id = $1", [計列])).rows[0].staff_role === "", "取消幹部角色不受影響");
+    // 2j. 承辦人先把還沒有帳號的會員 Email 改成分身信箱，再讓管理者照名冊 Email 建立帳號 → 不算管理者連結，指派被擋；核對後才能指派
+    const 目標列 = (await db.query("insert into public.members (name, email) values ('王將來', 'wang.future@fia.example.gov') returning id")).rows[0].id;
+    const 分身5 = await 新("wang.alt@gmail.example");
+    await db.query("update auth.users set email_confirmed_at = null where id = $1", [分身5.id]);
+    await 辦("update public.members set email = 'wang.alt@gmail.example' where id = $1", [目標列]);
+    檢查((await db.query("select identity_by_staff from public.members where id = $1", [目標列])).rows[0].identity_by_staff === true, "承辦人改了未連結會員的 Email，留下「會計、承辦人修改過」標記");
+    await 長("select public.create_member_login($1, 'wang.alt@gmail.example', 'wangpass1')", [目標列]);
+    檢查((await db.query("select linked_by_admin from public.members where id = $1", [目標列])).rows[0].linked_by_admin === false, "照承辦人改過的 Email 建立帳號，不算管理者連結");
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [目標列]), "還沒經具管理權限"), "這時不能直接指派幹部（防分身奪權）");
+    檢查(await 應失敗(() => 辦("select public.confirm_member_identity($1)", [目標列]), "只有具管理權限"), "承辦人不能自己按「已向本人核對」");
+    await 長("select public.confirm_member_identity($1)", [目標列]);
+    await 長("update public.members set staff_role = '總幹事' where id = $1", [目標列]);
+    檢查((await db.query("select staff_role, identity_by_staff, linked_by_admin from public.members where id = $1", [目標列])).rows.map((r) => r.staff_role + r.identity_by_staff + r.linked_by_admin).join() === "總幹事falsetrue", "管理者核對後才能指派");
+    const 管改列 = (await 辦("insert into public.members (name, email) values ('承辦人新增', 'staffadd@fia.example.gov') returning id")).rows[0].id;
+    檢查((await db.query("select identity_by_staff from public.members where id = $1", [管改列])).rows[0].identity_by_staff === true, "承辦人新增的會員也有標記");
+    await 長("update public.members set email = 'staffadd2@fia.example.gov' where id = $1", [管改列]);
+    檢查((await db.query("select identity_by_staff from public.members where id = $1", [管改列])).rows[0].identity_by_staff === false, "管理者修改身分資料後清除標記");
+    檢查(!(await db.query("select has_column_privilege('authenticated', 'public.members', 'identity_by_staff', 'UPDATE') as ok")).rows[0].ok, "登入者不能直接改標記");
     // 管理者可以看登入帳號（個人 Email）核對；其他人不行
     檢查((await 長("select public.member_login_email($1) as e", [R列])).rows[0].e === "clerk.alt4@gmail.example", "管理者看得到某位會員連結的登入帳號");
     檢查(await 應失敗(() => 辦("select public.member_login_email($1)", [R列]), "只有具管理權限"), "承辦人不能查登入帳號");
@@ -412,6 +437,20 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     await 以身分(db2, 唯一, () => db2.query("select public.delete_staff_role('秘書長')"));
     await 以身分(db2, 唯一, () => db2.query("select public.delete_staff_role('總幹事')"));
     檢查((await db2.query("select string_agg(name, ',' order by sort) as n from public.staff_roles")).rows[0].n === "理事長,會計,承辦人", "沒人使用的管理角色可以刪除");
+    // 唯一的管理者不能把自己取消角色、停權、解除連結或刪除（會讓系統沒有管理者）
+    const 唯一列 = (await db2.query("select id from public.members where user_id = $1", [唯一.id])).rows[0].id;
+    const 唯 = (sql, p) => 以身分(db2, 唯一, () => db2.query(sql, p));
+    檢查(await 應失敗(() => 唯("update public.members set staff_role = '' where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能取消自己的幹部角色");
+    檢查(await 應失敗(() => 唯("update public.members set staff_role = '會計' where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能把自己改成不具管理權限的角色");
+    檢查(await 應失敗(() => 唯("update public.members set status = '停權' where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能把自己停權");
+    檢查(await 應失敗(() => 唯("select public.unlink_member($1)", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能解除自己的帳號連結");
+    檢查(await 應失敗(() => 唯("delete from public.members where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能刪除自己");
+    // 有第二位管理者後就可以卸任
+    const 二 = { id: crypto.randomUUID(), email: "second@gmail.example" };
+    await db2.query("insert into auth.users values ($1, $2, now())", [二.id, 二.email]);
+    await db2.query("select public.make_staff('second@gmail.example', '理事長', '第二位', 'second@fia.example.gov')");
+    await 唯("update public.members set staff_role = '' where id = $1", [唯一列]);
+    檢查((await db2.query("select staff_role from public.members where id = $1", [唯一列])).rows[0].staff_role === "", "另有管理者時可以卸下自己的管理角色");
   }
 
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");

@@ -92,6 +92,11 @@ create policy staff_roles_select on public.staff_roles for select to authenticat
 drop policy if exists board_titles_select on public.board_titles;
 create policy board_titles_select on public.board_titles for select to authenticated using (true);
 
+-- 這筆的姓名、Email 或員工編號最後是不是由會計、承辦人（不具管理權限的幹部）新增或修改的（v2.2）。
+-- 是的話，具管理權限的幹部替他建立帳號或核准連結時不算「管理者連結」，要在會員資料「已向本人核對」後才能指派幹部
+-- （避免有人先把名冊上的 Email 改成自己分身的信箱，再讓管理者照著建立帳號）
+alter table public.members add column if not exists identity_by_staff boolean not null default false;
+
 -- 活動：meal_option 為 true 時，報名要選葷或素
 create table if not exists public.activities (
   id uuid primary key default gen_random_uuid(),
@@ -235,15 +240,21 @@ begin
       raise exception '只有具管理權限的幹部可以變更幹部的會籍、Email 或帳號連結';
     end if;
   end if;
-  -- 會計、承辦人改了已連結帳號那筆的姓名、Email 或員工編號：不再算管理者連結（避免把分身帳號那筆改成別人再請管理者指派）
-  if auth.uid() is not null and tg_op = 'UPDATE' and not public.is_admin() and new.user_id is not null
-      and (new.name, new.email, new.employee_no) is distinct from (old.name, lower(trim(old.email)), old.employee_no) then
-    new.linked_by_admin := false;
+  -- 姓名、Email、員工編號由誰設定：會計、承辦人新增或修改 → 標記，且這筆已連結的帳號不再算管理者連結
+  --（避免把分身帳號那筆改成別人、或先把名冊 Email 改成分身信箱，再請管理者建立帳號或指派）；具管理權限的幹部修改 → 清除標記
+  if auth.uid() is not null and (tg_op = 'INSERT'
+      or (new.name, new.email, new.employee_no) is distinct from (old.name, lower(trim(old.email)), old.employee_no)) then
+    if public.is_admin() then
+      new.identity_by_staff := false;
+    else
+      new.identity_by_staff := true;
+      if new.user_id is not null then new.linked_by_admin := false; end if;
+    end if;
   end if;
   -- 指派或變更幹部角色時（取消角色除外），這筆的帳號連結必須是管理者建立或核准的（SQL Editor 不受限）
   if auth.uid() is not null and tg_op = 'UPDATE' and new.staff_role is distinct from old.staff_role and new.staff_role <> ''
       and new.user_id is not null and not new.linked_by_admin then
-    raise exception '「%」的帳號連結不是由具管理權限的幹部建立的（例如由會計、承辦人核准連結，v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請先「解除帳號連結」，再由具管理權限的幹部替他「建立登入帳號」（或核准他的連結申請），之後再指派', new.name;
+    raise exception '「%」的登入帳號還沒經具管理權限的幹部核對（例如由會計、承辦人核准連結、v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請在會員資料看過「登入帳號」、向本人確認後，勾選「已向本人核對」並儲存，再指派', new.name;
   end if;
   return new;
 end $$;
@@ -624,7 +635,7 @@ begin
   select * into 申 from public.link_requests where id = p_request and status = '待審' for update;
   if not found then raise exception '找不到待審的連結申請'; end if;
   if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結其他會員資料'; end if;
-  update public.members set user_id = 申.user_id, linked_by_admin = public.is_admin() where id = p_member and user_id is null;
+  update public.members set user_id = 申.user_id, linked_by_admin = public.is_admin() and not identity_by_staff where id = p_member and user_id is null;
   if not found then raise exception '這位會員已連結其他帳號，或找不到這位會員'; end if;
   select name into 我名 from public.members where user_id = auth.uid();
   update public.link_requests set status = '核准', member_id = p_member, reviewed_by = coalesce(我名, ''), reviewed_at = now() where id = 申.id;
@@ -668,12 +679,22 @@ end $$;
 -- =====================================================================
 create extension if not exists pgcrypto with schema extensions;
 
+-- 讓某個帳號原本的登入全部失效（刪除 Supabase 的登入工作階段，更新憑證會一併失效）
+create or replace function public.end_sessions(p_user uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from auth.sessions where user_id = p_user;
+exception when undefined_table then null;
+end $$;
+
 -- 建立（或接管）登入帳號並連結到名冊上的這位會員；回傳 '已建立' 或 '已存在'
 --   Email 還沒有人註冊：建立一個已驗證的新帳號
---   Email 已經註冊過、但還沒連結任何會員（例如註冊了卻收不到驗證信）：直接完成驗證、改成這次設定的密碼
+--   Email 註冊過但還沒完成驗證（例如收不到驗證信）、也還沒連結任何會員：直接完成驗證、改成這次設定的密碼
+--   Email 已註冊並驗證過：不接管（避免改掉別人正在用的帳號密碼），請本人登入後送連結申請
+--   這筆的姓名、Email、員工編號若由會計、承辦人修改過，連結後還要在會員資料「已向本人核對」才能指派幹部
 create or replace function public.create_member_login(p_member uuid, p_login_email text, p_password text)
 returns text language plpgsql security definer set search_path = public, extensions as $$
-declare 人 public.members; 信箱 text := lower(btrim(coalesce(p_login_email, ''))); 帳號 uuid; 已連 text; 結果 text;
+declare 人 public.members; 信箱 text := lower(btrim(coalesce(p_login_email, ''))); 帳號 uuid; 已連 text; 結果 text; 已驗證 boolean;
 begin
   if not public.is_admin() then raise exception '只有具管理權限的幹部可以建立登入帳號'; end if;
   if 信箱 !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then raise exception 'Email 格式不正確'; end if;
@@ -681,13 +702,17 @@ begin
   select * into 人 from public.members where id = p_member for update;
   if not found then raise exception '找不到這位會員'; end if;
   if 人.user_id is not null then raise exception '「%」已經有登入帳號；要換 Email 請先「解除帳號連結」', 人.name; end if;
-  select id into 帳號 from auth.users where lower(email) = 信箱 limit 1;
+  select id, email_confirmed_at is not null into 帳號, 已驗證 from auth.users where lower(email) = 信箱 limit 1;
   if 帳號 is not null then
     select name into 已連 from public.members where user_id = 帳號;
     if 已連 is not null then raise exception '% 已經是名冊上「%」的登入帳號', 信箱, 已連; end if;
+    if 已驗證 then
+      raise exception '% 已經有人註冊並完成驗證，不能直接改它的密碼。請本人用這個 Email 登入後送「連結申請」，再到「申請審核」核准', 信箱;
+    end if;
     update auth.users set encrypted_password = crypt(p_password, gen_salt('bf', 10)),
-      email_confirmed_at = coalesce(email_confirmed_at, now()), confirmation_token = '', recovery_token = '', updated_at = now()
+      email_confirmed_at = now(), confirmation_token = '', recovery_token = '', updated_at = now()
       where id = 帳號;
+    perform public.end_sessions(帳號);
     結果 := '已存在';
   else
     帳號 := gen_random_uuid();
@@ -703,7 +728,7 @@ begin
         'email', now(), now(), now());
     結果 := '已建立';
   end if;
-  update public.members set user_id = 帳號, linked_by_admin = true where id = p_member;
+  update public.members set user_id = 帳號, linked_by_admin = not 人.identity_by_staff where id = p_member;
   return 結果;
 end $$;
 
@@ -721,6 +746,17 @@ begin
     raise exception '不能替其他具管理權限的幹部重設密碼，請他自己用「修改密碼」或「忘記密碼」';
   end if;
   update auth.users set encrypted_password = crypt(p_password, gen_salt('bf', 10)), updated_at = now() where id = 人.user_id;
+  -- 比照 Supabase 自己改密碼：讓這個帳號原本的登入全部失效（例如密碼外洩、在公用電腦忘了登出）
+  perform public.end_sessions(人.user_id);
+end $$;
+
+-- 管理者核對會員的身分資料與登入帳號：清除「會計、承辦人修改過」標記，已連結的帳號算管理者連結（之後可以指派幹部）
+create or replace function public.confirm_member_identity(p_member uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以核對會員身分'; end if;
+  update public.members set identity_by_staff = false, linked_by_admin = (user_id is not null) where id = p_member;
+  if not found then raise exception '找不到這位會員'; end if;
 end $$;
 
 -- =====================================================================
@@ -809,14 +845,32 @@ begin
   update public.board_titles b set sort = t.序 from unnest(p_titles) with ordinality as t(名, 序) where b.title = t.名;
 end $$;
 
+-- 不能讓系統沒有任何一位能登入的管理者：具管理權限的幹部把自己（或最後一位管理者）取消角色、停權、解除帳號連結、刪除時擋下
+-- （SQL Editor 不受限，萬一鎖住可以用 make_staff 救回）
+create or replace function public.members_keep_admin() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and old.user_id is not null and old.status = '有效'
+      and exists (select 1 from public.staff_roles r where r.name = old.staff_role and r.is_admin)
+      and not exists (select 1 from public.members m join public.staff_roles r on r.name = m.staff_role
+        where r.is_admin and m.user_id is not null and m.status = '有效') then
+    raise exception '這樣改之後就沒有任何人具管理權限了（系統設定、指派幹部都會無法再操作）。請先讓另一位會員擔任具管理權限的角色';
+  end if;
+  return null;
+end $$;
+drop trigger if exists members_keep_admin on public.members;
+create trigger members_keep_admin after update of staff_role, status, user_id or delete on public.members
+  for each row execute function public.members_keep_admin();
+
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
+revoke execute on function public.end_sessions(uuid), public.members_keep_admin() from public, anon, authenticated;
 revoke execute on function public.member_login_email(uuid), public.submit_link_request(text, text, text, text, text, text, text),
   public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),
-  public.create_member_login(uuid, text, text), public.set_member_password(uuid, text),
+  public.create_member_login(uuid, text, text), public.set_member_password(uuid, text), public.confirm_member_identity(uuid),
   public.add_staff_role(text, boolean), public.delete_staff_role(text), public.set_staff_role_admin(text, boolean), public.reorder_staff_roles(text[]),
   public.add_board_title(text, text), public.delete_board_title(text), public.reorder_board_titles(text[]) from public, anon;
 grant execute on function public.member_login_email(uuid), public.submit_link_request(text, text, text, text, text, text, text),
   public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),
-  public.create_member_login(uuid, text, text), public.set_member_password(uuid, text),
+  public.create_member_login(uuid, text, text), public.set_member_password(uuid, text), public.confirm_member_identity(uuid),
   public.add_staff_role(text, boolean), public.delete_staff_role(text), public.set_staff_role_admin(text, boolean), public.reorder_staff_roles(text[]),
   public.add_board_title(text, text), public.delete_board_title(text), public.reorder_board_titles(text[]) to authenticated;

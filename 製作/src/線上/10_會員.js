@@ -6,7 +6,7 @@ const 預設服務機關 = ["財政部（部本部）", "財政部國庫署", "�
 
 // 理監事職稱選項（依「系統設定」的清單）：選了就決定是理事或監事（兩者互斥）
 function 理監事選項() {
-  const 清單 = 線上.職稱們.length ? 線上.職稱們 : 預設職稱們;
+  const 清單 = 線上.設定已讀 ? 線上.職稱們 : 預設職稱們;
   return [{ 值: "", 字: "無" }].concat(清單.map(function (t) {
     return { 值: t.board_role + "|" + t.title, 字: t.title === t.board_role ? t.title : t.title + "（" + t.board_role + "）" };
   }));
@@ -14,7 +14,7 @@ function 理監事選項() {
 
 // 幹部角色選項（依「系統設定」的清單）
 function 幹部角色選項() {
-  return (線上.角色們.length ? 線上.角色們 : 預設角色們).map(function (r) { return r.name; });
+  return (線上.設定已讀 ? 線上.角色們 : 預設角色們).map(function (r) { return r.name; });
 }
 
 // 會員的職務文字（例：常務理事、會員代表、秘書長）

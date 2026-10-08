@@ -11,7 +11,7 @@ const 檢查 = (c, m) => { if (c) 通過++; else 失敗++; console.log((c ? "  �
 // 用指定的名冊與試算表內容執行一次匯入，回傳預覽文字、新增與修改的資料、匯入後的名冊
 async function run(roster, rows) {
   const db = roster.map(m=>({ email: "", employee_no: "", ...m })); let nid = 0; const out = { patches: [], inserts: [], dlg: [] };
-  const ctx = { console, 連線: { 帳號: { id: "me" } }, 預設職稱們: [], 線上: { 職稱們: [{ title: "理事長", board_role: "理事" }, { title: "理事", board_role: "理事" }, { title: "候補理事", board_role: "理事" }, { title: "監事", board_role: "監事" }] }, 選擇檔案: async()=>[{name:"x.csv"}], 讀試算表: async()=>rows, 查詢: async()=>db.map(m=>({...m})), 今天:()=>"2026-10-08",
+  const ctx = { console, 連線: { 帳號: { id: "me" } }, 預設職稱們: [], 線上: { 設定已讀: true, 職稱們: [{ title: "理事長", board_role: "理事" }, { title: "理事", board_role: "理事" }, { title: "候補理事", board_role: "理事" }, { title: "監事", board_role: "監事" }] }, 選擇檔案: async()=>[{name:"x.csv"}], 讀試算表: async()=>rows, 查詢: async()=>db.map(m=>({...m})), 今天:()=>"2026-10-08",
     提示: m=>out.dlg.push("toast:"+m), h:(t,a,...k)=>k.flat(Infinity).filter(x=>x!=null).map(x=>typeof x==="string"?x:"").join(" | "),
     對話框: async(t,b)=>{out.dlg.push([].concat(b).filter(Boolean).join(" || ")); return true;},
     新增: async(t,r)=>{ for (const x of r) { if (x.email && db.some(m=>m.email===x.email)) { const e = new Error("已有相同 Email 的會員"); e.狀態碼 = 409; throw e; } }

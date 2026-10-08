@@ -6,7 +6,8 @@ const 線上 = {
   申請: null,      // 最近一次入會申請（還不是會員時用）
   連結申請: null,  // 最近一次帳號連結申請（還沒連結會員資料時用）
   角色們: [],      // 系統設定的幹部角色 [{name, is_admin, sort}]
-  職稱們: []       // 系統設定的理監事職稱 [{title, board_role, sort}]
+  職稱們: [],      // 系統設定的理監事職稱 [{title, board_role, sort}]
+  設定已讀: false  // 已讀過系統設定（清單可能是空的，也照用）
 };
 
 // 資料庫還沒更新到有「系統設定」時用的預設清單
@@ -25,15 +26,18 @@ function 是管理者() {
   return !!(線上.幹部 && 角 && 角.is_admin);
 }
 
-// 讀取系統設定（幹部角色、理監事職稱）；資料庫還沒更新時用預設清單
+// 讀取系統設定（幹部角色、理監事職稱）；只有資料庫還沒更新（沒有這兩張表，回 404）時才用預設清單，其他錯誤照樣丟出
 async function 讀取系統設定() {
+  const 場 = 連線.場次;
+  let 角 = 預設角色們, 職 = 預設職稱們;
   try {
-    const [角, 職] = await Promise.all([查詢("staff_roles", null, "sort.asc", "name"), 查詢("board_titles", null, "sort.asc", "title")]);
-    線上.角色們 = 角; 線上.職稱們 = 職;
+    [角, 職] = await Promise.all([查詢("staff_roles", null, "sort.asc", "name"), 查詢("board_titles", null, "sort.asc", "title")]);
   } catch (e) {
-    if (e.需重新登入 || e.網路) throw e;
-    線上.角色們 = 預設角色們; 線上.職稱們 = 預設職稱們;
+    if (e.狀態碼 !== 404) throw e;
   }
+  // 讀取期間登出或換人登入：不要蓋掉下一位的設定
+  if (連線.場次 !== 場) return;
+  線上.角色們 = 角; 線上.職稱們 = 職; 線上.設定已讀 = true;
 }
 
 // 建立置中的卡片畫面（登入、註冊等用）
@@ -59,7 +63,7 @@ function 輸入欄(標題, 屬性) {
 
 // 顯示登入畫面
 function 顯示登入頁(訊息) {
-  線上.會員 = null; 線上.幹部 = ""; 線上.申請 = null; 線上.角色們 = []; 線上.職稱們 = [];
+  線上.會員 = null; 線上.幹部 = ""; 線上.申請 = null; 線上.角色們 = []; 線上.職稱們 = []; 線上.設定已讀 = false;
   更新外框();
   const 信 = 輸入欄("Email", { id: "登入信箱", type: "email", autocomplete: "username" });
   const 密 = 輸入欄("密碼", { id: "登入密碼", type: "password", autocomplete: "current-password" });
