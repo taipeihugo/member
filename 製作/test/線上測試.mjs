@@ -26,7 +26,8 @@ function 檢查(條件, 說明) {
 
 // ===== 模擬 Supabase =====
 const db = await 建立資料庫();
-const 帳號們 = new Map();   // email → {id, 密碼}
+// 依 Email 找登入帳號 {id, email}（帳號都存在模擬的 auth.users，密碼以 bcrypt 雜湊，與 Supabase 相同）
+async function 帳號(email) { return (await db.query("select id, email from auth.users where lower(email) = lower($1)", [email])).rows[0]; }
 // 產生假的存取憑證（測試用，不簽章；每次都不同，才測得出延長後換了新憑證）
 let 憑證序 = 0;
 const 憑證 = (u) => "h." + Buffer.from(JSON.stringify({ sub: u.id, email: u.email, n: ++憑證序 })).toString("base64url") + ".s";
@@ -65,6 +66,10 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
   const rpc = 路徑.match(/^\/rest\/v1\/rpc\/([a-z_]+)$/);
   // 指定某個資料庫函式回應延遲（在切換身分之前等，不影響其他同時進行的請求）
   if (rpc && 延遲["rpc:" + rpc[1]]) await new Promise((r) => setTimeout(r, 延遲["rpc:" + rpc[1]]));
+  // 指定的資料表讀取、修改延遲也在切換身分之前等（PGlite 只有一條連線，等候期間其他請求才不會用錯身分）
+  const 表名 = (路徑.match(/^\/rest\/v1\/([a-z_]+)$/) || [])[1];
+  if (方法 === "GET" && 延遲[表名]) await new Promise((r) => setTimeout(r, 延遲[表名]));
+  if (方法 === "PATCH" && 延遲.寫入) await new Promise((r) => setTimeout(r, 延遲.寫入));
   return 以身分(db, 使用者, async () => {
     if (rpc) {
       const 名 = rpc[1];
@@ -80,7 +85,6 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
     const 值們 = [];
     if (方法 === "GET") {
       // 比照 Supabase：一次最多回「最多列數」筆，超過的部分要用 limit／offset 分頁；Content-Range 告知總數
-      if (延遲[表]) await new Promise((r) => setTimeout(r, 延遲[表]));
       const 全部 = (await db.query(`select * from public.${表}${條件SQL(參數, 值們)}${排序SQL(參數)}`, 值們)).rows;
       const 起 = Number(參數.get("offset")) || 0;
       const 筆 = Math.min(Number(參數.get("limit")) || 最多列數, 最多列數);
@@ -89,7 +93,6 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
     }
     if (方法 === "DELETE") return (await db.query(`delete from public.${表}${條件SQL(參數, 值們)} returning *`, 值們)).rows;
     if (方法 === "PATCH") {
-      if (延遲.寫入) await new Promise((r) => setTimeout(r, 延遲.寫入));
       模擬.寫入者.push(使用者 ? 使用者.email : "未登入");
       const 欄 = Object.keys(內容);
       欄.forEach((k) => 值們.push(內容[k]));
@@ -120,17 +123,18 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
 async function 登入API(方法, 路徑, 參數, 內容, 使用者) {
   if (路徑 === "/auth/v1/signup") {
     // 比照開啟 Email 驗證的 Supabase：已註冊的 Email 回一個沒有身分資料的假使用者（不報錯、不寄信）
-    if (帳號們.has(內容.email)) return { id: crypto.randomUUID(), email: 內容.email, identities: [] };
-    const u = { id: crypto.randomUUID(), email: 內容.email, 密碼: 內容.password };
-    帳號們.set(內容.email, u);
+    if (await 帳號(內容.email)) return { id: crypto.randomUUID(), email: 內容.email, identities: [] };
+    const id = crypto.randomUUID();
     // 模擬「使用者已點驗證信」：直接標記已驗證；註冊回應不含登入憑證（需驗證 Email 的設定）
-    await db.query("insert into auth.users values ($1, $2, now())", [u.id, u.email]);
-    return { id: u.id, email: u.email };
+    await db.query("insert into auth.users (id, email, email_confirmed_at, encrypted_password, aud, role) values ($1, lower($2), now(), extensions.crypt($3, extensions.gen_salt('bf', 4)), 'authenticated', 'authenticated')", [id, 內容.email, 內容.password]);
+    return { id, email: 內容.email.toLowerCase() };
   }
   if (路徑 === "/auth/v1/token" && 參數.get("grant_type") === "password") {
-    const u = 帳號們.get(內容.email);
-    if (!u || u.密碼 !== 內容.password) throw Object.assign(new Error("Invalid login credentials"), { 狀態: 400 });
-    return 帳號回應(u);
+    // 比照 Supabase：比對 bcrypt 雜湊；Email 還沒驗證不能登入
+    const r = (await db.query("select id, email, email_confirmed_at is not null as 已驗證, coalesce(encrypted_password = extensions.crypt($2, encrypted_password), false) as 對 from auth.users where lower(email) = lower($1)", [內容.email, 內容.password])).rows[0];
+    if (!r || !r.對) throw Object.assign(new Error("Invalid login credentials"), { 狀態: 400 });
+    if (!r.已驗證) throw Object.assign(new Error("Email not confirmed"), { 狀態: 400 });
+    return 帳號回應({ id: r.id, email: r.email });
   }
   if (路徑 === "/auth/v1/token" && 參數.get("grant_type") === "refresh_token") {
     模擬.刷新次數++;
@@ -138,11 +142,14 @@ async function 登入API(方法, 路徑, 參數, 內容, 使用者) {
     if (模擬.刷新503 > 0) { 模擬.刷新503--; throw Object.assign(new Error("Service Unavailable"), { 狀態: 503 }); }
     if (模擬.刷新409 > 0) { 模擬.刷新409--; throw Object.assign(new Error("Too many concurrent token refresh requests on the same session or refresh token"), { 狀態: 409 }); }
     if (模擬.刷新拒絕) throw Object.assign(new Error("Invalid Refresh Token: Refresh Token Not Found"), { 狀態: 400 });
-    const u = [...帳號們.values()].find((x) => "r-" + x.id === 內容.refresh_token);
+    const u = (await db.query("select id, email from auth.users where 'r-' || id::text = $1", [內容.refresh_token])).rows[0];
     return 帳號回應(u);
   }
   if (路徑 === "/auth/v1/user" && 方法 === "GET") return { id: 使用者.id, email: 使用者.email };
-  if (路徑 === "/auth/v1/user" && 方法 === "PUT") { 帳號們.get(使用者.email).密碼 = 內容.password; return { id: 使用者.id }; }
+  if (路徑 === "/auth/v1/user" && 方法 === "PUT") {
+    await db.query("update auth.users set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)) where id = $1", [使用者.id, 內容.password]);
+    return { id: 使用者.id };
+  }
   if (路徑 === "/auth/v1/logout" || 路徑 === "/auth/v1/recover") return {};
   throw new Error("不支援的登入 API " + 路徑);
 }
@@ -235,7 +242,7 @@ try {
   檢查(await page.waitForSelector("text=這個 Email 已經註冊過了", { timeout: 5000 }).then(() => true, () => false), "已註冊的 Email 再註冊時，提示直接登入（不會誤以為有寄信）");
   await 登入("sec@example.org", "staffpass1");
   const 選單項 = (await page.locator("#側欄 button").allInnerTexts()).join();
-  檢查(選單項.includes("會員管理") && 選單項.includes("申請審核") && 選單項.includes("活動管理") && 選單項.includes("會費管理"), "秘書長登入後看得到幹部功能");
+  檢查(選單項.includes("會員管理") && 選單項.includes("申請審核") && 選單項.includes("活動管理") && 選單項.includes("會費管理") && 選單項.includes("系統設定"), "秘書長登入後看得到幹部功能與系統設定");
 
   console.log("三、會員管理：匯入標準名冊（含理監事、會員代表）");
   await 選單("會員管理");
@@ -319,38 +326,44 @@ try {
   fs.mkdirSync(path.dirname(出), { recursive: true });
   await dl.saveAs(出);
   檢查(fs.readFileSync(出, "utf8").replace(/^\uFEFF/, "").startsWith("姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱"), "匯出標準格式名冊");
-  // 產生認領碼（甲；秘書長已連結帳號會被略過）
-  await page.locator(".表工具列 select").nth(4).selectOption("未註冊");
-  await page.locator("#內容 tbody tr", { hasText: "甲會員" }).locator(".勾 input").check();
-  await page.locator(".批次列 button", { hasText: "產生認領碼" }).click();
-  await 框().locator("button", { hasText: "產生" }).click();
-  await page.waitForSelector("#認領碼表");
-  const 甲碼 = (await page.locator("#認領碼表 tbody td:nth-child(4)").first().innerText()).trim();
-  檢查(/^[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(甲碼), "幹部替會員產生認領碼（" + 甲碼 + "）");
-  await 截圖("專區_認領碼");
-  await 框().locator("button", { hasText: "列印紙條" }).click();
-  檢查((await page.evaluate(() => window.__T.狀態.最後列印 || "")).includes(甲碼), "可列印認領碼紙條");
-  await 框().locator("button", { hasText: "關閉" }).last().click();
+  // 管理者替會員建立登入帳號（不用收驗證信，馬上可以登入）
+  const 建帳號 = async (姓名, email, 密碼) => {
+    await page.fill(".表工具列 input[type=search]", 姓名);
+    await page.locator("#內容 tbody tr", { hasText: 姓名 }).first().click();
+    await 框().locator("button", { hasText: "建立登入帳號" }).click();
+    await 框().locator("[data-key='email']").fill(email);
+    await 框().locator("[data-key='密碼']").fill(密碼);
+    await 框().locator("[data-key='再次']").fill(密碼);
+    if (姓名 === "甲會員") await 截圖("專區_建立登入帳號");
+    await 框().locator("button", { hasText: "建立帳號" }).click();
+    await page.waitForSelector("text=已建立登入帳號 " + email.toLowerCase());
+    await page.waitForTimeout(300);
+    await page.fill(".表工具列 input[type=search]", "");
+  };
+  await 建帳號("甲會員", "jia.home@gmail.example", "memberpass1");
+  const 甲帳號 = (await db.query("select u.email, u.email_confirmed_at is not null as ok from public.members m join auth.users u on u.id = m.user_id where m.email = 'jia@example.org'")).rows[0];
+  檢查(甲帳號 && 甲帳號.email === "jia.home@gmail.example" && 甲帳號.ok, "管理者在「會員管理」替甲建立登入帳號（已驗證、已連結名冊）");
+  // 收不到信的測試帳號：新增會員後直接建立帳號
+  await page.click("#新增會員鈕");
+  await 框().locator("[data-key='name']").fill("測試帳號");
+  await 框().locator("[data-key='agency']").selectOption("財政部（部本部）");
+  await 框().locator("[data-key='email']").fill("moftest@mof.gov.tw");
+  await 框().locator("button", { hasText: "儲存" }).click();
+  await page.waitForTimeout(400);
+  await 建帳號("測試帳號", "moftest@mof.gov.tw", "test1234");
+  檢查(true, "收不到信的 moftest@mof.gov.tw 也能直接建立帳號");
   await page.click("#登出鈕");
 
-  console.log("四、一般會員：個人 Email 註冊、認領碼連結、我的資料、報名（葷素）");
-  await 註冊並登入("jia.home@gmail.example", "memberpass1");
-  await page.waitForSelector("#認領碼");
-  檢查((await page.locator("#側欄").innerText()).includes("連結會員資料"), "個人 Email 登入後先到「連結會員資料」");
-  await 截圖("專區_連結會員資料");
-  // 故意輸入錯的認領碼：伺服器回 400，瀏覽器會記一筆網路錯誤，這一筆是預期的
-  const 錯誤數 = 主控台錯誤.length;
-  await page.fill("#認領碼", "abcde-fghjk");
-  await page.click("#認領鈕");
-  await page.waitForSelector("text=認領碼不正確");
-  const 新增錯誤 = 主控台錯誤.splice(錯誤數);
-  檢查(新增錯誤.every((e) => /status of 400/.test(e)), "錯誤的認領碼被拒絕並顯示提示");
-  await page.fill("#認領碼", 甲碼.toLowerCase());
-  await page.click("#認領鈕");
+  console.log("四、一般會員：用管理者建立的帳號直接登入、我的資料、報名（葷素）");
+  await 登入("moftest@mof.gov.tw", "test1234");
+  await page.waitForSelector("#內容 >> text=測試帳號");
+  檢查(true, "收不到信的測試帳號（moftest@mof.gov.tw）不用驗證，直接用管理者設定的密碼登入");
+  await page.click("#登出鈕");
+  await 登入("jia.home@gmail.example", "memberpass1");
   await page.waitForSelector("text=常務理事");
-  檢查((await page.locator("#內容").innerText()).includes("會員代表"), "輸入認領碼後連結名冊，看得到自己的職務（常務理事、會員代表）");
+  檢查((await page.locator("#內容").innerText()).includes("會員代表"), "甲用管理者建立的帳號登入，直接看到自己的職務（常務理事、會員代表）");
   const 會員選單 = (await page.locator("#側欄 button").allInnerTexts()).join();
-  檢查(!會員選單.includes("會員管理") && 會員選單.includes("活動報名") && 會員選單.includes("繳費紀錄"), "一般會員看不到幹部功能");
+  檢查(!會員選單.includes("會員管理") && !會員選單.includes("系統設定") && 會員選單.includes("活動報名") && 會員選單.includes("繳費紀錄"), "一般會員看不到幹部功能與系統設定");
   const 可見會員 = await page.evaluate(async () => {
     const r = await fetch(window.__T.連線.網址 + "/rest/v1/members?select=*", { headers: { apikey: "x", Authorization: "Bearer " + window.__T.連線.憑證 } });
     return (await r.json()).length;
@@ -372,7 +385,7 @@ try {
   await 截圖("專區_活動報名");
   await page.click("#登出鈕");
 
-  console.log("五、沒有認領碼：送連結申請；非會員：線上入會申請");
+  console.log("五、自己註冊：送連結申請；非會員：線上入會申請");
   await 註冊並登入("yi.home@gmail.example", "memberpass2");
   await page.waitForSelector("#送出連結申請鈕");
   await page.locator("[data-key='name']").fill("乙理事長");
@@ -403,7 +416,7 @@ try {
   await page.locator("#內容 tbody tr", { hasText: "甲會員" }).first().click();
   await 框().waitFor();
   const 登入帳號欄 = await 框().locator("[data-key='登入帳號']").inputValue();
-  檢查(登入帳號欄.startsWith("jia.home@gmail.example（由理事長、秘書長或總幹事連結）"), "管理者編輯會員時看得到連結的登入帳號與連結方式（" + 登入帳號欄 + "）");
+  檢查(登入帳號欄.startsWith("jia.home@gmail.example（由具管理權限的幹部建立或連結）"), "管理者編輯會員時看得到連結的登入帳號與連結方式（" + 登入帳號欄 + "）");
   await page.keyboard.press("Escape");
   // 連點兩下：只開一個編輯視窗
   延遲["rpc:member_login_email"] = 300;
@@ -486,7 +499,7 @@ try {
   await page.click("#登出鈕");
 
   console.log("八、信件連結的安全處理");
-  const 甲帳 = 帳號們.get("jia.home@gmail.example");
+  const 甲帳 = await 帳號("jia.home@gmail.example");
   // 別人做的「驗證完成」連結夾帶他自己的登入憑證：不可以直接登入
   await page.goto("about:blank");
   await page.goto("file://" + path.join(專區夾, "index.html") + "#access_token=" + 憑證(甲帳) + "&refresh_token=r-" + 甲帳.id + "&expires_in=3600&type=signup");
@@ -620,6 +633,53 @@ try {
   模擬.刷新拒絕 = false;
   const 異常錯誤 = 主控台錯誤.splice(異常起點);
   檢查(異常錯誤.every((e) => /status of (400|401|409|503)|ERR_CONNECTION_RESET|Failed to fetch/.test(e)), "上述模擬異常只產生預期的網路錯誤（" + 異常錯誤.length + " 筆）");
+
+  console.log("十一、系統設定：增刪幹部角色與理監事職稱");
+  await 登入("sec@example.org", "staffpass1");
+  await 選單("系統設定");
+  await page.waitForSelector("#角色表");
+  檢查((await page.locator("#角色表 tbody tr").count()) === 5 && (await page.locator("#職稱表 tbody tr").count()) === 6, "系統設定列出預設的 5 個幹部角色與 6 個理監事職稱");
+  await page.fill("#新角色", "副秘書長");
+  await page.click("#新增角色鈕");
+  await page.waitForSelector("#角色表 tr[data-role='副秘書長']");
+  await page.fill("#新職稱", "候補理事");
+  await page.locator("#新職稱類別").selectOption("理事");
+  await page.click("#新增職稱鈕");
+  await page.waitForSelector("#職稱表 tr[data-title='候補理事']");
+  檢查((await db.query("select board_role from public.board_titles where title = '候補理事'")).rows[0].board_role === "理事", "新增角色「副秘書長」與職稱「候補理事（理事）」");
+  await 截圖("專區_系統設定");
+  // 新選項出現在會員編輯視窗
+  await 選單("會員管理");
+  await page.fill(".表工具列 input[type=search]", "乙理事長");
+  await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).first().click();
+  await 框().waitFor();
+  const 角色選項 = await 框().locator("[data-key='staff_role'] option").allInnerTexts();
+  檢查(角色選項.includes("副秘書長"), "會員編輯視窗的幹部角色選單出現新角色");
+  await 框().locator("[data-key='理監事']").selectOption("理事|候補理事");
+  await 框().locator("button", { hasText: "儲存" }).click();
+  await page.waitForTimeout(500);
+  const 乙職 = (await db.query("select board_role, board_title from public.members where email = 'yi@example.org'")).rows[0];
+  檢查(乙職.board_role === "理事" && 乙職.board_title === "候補理事", "會員可以設成新職稱（自動歸為理事）");
+  // 使用中的職稱不能刪；沒人用的角色可以刪；調整順序；切換管理權限
+  await 選單("系統設定");
+  await page.waitForSelector("#職稱表 tr[data-title='候補理事']");
+  檢查(await page.locator("#職稱表 tr[data-title='候補理事'] button", { hasText: "刪除" }).isDisabled(), "還有會員在用的職稱，刪除按鈕不能按");
+  await page.locator("#角色表 tr[data-role='副秘書長'] button", { hasText: "刪除" }).click();
+  await 框().locator("button", { hasText: "刪除" }).click();
+  await page.waitForSelector("#角色表 tr[data-role='副秘書長']", { state: "detached" });
+  檢查(!(await db.query("select 1 from public.staff_roles where name = '副秘書長'")).rows.length, "刪除沒人使用的角色");
+  await page.locator("#角色表 tr[data-role='理事長'] button", { hasText: "↓" }).click();
+  await page.waitForTimeout(500);
+  檢查((await db.query("select name from public.staff_roles order by sort limit 1")).rows[0].name === "秘書長", "用 ↑ ↓ 調整角色順序");
+  await page.locator("#角色表 tr[data-role='會計'] input[type=checkbox]").check();
+  await 框().locator("button", { hasText: "給予管理權限" }).click();
+  await page.waitForTimeout(500);
+  檢查((await db.query("select is_admin from public.staff_roles where name = '會計'")).rows[0].is_admin === true, "可以讓「會計」具管理權限");
+  await page.locator("#角色表 tr[data-role='會計'] input[type=checkbox]").uncheck();
+  await 框().locator("button", { hasText: "取消管理權限" }).click();
+  await page.waitForTimeout(500);
+  檢查((await db.query("select is_admin from public.staff_roles where name = '會計'")).rows[0].is_admin === false, "也可以再取消");
+  檢查((await page.locator("#幹部表 tbody tr").count()) >= 1, "系統設定列出目前的幹部名單");
 } catch (e) {
   失敗.push("測試中斷：" + (e.stack || e.message));
   console.error(e);

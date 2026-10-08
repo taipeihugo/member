@@ -5,13 +5,13 @@ const src = fs.readFileSync(path.join(原始碼, "20_幹部.js"), "utf8");
 const conn = fs.readFileSync(path.join(原始碼, "01_連線.js"), "utf8");
 // 從原始碼切出 a 到 b 之間的程式
 const g = (t, a, b) => { const i = t.indexOf(a); if (i < 0) throw a; return t.slice(i, t.indexOf(b, i)); };
-const code = [g(src,"const 線上匯入別名","// 把名冊裡的理監事"),g(src,"function 轉理監事","// 兩個值是否不衝突"),g(src,"function 不衝突","// 匯入名冊："),g(src,"async function 匯入線上名冊","// ===== 認領碼"),g(conn,"function 暫時錯誤","// 實際送出")].join("\n");
+const code = [g(src,"const 線上匯入別名","// 把名冊裡的理監事"),g(src,"function 轉理監事","// 兩個值是否不衝突"),g(src,"function 不衝突","// 匯入名冊："),g(src,"async function 匯入線上名冊","// ===== 申請審核"),g(conn,"function 暫時錯誤","// 實際送出")].join("\n");
 let 通過 = 0, 失敗 = 0;
 const 檢查 = (c, m) => { if (c) 通過++; else 失敗++; console.log((c ? "  ✔ " : "  ✘ ") + m); };
 // 用指定的名冊與試算表內容執行一次匯入，回傳預覽文字、新增與修改的資料、匯入後的名冊
 async function run(roster, rows) {
   const db = roster.map(m=>({ email: "", employee_no: "", ...m })); let nid = 0; const out = { patches: [], inserts: [], dlg: [] };
-  const ctx = { console, 連線: { 帳號: { id: "me" } }, 選擇檔案: async()=>[{name:"x.csv"}], 讀試算表: async()=>rows, 查詢: async()=>db.map(m=>({...m})), 今天:()=>"2026-10-08",
+  const ctx = { console, 連線: { 帳號: { id: "me" } }, 預設職稱們: [], 線上: { 職稱們: [{ title: "理事長", board_role: "理事" }, { title: "理事", board_role: "理事" }, { title: "候補理事", board_role: "理事" }, { title: "監事", board_role: "監事" }] }, 選擇檔案: async()=>[{name:"x.csv"}], 讀試算表: async()=>rows, 查詢: async()=>db.map(m=>({...m})), 今天:()=>"2026-10-08",
     提示: m=>out.dlg.push("toast:"+m), h:(t,a,...k)=>k.flat(Infinity).filter(x=>x!=null).map(x=>typeof x==="string"?x:"").join(" | "),
     對話框: async(t,b)=>{out.dlg.push([].concat(b).filter(Boolean).join(" || ")); return true;},
     新增: async(t,r)=>{ for (const x of r) { if (x.email && db.some(m=>m.email===x.email)) { const e = new Error("已有相同 Email 的會員"); e.狀態碼 = 409; throw e; } }
@@ -190,6 +190,12 @@ console.log("S24 名冊兩位同名、員工編號也相同（各機關各自編
   const A1 = { id:"A", name:"陳建宏", agency:"財政部賦稅署", email:"chen.jh@example.org", employee_no:"00123" }, B1 = { id:"B", name:"陳建宏", agency:"財政部國庫署", email:"jhchen@example.org", employee_no:"00123" };
   const r = await run([A1, B1], [員, ["陳建宏",1,"財政部賦稅署","法務組","科長","chen.jh@example.org","00123"]]);
   檢查(r.patches.length === 1 && r.patches[0].id === "A" && by(r.db,"B").unit === undefined, "依 Email 更新賦稅署那位");
+}
+console.log("S26 理監事欄依系統設定的職稱清單（含新增的職稱）");
+{
+  const r = await run([], [["姓名","服務機關","電子郵件信箱","理監事"], ["甲",'財政部賦稅署',"a1@example.org","候補理事"], ["乙","財政部賦稅署","b1@example.org","常務監事"], ["丙","財政部賦稅署","c1@example.org","監事"]]);
+  const 甲 = r.inserts.find((x) => x.name === "甲"), 乙 = r.inserts.find((x) => x.name === "乙"), 丙 = r.inserts.find((x) => x.name === "丙");
+  檢查(甲.board_role === "理事" && 甲.board_title === "候補理事" && 丙.board_role === "監事" && 乙.board_role === "" && /理監事欄看不懂（常務監事）/.test(r.預覽), "新增的職稱看得懂，清單裡沒有的職稱列為問題（新增者設為「無」）");
 }
 console.log("S25 隨機情境：所有列的排列結果都相同");
 {

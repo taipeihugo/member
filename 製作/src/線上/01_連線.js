@@ -249,12 +249,12 @@ function 篩選參數(條件) {
 }
 
 // 讀資料表：查詢("members", {status: "有效"}, "member_no.asc")。
-// 分頁讀完全部資料（Supabase 一次最多回 1000 筆，超過的部分不會報錯，只會被截掉）；排序最後加上 id，分頁才不會重複或漏掉
-async function 查詢(表, 條件, 排序) {
+// 分頁讀完全部資料（Supabase 一次最多回 1000 筆，超過的部分不會報錯，只會被截掉）；排序最後加上主鍵（預設 id），分頁才不會重複或漏掉
+async function 查詢(表, 條件, 排序, 主鍵) {
   const 參 = ["select=*"];
   const 篩 = 篩選參數(條件);
   if (篩) 參.push(篩);
-  參.push("order=" + encodeURIComponent((排序 ? 排序 + "," : "") + "id.asc"));
+  參.push("order=" + encodeURIComponent((排序 ? 排序 + "," : "") + (主鍵 || "id") + ".asc"));
   const 每頁 = 1000;
   let 全部 = [];
   let 總數 = null;

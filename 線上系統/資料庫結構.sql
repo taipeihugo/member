@@ -2,7 +2,7 @@
 -- 財政部公務人員協會 線上會員系統：資料庫結構與權限
 -- 用法：在 Supabase 專案的「SQL Editor」貼上全文，按 Run（可重複執行）。
 -- 權限原則：每張表都開啟「列層級安全」（RLS），預設誰都看不到；
---   一般會員只看得到自己的資料，幹部（理事長、秘書長、總幹事、會計、承辦人）才看得到全部。
+--   一般會員只看得到自己的資料，幹部（預設：理事長、秘書長、總幹事、會計、承辦人，可在「系統設定」增刪）才看得到全部。
 --   網頁上的公開金鑰（publishable key，舊版稱 anon key）本身沒有任何讀取權限，所有保護都在資料庫這一層。
 -- =====================================================================
 
@@ -30,16 +30,11 @@ create table if not exists public.members (
   staff_role text not null default '',
   note text not null default '',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint members_board_title_ok check (
-    (board_role = '' and board_title = '')
-    or (board_role = '理事' and board_title in ('理事長', '常務理事', '理事'))
-    or (board_role = '監事' and board_title in ('監事會召集人', '常務監事', '監事')))
+  updated_at timestamptz not null default now()
 );
--- 幹部角色（另外寫成可重複執行的約束，舊資料庫升級時也會更新允許的角色）
+-- 幹部角色、理監事職稱改由「系統設定」的清單決定（v2.1）；舊版寫死在約束裡的清單移除，改由觸發程序檢查
 alter table public.members drop constraint if exists members_staff_role_check;
-alter table public.members add constraint members_staff_role_check
-  check (staff_role in ('', '理事長', '秘書長', '總幹事', '會計', '承辦人'));
+alter table public.members drop constraint if exists members_board_title_ok;
 create unique index if not exists members_email_uniq on public.members (lower(email)) where email <> '';
 -- 帳號連結是否由理事長、秘書長、總幹事（或 SQL Editor）建立或核准（v1.8）。
 -- 會計、承辦人連結的帳號，要先改由管理者重新連結，才能被指派為幹部，避免有人先把分身帳號連到日後會當幹部的會員
@@ -56,6 +51,46 @@ begin
     comment on column public.members.linked_by_admin is '帳號連結由管理者建立（已回填既有幹部）';
   end if;
 end $$;
+
+-- ---------- 系統設定：幹部角色、理監事職稱（具管理權限的幹部可在「系統設定」增刪） ----------
+-- 幹部角色：is_admin＝具管理權限（可指派幹部角色、建立登入帳號、重設密碼、解除帳號連結、刪除會員、修改系統設定）
+-- 理監事職稱：每個職稱屬於「理事」或「監事」其中一類（兩者互斥）；會員代表另外勾選，可與任一類並存
+-- 只在第一次建立時放入預設值；之後重新執行這份結構，不會把管理者刪掉的項目加回來
+do $$
+begin
+  if to_regclass('public.staff_roles') is null then
+    create table public.staff_roles (
+      name text primary key check (length(name) between 1 and 20 and name = btrim(name)),
+      is_admin boolean not null default false,
+      sort int not null default 0
+    );
+    insert into public.staff_roles (name, is_admin, sort) values
+      ('理事長', true, 1), ('秘書長', true, 2), ('總幹事', true, 3), ('會計', false, 4), ('承辦人', false, 5);
+    insert into public.staff_roles (name, sort)
+      select distinct staff_role, 99 from public.members where staff_role <> '' on conflict do nothing;
+  end if;
+  if to_regclass('public.board_titles') is null then
+    create table public.board_titles (
+      title text primary key check (length(title) between 1 and 20 and title = btrim(title) and position('|' in title) = 0),
+      board_role text not null check (board_role in ('理事', '監事')),
+      sort int not null default 0
+    );
+    insert into public.board_titles (title, board_role, sort) values
+      ('理事長', '理事', 1), ('常務理事', '理事', 2), ('理事', '理事', 3),
+      ('監事會召集人', '監事', 4), ('常務監事', '監事', 5), ('監事', '監事', 6);
+    insert into public.board_titles (title, board_role, sort)
+      select distinct board_title, board_role, 99 from public.members where board_title <> '' and board_role <> '' on conflict do nothing;
+  end if;
+end $$;
+alter table public.staff_roles enable row level security;
+alter table public.board_titles enable row level security;
+-- 登入者都讀得到清單（畫面上的選單要用）；只能透過下面的管理函式修改
+revoke all on public.staff_roles, public.board_titles from anon, authenticated;
+grant select on public.staff_roles, public.board_titles to authenticated;
+drop policy if exists staff_roles_select on public.staff_roles;
+create policy staff_roles_select on public.staff_roles for select to authenticated using (true);
+drop policy if exists board_titles_select on public.board_titles;
+create policy board_titles_select on public.board_titles for select to authenticated using (true);
 
 -- 活動：meal_option 為 true 時，報名要選葷或素
 create table if not exists public.activities (
@@ -147,10 +182,10 @@ language sql stable security definer set search_path = public as $$
   select public.my_staff_role() <> ''
 $$;
 
--- 是否為理事長、秘書長或總幹事（可以指派幹部角色）
+-- 是否為具管理權限的幹部（預設是理事長、秘書長、總幹事；可在「系統設定」調整）
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.my_staff_role() in ('理事長', '秘書長', '總幹事')
+  select exists (select 1 from public.staff_roles r where r.name = public.my_staff_role() and r.is_admin)
 $$;
 
 -- 產生下一個會員編號（M0001…）
@@ -162,16 +197,27 @@ $$;
 
 -- ---------- 觸發程序 ----------
 
--- 會員資料存檔前：整理理監事職稱、更新修改時間；
--- 非管理者（理事長、秘書長、總幹事以外）不能指派幹部角色，也不能變更幹部那幾筆的會籍、Email、帳號連結
+-- 會員資料存檔前：整理理監事職稱（依「系統設定」的職稱決定是理事或監事）、檢查幹部角色、更新修改時間；
+-- 不具管理權限的幹部不能指派幹部角色，也不能變更幹部那幾筆的會籍、Email、帳號連結
 create or replace function public.members_before_write() returns trigger
 language plpgsql security definer set search_path = public as $$
+declare 類別 text;
 begin
   new.email := lower(trim(new.email));
-  if new.board_role = '' then
-    new.board_title := '';
-  elsif new.board_title = '' then
-    new.board_title := new.board_role;
+  new.board_title := btrim(coalesce(new.board_title, ''));
+  if new.board_title = '' and new.board_role <> '' then new.board_title := new.board_role; end if;
+  if tg_op = 'INSERT' or new.board_title is distinct from old.board_title or new.board_role is distinct from old.board_role then
+    if new.board_title = '' then
+      new.board_role := '';
+    else
+      select board_role into 類別 from public.board_titles where title = new.board_title;
+      if 類別 is null then raise exception '沒有「%」這個理監事職稱（可到「系統設定」新增）', new.board_title; end if;
+      new.board_role := 類別;
+    end if;
+  end if;
+  if new.staff_role <> '' and (tg_op = 'INSERT' or new.staff_role is distinct from old.staff_role)
+      and not exists (select 1 from public.staff_roles where name = new.staff_role) then
+    raise exception '沒有「%」這個幹部角色（可到「系統設定」新增）', new.staff_role;
   end if;
   if new.member_no is null or new.member_no = '' then
     new.member_no := public.next_member_no();
@@ -180,13 +226,13 @@ begin
   if new.user_id is null then new.linked_by_admin := false; end if;
   if auth.uid() is not null and not public.is_admin() then
     if tg_op = 'INSERT' and new.staff_role <> '' then
-      raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
+      raise exception '只有具管理權限的幹部（例如理事長、秘書長、總幹事）可以指派幹部角色';
     elsif tg_op = 'UPDATE' and new.staff_role is distinct from old.staff_role then
-      raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
+      raise exception '只有具管理權限的幹部（例如理事長、秘書長、總幹事）可以指派幹部角色';
     elsif tg_op = 'UPDATE' and old.staff_role <> '' and (
         new.status is distinct from old.status or new.email is distinct from lower(trim(old.email))
         or (new.user_id is distinct from old.user_id and new.user_id is distinct from auth.uid())) then
-      raise exception '只有理事長、秘書長或總幹事可以變更幹部的會籍、Email 或帳號連結';
+      raise exception '只有具管理權限的幹部可以變更幹部的會籍、Email 或帳號連結';
     end if;
   end if;
   -- 會計、承辦人改了已連結帳號那筆的姓名、Email 或員工編號：不再算管理者連結（避免把分身帳號那筆改成別人再請管理者指派）
@@ -197,7 +243,7 @@ begin
   -- 指派或變更幹部角色時（取消角色除外），這筆的帳號連結必須是管理者建立或核准的（SQL Editor 不受限）
   if auth.uid() is not null and tg_op = 'UPDATE' and new.staff_role is distinct from old.staff_role and new.staff_role <> ''
       and new.user_id is not null and not new.linked_by_admin then
-    raise exception '「%」的帳號連結不是由理事長、秘書長或總幹事建立的（例如由會計、承辦人連結，v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請先「解除帳號連結」，再由理事長、秘書長或總幹事產生認領碼交給本人重新連結，之後再指派', new.name;
+    raise exception '「%」的帳號連結不是由具管理權限的幹部建立的（例如由會計、承辦人核准連結，v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請先「解除帳號連結」，再由具管理權限的幹部替他「建立登入帳號」（或核准他的連結申請），之後再指派', new.name;
   end if;
   return new;
 end $$;
@@ -216,7 +262,7 @@ alter table public.applications enable row level security;
 -- 權限：先全部收回，再只給需要的（Supabase 預設會把新資料表的全部權限給 anon、authenticated）
 revoke all on public.members, public.activities, public.registrations, public.fees, public.applications from anon, authenticated;
 grant select, insert, update, delete on public.activities, public.fees to authenticated;
--- 會員表：帳號連結（user_id）只能經由函式（認領碼、核准連結、核准入會、解除連結）修改，幹部直接改資料表碰不到
+-- 會員表：帳號連結（user_id）只能經由函式（建立登入帳號、核准連結、核准入會、解除連結）修改，幹部直接改資料表碰不到
 grant select, delete on public.members to authenticated;
 grant insert (member_no, name, gender, employee_no, agency, unit, title, email, phone, join_date, category, status,
   board_role, board_title, is_representative, staff_role, note) on public.members to authenticated;
@@ -386,7 +432,7 @@ begin
   if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結會員資料'; end if;
   select name into 既有 from public.members where 申.email <> '' and email = lower(申.email) limit 1;
   if 既有 is not null then
-    raise exception '名冊已有公務信箱 % 的會員「%」。請退回這件申請，並請申請人改用「連結會員資料」（認領碼或連結申請），由幹部核對後連結', 申.email, 既有;
+    raise exception '名冊已有公務信箱 % 的會員「%」。請退回這件申請，並請申請人改送「連結申請」由幹部核對後連結（或由具管理權限的幹部在「會員管理」替那位會員建立登入帳號）', 申.email, 既有;
   end if;
   select name into 我名 from public.members where user_id = auth.uid();
   insert into public.members (user_id, linked_by_admin, name, gender, employee_no, agency, unit, title, email, phone, join_date, note)
@@ -432,7 +478,7 @@ begin
 end $$;
 
 -- 第一次設定用（只能在 SQL Editor 執行）：把某人設為幹部
---   p_login_email：他在會員專區註冊用的 Email（個人信箱）
+--   p_login_email：他的登入 Email（要先在會員專區註冊，或在 Supabase「Authentication → Users → Add user」建立）
 --   p_office_email：名冊上的公務信箱（可省略）；名冊已有這個公務信箱的會員就直接設定並連結，沒有就新建
 -- 例：select public.make_staff('wang@gmail.com', '秘書長', '王小明', 'wang@mail.mof.gov.tw');
 drop function if exists public.make_staff(text, text, text);
@@ -441,8 +487,8 @@ returns text language plpgsql security definer set search_path = public as $$
 declare 帳號 uuid; 名冊信箱 text := lower(trim(coalesce(nullif(p_office_email, ''), p_login_email)));
   列 public.members; 已連信箱 text; 他列 text;
 begin
-  if p_role not in ('理事長', '秘書長', '總幹事', '會計', '承辦人') then
-    raise exception '角色只能是：理事長、秘書長、總幹事、會計、承辦人（您填的是「%」）', p_role;
+  if not exists (select 1 from public.staff_roles where name = p_role) then
+    raise exception '角色只能是：%（您填的是「%」）', (select string_agg(name, '、' order by sort) from public.staff_roles), p_role;
   end if;
   select id into 帳號 from auth.users where lower(email) = lower(trim(p_login_email));
   if 帳號 is null then
@@ -460,7 +506,6 @@ begin
   end if;
   if found then
     update public.members set staff_role = p_role, status = '有效', user_id = 帳號, linked_by_admin = true where id = 列.id;
-    delete from public.claim_codes where member_id = 列.id;
   else
     insert into public.members (user_id, linked_by_admin, name, email, staff_role, join_date)
       values (帳號, true, coalesce(nullif(p_name, ''), split_part(名冊信箱, '@', 1)), 名冊信箱, p_role, current_date);
@@ -496,34 +541,16 @@ revoke execute on function public.activity_counts() from public, anon;
 grant execute on function public.activity_counts() to authenticated;
 
 -- =====================================================================
--- 帳號連結（v1.3）：公務信箱收不到外部信，會員改用個人 Email 註冊，
--- 再用「認領碼」或「申請連結（幹部核對後核准）」連到名冊上的自己。
+-- 帳號連結：會員的登入帳號（Email）連到名冊上的自己。三種方式：
+--   1. 具管理權限的幹部在「會員管理」替會員「建立登入帳號」（不用收驗證信，馬上可以登入）
+--   2. 會員自己註冊後送「連結申請」，幹部核對名冊後核准
+--   3. 線上入會申請核准時自動連結
+-- （v2.1 起移除「認領碼」）
 -- =====================================================================
-
--- 認領碼：幹部替尚未連結帳號的會員產生，一次性、30 天有效。
--- 資料庫只存認領碼的雜湊值（code_hash），明碼只在產生當下回傳給幹部一次；
--- by_admin 記錄是否由理事長、秘書長或總幹事產生（幹部那幾筆只認管理者發的碼）
-create table if not exists public.claim_codes (
-  member_id uuid primary key references public.members (id) on delete cascade,
-  code_hash text,
-  by_admin boolean not null default false,
-  expires_at timestamptz not null default now() + interval '30 days',
-  created_by text not null default '',
-  created_at timestamptz not null default now()
-);
--- v1.7 升級：舊版以明碼存認領碼，改存雜湊；舊碼一律作廢（請幹部重新產生）
-alter table public.claim_codes add column if not exists code_hash text;
-alter table public.claim_codes add column if not exists by_admin boolean not null default false;
-delete from public.claim_codes where code_hash is null;
-alter table public.claim_codes drop column if exists code;
-alter table public.claim_codes alter column code_hash set not null;
-create unique index if not exists claim_codes_code_hash_key on public.claim_codes (code_hash);
-
--- 認領碼的雜湊值（先整理成「XXXXX-XXXXX」大寫格式再算 SHA-256）
-create or replace function public.claim_code_hash(p_code text) returns text
-language sql immutable set search_path = public as $$
-  select encode(sha256(convert_to(p_code, 'UTF8')), 'hex')
-$$;
+drop function if exists public.generate_claim_codes(uuid[]);
+drop function if exists public.claim_with_code(text);
+drop function if exists public.claim_code_hash(text);
+drop table if exists public.claim_codes cascade;
 
 -- 連結申請：會員填寫姓名、機關、公務信箱，由幹部核對名冊後指定對應的會員
 create table if not exists public.link_requests (
@@ -546,25 +573,18 @@ create table if not exists public.link_requests (
 );
 create unique index if not exists link_requests_one_pending on public.link_requests (user_id) where status = '待審';
 
-alter table public.claim_codes enable row level security;
 alter table public.link_requests enable row level security;
--- 認領碼表任何人都不能直接讀寫（連幹部也不行），只能透過下面的函式產生與使用
-revoke all on public.claim_codes, public.link_requests from anon, authenticated;
+revoke all on public.link_requests from anon, authenticated;
 grant select on public.link_requests to authenticated;
 
-drop policy if exists claim_codes_select on public.claim_codes;
 drop policy if exists link_requests_select on public.link_requests;
 create policy link_requests_select on public.link_requests for select to authenticated using (user_id = auth.uid() or public.is_staff());
 
--- 帳號一連結到會員資料（不論透過認領碼、核准連結、核准入會或 make_staff），
--- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請；
--- 會員資料的帳號連結或幹部角色一有變動，這筆的認領碼立即作廢（避免舊碼被拿來認領幹部資料）
+-- 帳號一連結到會員資料（不論透過建立登入帳號、核准連結、核准入會或 make_staff），
+-- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請
 create or replace function public.members_after_link() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if tg_op = 'UPDATE' and (new.user_id is distinct from old.user_id or new.staff_role is distinct from old.staff_role) then
-    delete from public.claim_codes where member_id = new.id;
-  end if;
   if new.user_id is not null and (tg_op = 'INSERT' or new.user_id is distinct from old.user_id) then
     update public.link_requests set status = '核准', member_id = new.id, reviewed_by = '系統（帳號已連結）', reviewed_at = now()
       where user_id = new.user_id and status = '待審';
@@ -574,65 +594,11 @@ begin
   return null;
 end $$;
 drop trigger if exists members_after_link on public.members;
-create trigger members_after_link after insert or update of user_id, staff_role on public.members
+create trigger members_after_link after insert or update of user_id on public.members
   for each row execute function public.members_after_link();
 revoke execute on function public.members_after_link() from public, anon, authenticated;
 
--- 幹部產生認領碼（只針對尚未連結帳號的會員；重新產生會取代舊碼）；回傳 會員id、姓名、認領碼、到期日。
--- 明碼只在這裡回傳一次，資料庫只留雜湊值
-create or replace function public.generate_claim_codes(p_members uuid[])
-returns table (member_id uuid, name text, code text, expires_at timestamptz)
-language plpgsql security definer set search_path = public as $$
-declare 人 public.members; 碼 text; 我名 text; 管理者 boolean := public.is_admin();
-  -- 不用 0、O、1、I、L，避免抄錯
-  字表 constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-begin
-  if not public.is_staff() then raise exception '沒有權限'; end if;
-  select m.name into 我名 from public.members m where m.user_id = auth.uid();
-  -- 幹部那幾筆（有幹部角色）只有理事長、秘書長、總幹事能產生認領碼
-  for 人 in select * from public.members m where m.id = any(p_members) and m.user_id is null
-      and (m.staff_role = '' or 管理者) loop
-    loop
-      碼 := '';
-      for i in 1..10 loop 碼 := 碼 || substr(字表, 1 + floor(random() * length(字表))::int, 1); end loop;
-      碼 := substr(碼, 1, 5) || '-' || substr(碼, 6, 5);
-      exit when not exists (select 1 from public.claim_codes c where c.code_hash = public.claim_code_hash(碼));
-    end loop;
-    insert into public.claim_codes as c (member_id, code_hash, by_admin, expires_at, created_by)
-      values (人.id, public.claim_code_hash(碼), 管理者, now() + interval '30 days', coalesce(我名, ''))
-      on conflict on constraint claim_codes_pkey do update set code_hash = excluded.code_hash, by_admin = excluded.by_admin,
-        expires_at = excluded.expires_at, created_by = excluded.created_by, created_at = now();
-    member_id := 人.id; name := 人.name; code := 碼; expires_at := now() + interval '30 days';
-    return next;
-  end loop;
-end $$;
-
--- 會員輸入認領碼連結自己的會員資料（碼用過即作廢；幹部那幾筆只認理事長、秘書長、總幹事發的碼）
-create or replace function public.claim_with_code(p_code text)
-returns uuid language plpgsql security definer set search_path = public as $$
-declare 碼 public.claim_codes; 整理 text; 角色 text;
-begin
-  if auth.uid() is null then raise exception '請先登入'; end if;
-  if public.my_member_id() is not null then raise exception '您的帳號已經連結會員資料'; end if;
-  整理 := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
-  if length(整理) <> 10 then raise exception '認領碼不正確'; end if;
-  整理 := substr(整理, 1, 5) || '-' || substr(整理, 6, 5);
-  select * into 碼 from public.claim_codes where code_hash = public.claim_code_hash(整理) for update;
-  if not found or 碼.expires_at < now() then raise exception '認領碼不正確或已過期，請洽協會重新產生'; end if;
-  select staff_role into 角色 from public.members where id = 碼.member_id;
-  if coalesce(角色, '') <> '' and not 碼.by_admin then
-    delete from public.claim_codes where member_id = 碼.member_id;
-    raise exception '這組認領碼不能用於幹部的會員資料，請洽理事長、秘書長或總幹事重新產生';
-  end if;
-  update public.members set user_id = auth.uid(), linked_by_admin = 碼.by_admin where id = 碼.member_id and user_id is null;
-  if not found then raise exception '這筆會員資料已連結其他帳號，請洽協會'; end if;
-  delete from public.claim_codes where member_id = 碼.member_id;
-  update public.link_requests set status = '核准', member_id = 碼.member_id, reviewed_by = '認領碼', reviewed_at = now()
-    where user_id = auth.uid() and status = '待審';
-  return 碼.member_id;
-end $$;
-
--- 會員送出連結申請（沒有認領碼時用）
+-- 會員自己註冊後送出連結申請，由幹部核對名冊後核准
 create or replace function public.submit_link_request(p_name text, p_agency text, p_unit text, p_title text,
   p_office_email text, p_phone text, p_note text)
 returns uuid language plpgsql security definer set search_path = public as $$
@@ -660,7 +626,6 @@ begin
   if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結其他會員資料'; end if;
   update public.members set user_id = 申.user_id, linked_by_admin = public.is_admin() where id = p_member and user_id is null;
   if not found then raise exception '這位會員已連結其他帳號，或找不到這位會員'; end if;
-  delete from public.claim_codes where member_id = p_member;
   select name into 我名 from public.members where user_id = auth.uid();
   update public.link_requests set status = '核准', member_id = p_member, reviewed_by = coalesce(我名, ''), reviewed_at = now() where id = 申.id;
 end $$;
@@ -681,10 +646,8 @@ end $$;
 create or replace function public.unlink_member(p_member uuid)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_admin() then raise exception '只有理事長、秘書長或總幹事可以解除帳號連結'; end if;
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以解除帳號連結'; end if;
   update public.members set user_id = null where id = p_member;
-  -- 解除後舊的認領碼不會復活；要重新連結請重新產生認領碼
-  delete from public.claim_codes where member_id = p_member;
 end $$;
 
 -- 管理者查某位會員連結的登入帳號（個人 Email），指派幹部角色前核對是不是本人
@@ -692,18 +655,168 @@ create or replace function public.member_login_email(p_member uuid)
 returns text language plpgsql stable security definer set search_path = public as $$
 declare 信箱 text;
 begin
-  if not public.is_admin() then raise exception '只有理事長、秘書長或總幹事可以查看登入帳號'; end if;
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以查看登入帳號'; end if;
   select u.email into 信箱 from public.members m join auth.users u on u.id = m.user_id where m.id = p_member;
   return coalesce(信箱, '');
 end $$;
 
+-- =====================================================================
+-- 管理者替會員建立登入帳號、重設密碼（v2.1）
+-- 會員的公務信箱收不到外部信、或是測試用的假帳號時，由具管理權限的幹部直接建立「已驗證」的帳號，
+-- 設定一組初始密碼交給本人，馬上可以登入（登入後可在「我的資料 → 修改密碼」自己改）。
+-- 密碼用 bcrypt 雜湊（與 Supabase 登入相同的格式），資料庫不存明碼。
+-- =====================================================================
+create extension if not exists pgcrypto with schema extensions;
+
+-- 建立（或接管）登入帳號並連結到名冊上的這位會員；回傳 '已建立' 或 '已存在'
+--   Email 還沒有人註冊：建立一個已驗證的新帳號
+--   Email 已經註冊過、但還沒連結任何會員（例如註冊了卻收不到驗證信）：直接完成驗證、改成這次設定的密碼
+create or replace function public.create_member_login(p_member uuid, p_login_email text, p_password text)
+returns text language plpgsql security definer set search_path = public, extensions as $$
+declare 人 public.members; 信箱 text := lower(btrim(coalesce(p_login_email, ''))); 帳號 uuid; 已連 text; 結果 text;
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以建立登入帳號'; end if;
+  if 信箱 !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then raise exception 'Email 格式不正確'; end if;
+  if length(coalesce(p_password, '')) < 8 then raise exception '密碼至少 8 個字元'; end if;
+  select * into 人 from public.members where id = p_member for update;
+  if not found then raise exception '找不到這位會員'; end if;
+  if 人.user_id is not null then raise exception '「%」已經有登入帳號；要換 Email 請先「解除帳號連結」', 人.name; end if;
+  select id into 帳號 from auth.users where lower(email) = 信箱 limit 1;
+  if 帳號 is not null then
+    select name into 已連 from public.members where user_id = 帳號;
+    if 已連 is not null then raise exception '% 已經是名冊上「%」的登入帳號', 信箱, 已連; end if;
+    update auth.users set encrypted_password = crypt(p_password, gen_salt('bf', 10)),
+      email_confirmed_at = coalesce(email_confirmed_at, now()), confirmation_token = '', recovery_token = '', updated_at = now()
+      where id = 帳號;
+    結果 := '已存在';
+  else
+    帳號 := gen_random_uuid();
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+        raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+        confirmation_token, recovery_token, email_change_token_new, email_change)
+      values ('00000000-0000-0000-0000-000000000000', 帳號, 'authenticated', 'authenticated', 信箱,
+        crypt(p_password, gen_salt('bf', 10)), now(),
+        '{"provider": "email", "providers": ["email"]}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', '');
+    insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+      values (gen_random_uuid(), 帳號, 帳號::text,
+        jsonb_build_object('sub', 帳號::text, 'email', 信箱, 'email_verified', true, 'phone_verified', false),
+        'email', now(), now(), now());
+    結果 := '已建立';
+  end if;
+  update public.members set user_id = 帳號, linked_by_admin = true where id = p_member;
+  return 結果;
+end $$;
+
+-- 管理者替會員重設登入密碼（收不到重設密碼信的人用）；不能替其他具管理權限的幹部重設
+create or replace function public.set_member_password(p_member uuid, p_password text)
+returns void language plpgsql security definer set search_path = public, extensions as $$
+declare 人 public.members;
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以重設密碼'; end if;
+  if length(coalesce(p_password, '')) < 8 then raise exception '密碼至少 8 個字元'; end if;
+  select * into 人 from public.members where id = p_member;
+  if not found then raise exception '找不到這位會員'; end if;
+  if 人.user_id is null then raise exception '「%」還沒有登入帳號，請改用「建立登入帳號」', 人.name; end if;
+  if 人.user_id <> auth.uid() and exists (select 1 from public.staff_roles r where r.name = 人.staff_role and r.is_admin) then
+    raise exception '不能替其他具管理權限的幹部重設密碼，請他自己用「修改密碼」或「忘記密碼」';
+  end if;
+  update auth.users set encrypted_password = crypt(p_password, gen_salt('bf', 10)), updated_at = now() where id = 人.user_id;
+end $$;
+
+-- =====================================================================
+-- 系統設定：增刪幹部角色、理監事職稱（只有具管理權限的幹部能用）
+-- =====================================================================
+
+-- 新增幹部角色
+create or replace function public.add_staff_role(p_name text, p_is_admin boolean)
+returns void language plpgsql security definer set search_path = public as $$
+declare 名 text := btrim(coalesce(p_name, ''));
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  if 名 = '' or length(名) > 20 then raise exception '角色名稱要 1～20 個字'; end if;
+  if exists (select 1 from public.staff_roles where name = 名) then raise exception '已經有「%」這個角色', 名; end if;
+  insert into public.staff_roles (name, is_admin, sort)
+    values (名, coalesce(p_is_admin, false), coalesce((select max(sort) from public.staff_roles), 0) + 1);
+end $$;
+
+-- 刪除幹部角色：還有人是這個角色時不能刪；至少要留一個具管理權限的角色
+create or replace function public.delete_staff_role(p_name text)
+returns void language plpgsql security definer set search_path = public as $$
+declare 人數 int; 管理 boolean;
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  select is_admin into 管理 from public.staff_roles where name = p_name;
+  if not found then raise exception '找不到「%」這個角色', p_name; end if;
+  select count(*) into 人數 from public.members where staff_role = p_name;
+  if 人數 > 0 then raise exception '還有 % 位會員是「%」，請先改掉他們的幹部角色再刪除', 人數, p_name; end if;
+  if 管理 and not exists (select 1 from public.staff_roles where is_admin and name <> p_name) then
+    raise exception '至少要保留一個具管理權限的角色';
+  end if;
+  delete from public.staff_roles where name = p_name;
+end $$;
+
+-- 設定某個角色是否具管理權限：改完之後至少要有一位已連結帳號的有效會員具管理權限（避免沒有人能再修改設定）
+create or replace function public.set_staff_role_admin(p_name text, p_is_admin boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  update public.staff_roles set is_admin = coalesce(p_is_admin, false) where name = p_name;
+  if not found then raise exception '找不到「%」這個角色', p_name; end if;
+  if not exists (select 1 from public.members m join public.staff_roles r on r.name = m.staff_role
+      where r.is_admin and m.user_id is not null and m.status = '有效') then
+    raise exception '這樣改之後就沒有任何人具管理權限了（系統設定會無法再修改）。請先讓另一位會員擔任具管理權限的角色';
+  end if;
+end $$;
+
+-- 依傳入的順序重排幹部角色（選單上的順序）
+create or replace function public.reorder_staff_roles(p_names text[])
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  update public.staff_roles r set sort = t.序 from unnest(p_names) with ordinality as t(名, 序) where r.name = t.名;
+end $$;
+
+-- 新增理監事職稱（屬於理事或監事）
+create or replace function public.add_board_title(p_title text, p_board_role text)
+returns void language plpgsql security definer set search_path = public as $$
+declare 名 text := btrim(coalesce(p_title, ''));
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  if 名 = '' or length(名) > 20 or position('|' in 名) > 0 then raise exception '職稱要 1～20 個字，不能有「|」'; end if;
+  if coalesce(p_board_role, '') not in ('理事', '監事') then raise exception '職稱要歸類為「理事」或「監事」'; end if;
+  if exists (select 1 from public.board_titles where title = 名) then raise exception '已經有「%」這個職稱', 名; end if;
+  insert into public.board_titles (title, board_role, sort)
+    values (名, p_board_role, coalesce((select max(sort) from public.board_titles), 0) + 1);
+end $$;
+
+-- 刪除理監事職稱：還有人是這個職稱時不能刪
+create or replace function public.delete_board_title(p_title text)
+returns void language plpgsql security definer set search_path = public as $$
+declare 人數 int;
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  if not exists (select 1 from public.board_titles where title = p_title) then raise exception '找不到「%」這個職稱', p_title; end if;
+  select count(*) into 人數 from public.members where board_title = p_title;
+  if 人數 > 0 then raise exception '還有 % 位會員是「%」，請先改掉他們的職稱再刪除', 人數, p_title; end if;
+  delete from public.board_titles where title = p_title;
+end $$;
+
+-- 依傳入的順序重排理監事職稱
+create or replace function public.reorder_board_titles(p_titles text[])
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
+  update public.board_titles b set sort = t.序 from unnest(p_titles) with ordinality as t(名, 序) where b.title = t.名;
+end $$;
+
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
-revoke execute on function public.claim_code_hash(text) from public, anon, authenticated;
-revoke execute on function public.member_login_email(uuid) from public, anon;
-grant execute on function public.member_login_email(uuid) to authenticated;
-revoke execute on function public.generate_claim_codes(uuid[]), public.claim_with_code(text),
-  public.submit_link_request(text, text, text, text, text, text, text), public.approve_link_request(uuid, uuid),
-  public.reject_link_request(uuid, text), public.unlink_member(uuid) from public, anon;
-grant execute on function public.generate_claim_codes(uuid[]), public.claim_with_code(text),
-  public.submit_link_request(text, text, text, text, text, text, text), public.approve_link_request(uuid, uuid),
-  public.reject_link_request(uuid, text), public.unlink_member(uuid) to authenticated;
+revoke execute on function public.member_login_email(uuid), public.submit_link_request(text, text, text, text, text, text, text),
+  public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),
+  public.create_member_login(uuid, text, text), public.set_member_password(uuid, text),
+  public.add_staff_role(text, boolean), public.delete_staff_role(text), public.set_staff_role_admin(text, boolean), public.reorder_staff_roles(text[]),
+  public.add_board_title(text, text), public.delete_board_title(text), public.reorder_board_titles(text[]) from public, anon;
+grant execute on function public.member_login_email(uuid), public.submit_link_request(text, text, text, text, text, text, text),
+  public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),
+  public.create_member_login(uuid, text, text), public.set_member_password(uuid, text),
+  public.add_staff_role(text, boolean), public.delete_staff_role(text), public.set_staff_role_admin(text, boolean), public.reorder_staff_roles(text[]),
+  public.add_board_title(text, text), public.delete_board_title(text), public.reorder_board_titles(text[]) to authenticated;

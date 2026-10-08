@@ -4,12 +4,18 @@
 const 預設服務機關 = ["財政部（部本部）", "財政部國庫署", "財政部賦稅署", "財政部關務署", "財政部國有財產署", "財政部財政資訊中心",
   "財政部臺北國稅局", "財政部高雄國稅局", "財政部北區國稅局", "財政部中區國稅局", "財政部南區國稅局", "財政部財政人員訓練所"];
 
-// 理監事職稱選項：選了就決定是理事或監事（兩者互斥）
-const 理監事選項 = [
-  { 值: "", 字: "無" },
-  { 值: "理事|理事長", 字: "理事長（理事）" }, { 值: "理事|常務理事", 字: "常務理事（理事）" }, { 值: "理事|理事", 字: "理事" },
-  { 值: "監事|監事會召集人", 字: "監事會召集人（監事）" }, { 值: "監事|常務監事", 字: "常務監事（監事）" }, { 值: "監事|監事", 字: "監事" }
-];
+// 理監事職稱選項（依「系統設定」的清單）：選了就決定是理事或監事（兩者互斥）
+function 理監事選項() {
+  const 清單 = 線上.職稱們.length ? 線上.職稱們 : 預設職稱們;
+  return [{ 值: "", 字: "無" }].concat(清單.map(function (t) {
+    return { 值: t.board_role + "|" + t.title, 字: t.title === t.board_role ? t.title : t.title + "（" + t.board_role + "）" };
+  }));
+}
+
+// 幹部角色選項（依「系統設定」的清單）
+function 幹部角色選項() {
+  return (線上.角色們.length ? 線上.角色們 : 預設角色們).map(function (r) { return r.name; });
+}
 
 // 會員的職務文字（例：常務理事、會員代表、秘書長）
 function 職務文字(m) {
@@ -159,30 +165,12 @@ function 報名對話框(a) {
 註冊頁面("連結會員資料", {
   圖示: "🔗",
   可見: function () { return !線上.會員; },
-  說明: "您的帳號（個人 Email）還沒連到名冊上的會員資料。有協會給的認領碼，輸入後立即連結；沒有的話，送出連結申請，由協會核對名冊後連結。還不是會員，請改用「入會申請」。",
+  說明: "您的帳號還沒連到名冊上的會員資料。請送出連結申請，由協會核對名冊後連結（也可以請協會直接替您建立帳號）。還不是會員，請改用「入會申請」。",
   繪製: function (容器) {
     容器.appendChild(頁首("連結會員資料"));
-    容器.appendChild(h("p", { class: "次要字" }, "登入帳號：" + 連線.帳號.email + "。已經是協會會員的同仁，請用下面任一種方式連到名冊上的資料；還不是會員請到「入會申請」。"));
-    // 方式一：認領碼
-    const 碼 = h("input", { id: "認領碼", placeholder: "例：ABCDE-FGH23", autocomplete: "off", style: "text-transform:uppercase;max-width:220px" });
-    const 碼訊 = h("p", { class: "錯誤", role: "alert" });
-    const 用碼 = async function () {
-      碼訊.textContent = "";
-      try {
-        await 呼叫("claim_with_code", { p_code: 碼.value });
-        await 重新讀取我的資料();
-        更新外框();
-        提示("已連結您的會員資料");
-        前往("我的資料");
-      } catch (e) { 碼訊.textContent = e.message; }
-    };
-    碼.addEventListener("keydown", function (e) { if (e.key === "Enter") 用碼(); });
-    容器.appendChild(h("div", { class: "卡" }, h("h2", null, "方式一：輸入認領碼（立即連結）"),
-      h("p", { class: "次要字" }, "認領碼由協會幹部提供（10 碼英數字，30 天內有效，用一次就失效）。"),
-      h("div", { class: "表工具列" }, 碼, h("button", { class: "鈕 主", type: "button", id: "認領鈕", onclick: 用碼 }, "連結")), 碼訊));
-    // 方式二：連結申請
+    容器.appendChild(h("p", { class: "次要字" }, "登入帳號：" + 連線.帳號.email + "。已經是協會會員的同仁，請送出連結申請，協會核對名冊後就會連到您的資料；還不是會員請到「入會申請」。"));
     const 申 = 線上.連結申請;
-    const 卡 = h("div", { class: "卡", style: "margin-top:1rem" }, h("h2", null, "方式二：沒有認領碼，送出連結申請"));
+    const 卡 = h("div", { class: "卡" }, h("h2", null, "送出連結申請"));
     容器.appendChild(卡);
     if (申 && 申.status === "待審") {
       卡.appendChild(h("p", null, "您於 " + 民國時間(申.created_at) + " 送出的連結申請正在審核，協會核對名冊後就會連結，屆時重新登入即可。"));

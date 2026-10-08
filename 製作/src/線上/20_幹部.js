@@ -5,7 +5,7 @@
   圖示: "👥",
   分隔: true,
   可見: 是幹部,
-  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長、總幹事能指派；已連結帳號的會員，要是由他們連結的（他們發的認領碼或核准的連結申請）才能指派，否則請先解除帳號連結、重新發碼。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同、員工編號與姓名都相同，或姓名＋服務機關相同（名冊上只有一位且 Email、員工編號沒有矛盾）的視為同一人並更新資料，其他新增；無法判斷的列會列出並略過，更新時空白的儲存格不會清掉原有資料。會員用個人 Email 註冊後，有兩種連結方式：勾選會員按「產生認領碼」交給本人輸入，或由會員送「連結申請」再到「申請審核」核准。「帳號」欄可篩出還沒連結的人。",
+  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存；職稱與幹部角色的選項在「系統設定」增刪。幹部角色只有具管理權限的幹部（預設是理事長、秘書長、總幹事）能指派；已連結帳號的會員，帳號要是由他們建立或核准連結的才能指派，否則請先解除帳號連結、再替他建立登入帳號。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同、員工編號與姓名都相同，或姓名＋服務機關相同（名冊上只有一位且 Email、員工編號沒有矛盾）的視為同一人並更新資料，其他新增；無法判斷的列會列出並略過，更新時空白的儲存格不會清掉原有資料。登入帳號：具管理權限的幹部點會員後按「建立登入帳號」，填 Email 與初始密碼即可直接登入（不用收驗證信，適合收不到外部信的公務信箱或測試帳號）；會員也可以自己註冊後送「連結申請」，到「申請審核」核准。「帳號」欄可篩出還沒有帳號的人。",
   繪製: async function (容器) {
     let 名冊 = await 查詢("members", null, "member_no.asc");
     const 統計 = h("p", { class: "次要字" });
@@ -27,18 +27,17 @@
         { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" }, { key: "email", 標題: "Email" },
         { key: "職務", 標題: "協會職務", 值: 職務文字 },
         { key: "status", 標題: "會籍", 顯示: function (r) { return h("span", { class: "標記 " + (r.status === "有效" ? "成" : "危") }, r.status); } },
-        { key: "帳號", 標題: "帳號", 值: function (r) { return r.user_id ? "已註冊" : "未註冊"; } }
+        { key: "帳號", 標題: "帳號", 值: function (r) { return r.user_id ? "已有帳號" : "沒有帳號"; } }
       ],
       篩選: [
         { 標題: "機關", 選項: 機關們, 取值: function (r) { return r.agency; } },
         { 標題: "理監事", 選項: ["理事", "監事", "非理監事"], 取值: function (r) { return r.board_role || "非理監事"; } },
         { 標題: "會員代表", 選項: ["會員代表", "非會員代表"], 取值: function (r) { return r.is_representative ? "會員代表" : "非會員代表"; } },
         { 標題: "會籍", 選項: ["有效", "停權", "退會"], 取值: function (r) { return r.status; } },
-        { 標題: "帳號", 選項: ["已註冊", "未註冊"], 取值: function (r) { return r.user_id ? "已註冊" : "未註冊"; } }
+        { 標題: "帳號", 選項: ["已有帳號", "沒有帳號"], 取值: function (r) { return r.user_id ? "已有帳號" : "沒有帳號"; } }
       ],
       點列: function (r) { 編輯線上會員(r, 機關們(), 重載); },
       批次: [
-        { 文字: "產生認領碼", 動作: function (列) { 產生認領碼(列); } },
         { 文字: "複製 Email 收件者", 動作: function (列) { 顯示信箱(列); } }
       ]
     });
@@ -76,26 +75,28 @@ async function 編輯線上會員(原, 機關們, 完成後) {
     finally { 編輯開啟中 = false; }
     // 讀取期間登出或換人登入：不開視窗（避免個資出現在登入畫面或下一位的畫面）
     if (連線.場次 !== 場 || !連線.帳號) return;
-    登入帳號 += 原.linked_by_admin ? "（由理事長、秘書長或總幹事連結）" : "（不是由理事長、秘書長或總幹事連結：要指派或變更幹部角色前，請先解除連結並重新發碼）";
+    登入帳號 += 原.linked_by_admin ? "（由具管理權限的幹部建立或連結）" : "（不是由具管理權限的幹部連結：要指派或變更幹部角色前，請先解除帳號連結，再替他建立登入帳號）";
   }
   const 欄位們 = [
     { key: "name", 標題: "姓名", 必填: true }, { key: "gender", 標題: "性別", 類型: "選單", 選項: ["女", "男"] },
     { key: "employee_no", 標題: "員工編號" }, { key: "agency", 標題: "服務機關", 類型: "選單", 選項: 機關們, 必填: true },
     { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" },
-    { key: "email", 標題: "Email（會員用這個 Email 註冊）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
+    { key: "email", 標題: "Email（名冊上的公務信箱）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
     { key: "join_date", 標題: "入會日期", 類型: "日期" }, { key: "status", 標題: "會籍", 類型: "選單", 選項: ["有效", "停權", "退會"], 必填: true },
-    { key: "理監事", 標題: "理監事職稱（理事、監事只能擇一）", 類型: "選單", 選項: 理監事選項, 不加空白: true },
+    { key: "理監事", 標題: "理監事職稱（理事、監事只能擇一）", 類型: "選單", 選項: 理監事選項(), 不加空白: true },
     { key: "is_representative", 標題: "會員代表", 類型: "勾選", 勾選文字: "是會員代表（可同時為理事或監事）" },
-    { key: "staff_role", 標題: "幹部角色（可使用管理功能）", 類型: "選單", 選項: ["理事長", "秘書長", "總幹事", "會計", "承辦人"], 唯讀: !是管理者(), 說明: 是管理者() ? "" : "只有理事長、秘書長或總幹事可以指派" },
+    { key: "staff_role", 標題: "幹部角色（可使用管理功能）", 類型: "選單", 選項: 幹部角色選項(), 唯讀: !是管理者(), 說明: 是管理者() ? "" : "只有具管理權限的幹部可以指派" },
     { key: "note", 標題: "備註", 類型: "多行", 行數: 2 }
   ];
-  if (登入帳號) 欄位們.push({ key: "登入帳號", 標題: "登入帳號（個人 Email，只有理事長、秘書長、總幹事看得到）", 唯讀: true, 寬: true });
+  if (登入帳號) 欄位們.push({ key: "登入帳號", 標題: "登入帳號（只有具管理權限的幹部看得到）", 唯讀: true, 寬: true });
   const 初值 = 原 ? Object.assign({}, 原, { 登入帳號: 登入帳號, 理監事: 原.board_role ? 原.board_role + "|" + (原.board_title || 原.board_role) : "" }) : { status: "有效", join_date: 今天(), 理監事: "" };
   const 選項 = {};
   if (原 && 是管理者()) {
     選項.額外按鈕 = [];
+    if (!原.user_id) 選項.額外按鈕.push({ 文字: "建立登入帳號", 動作: function (關) { 關(null); 建立登入帳號(原, 完成後); } });
+    if (原.user_id) 選項.額外按鈕.push({ 文字: "重設密碼", 動作: function (關) { 關(null); 重設會員密碼(原); } });
     if (原.user_id) 選項.額外按鈕.push({ 文字: "解除帳號連結", 動作: async function (關) {
-      if (!(await 確認("解除「" + 原.name + "」的帳號連結？他之後要重新用認領碼或連結申請連結。", "解除連結"))) return false;
+      if (!(await 確認("解除「" + 原.name + "」的帳號連結？之後要再替他建立登入帳號，或由他送連結申請。", "解除連結"))) return false;
       try { await 呼叫("unlink_member", { p_member: 原.id }); 關(null); 提示("已解除連結"); 完成後(); } catch (e) { 提示(e.message, true); return false; }
     } });
     選項.額外按鈕.push({ 文字: "刪除會員", 危: true, 動作: async function (關) {
@@ -120,6 +121,43 @@ async function 編輯線上會員(原, 機關們, 完成後) {
   }, 選項);
 }
 
+// 檢查兩次輸入的密碼；有問題回傳錯誤訊息
+function 檢查密碼(值) {
+  if (String(值.密碼 || "").length < 8) return "密碼至少 8 個字元";
+  if (值.密碼 !== 值.再次) return "兩次輸入的密碼不一樣";
+  return "";
+}
+
+// 管理者替會員建立登入帳號（不用收驗證信，馬上可以登入）；Email 已註冊過時直接完成驗證並改成這組密碼
+function 建立登入帳號(原, 完成後) {
+  表單對話框("建立登入帳號：" + 原.name, [
+    { key: "email", 標題: "登入 Email", 類型: "Email", 必填: true, 說明: "可以是公務信箱或測試帳號，收不到信也沒關係（不寄驗證信）" },
+    { key: "密碼", 標題: "初始密碼（至少 8 個字元）", 類型: "密碼", 必填: true },
+    { key: "再次", 標題: "再輸入一次", 類型: "密碼", 必填: true }
+  ], { email: 原.email || "" }, async function (值) {
+    const 錯 = 檢查密碼(值);
+    if (錯) return 錯;
+    try {
+      const 結果 = await 呼叫("create_member_login", { p_member: 原.id, p_login_email: 值.email, p_password: 值.密碼 });
+      提示(結果 === "已存在" ? "這個 Email 原本已註冊：已完成驗證、改成新密碼並連結到「" + 原.name + "」" : "已建立登入帳號 " + String(值.email).trim().toLowerCase() + "，可以直接登入");
+      完成後();
+    } catch (e) { return e.message; }
+  }, { 儲存文字: "建立帳號", 前言: "建立後請把 Email 與密碼交給本人，登入後可在「我的資料 → 修改密碼」自己改。\n這個 Email 如果已經有人註冊過（例如註冊了卻收不到驗證信），會直接完成驗證、改成這組密碼並連結。" });
+}
+
+// 管理者替會員重設登入密碼（收不到重設密碼信的人用）
+function 重設會員密碼(原) {
+  表單對話框("重設密碼：" + 原.name, [
+    { key: "密碼", 標題: "新密碼（至少 8 個字元）", 類型: "密碼", 必填: true },
+    { key: "再次", 標題: "再輸入一次", 類型: "密碼", 必填: true }
+  ], {}, async function (值) {
+    const 錯 = 檢查密碼(值);
+    if (錯) return 錯;
+    try { await 呼叫("set_member_password", { p_member: 原.id, p_password: 值.密碼 }); 提示("已重設「" + 原.name + "」的密碼，請把新密碼交給本人"); }
+    catch (e) { return e.message; }
+  }, { 儲存文字: "重設密碼" });
+}
+
 // 標準名冊欄位（與會務管理系統相同）
 const 標準欄位 = ["姓名", "女0男1", "服務機關", "服務單位", "職稱", "電子郵件信箱"];
 
@@ -142,13 +180,12 @@ const 線上匯入別名 = {
   phone: ["公務電話", "電話", "分機"], employee_no: ["員工編號", "員編"], 理監事: ["理監事", "理監事職稱", "協會職務"], 會員代表: ["會員代表"]
 };
 
-// 把名冊裡的理監事寫法轉成 [身分, 職稱]：理事長→[理事,理事長]、監事→[監事,監事]；空白回傳 ["",""]
+// 把名冊裡的理監事寫法轉成 [身分, 職稱]（依「系統設定」的職稱清單）：理事長→[理事,理事長]、監事→[監事,監事]；空白回傳 ["",""]；看不懂回傳 null
 function 轉理監事(v) {
   const s = String(v || "").trim();
   if (!s || s === "無") return ["", ""];
-  if (["理事長", "常務理事", "理事"].indexOf(s) >= 0) return ["理事", s];
-  if (["監事會召集人", "常務監事", "監事"].indexOf(s) >= 0) return ["監事", s];
-  return null;
+  const 職 = (線上.職稱們.length ? 線上.職稱們 : 預設職稱們).find(function (t) { return t.title === s; });
+  return 職 ? [職.board_role, 職.title] : null;
 }
 
 // 兩個值是否不衝突：任一邊空白，或兩邊相同（不分大小寫）
@@ -418,56 +455,11 @@ async function 匯入線上名冊(名冊, 完成後) {
   if (連線.帳號) 完成後();
 }
 
-// ===== 認領碼 =====
-
-// 替勾選的會員產生認領碼（已連結帳號的人略過），顯示清單並可列印紙條、匯出
-async function 產生認領碼(列) {
-  const 未連 = 列.filter(function (m) { return !m.user_id; });
-  if (!未連.length) return 提示("勾選的會員都已連結帳號", true);
-  if (!(await 確認("替 " + 未連.length + " 位尚未連結帳號的會員產生認領碼？（30 天有效；已有的舊碼會作廢）", "產生"))) return;
-  // 每 500 人送一次（伺服器一次回傳的筆數有上限，分批才不會漏掉）
-  const 場 = 連線.場次;
-  let 碼們 = [], 錯誤 = "";
-  for (let i = 0; i < 未連.length; i += 500) {
-    try { 碼們 = 碼們.concat(await 呼叫("generate_claim_codes", { p_members: 未連.slice(i, i + 500).map(function (m) { return m.id; }) }) || []); }
-    catch (e) { 錯誤 = e.message; break; }
-  }
-  // 產生期間登出或換人登入：認領碼不顯示在別人的畫面上
-  if (連線.場次 !== 場 || !連線.帳號) return;
-  if (!碼們.length) return 提示(錯誤 || "沒有產生任何認領碼（幹部那幾筆只有理事長、秘書長、總幹事能產生）", true);
-  const 依編號 = {}, 有碼 = {};
-  未連.forEach(function (m) { 依編號[m.id] = m; });
-  碼們.forEach(function (c) { 有碼[c.member_id] = true; });
-  const 沒碼 = 未連.filter(function (m) { return !有碼[m.id]; });
-  const 列們 = 碼們.map(function (c) { const m = 依編號[c.member_id] || {}; return { 姓名: c.name, 機關: m.agency || "", 單位: m.unit || "", 碼: c.code, 到期: 民國(String(c.expires_at).slice(0, 10)) }; });
-  const 網址 = location.origin + location.pathname;
-  // 一張紙條：給會員的認領碼與操作步驟
-  const 紙條 = function (r) {
-    return h("div", { style: "border:1px dashed #555;padding:5mm;margin-bottom:4mm;page-break-inside:avoid" },
-      h("strong", null, "財政部公務人員協會　會員專區認領碼"),
-      h("p", { style: "margin:2mm 0" }, r.姓名 + "　" + r.機關 + " " + r.單位),
-      h("p", { style: "margin:2mm 0;font-size:16pt;letter-spacing:2px" }, r.碼),
-      h("p", { style: "margin:0;font-size:9pt" }, "1. 到 " + 網址 + " 用個人 Email 註冊並驗證　2. 登入後在「連結會員資料」輸入認領碼　（" + r.到期 + " 前有效，請勿交給他人）"));
-  };
-  對話框("認領碼（" + 列們.length + " 人）", [
-    h("p", { class: "提醒" }, "認領碼等同開門鑰匙，請只交給會員本人（當面、紙條或私訊），不要張貼在群組。關閉這個視窗後無法再看到，需要時可重新產生。"),
-    沒碼.length ? h("p", { class: "錯誤" }, "下列 " + 沒碼.length + " 位沒有產生認領碼" + (錯誤 ? "（" + 錯誤 + "）" : "（幹部那幾筆只有理事長、秘書長、總幹事能產生，或剛好已連結帳號）") + "：" +
-      沒碼.slice(0, 20).map(function (m) { return m.name; }).join("、") + (沒碼.length > 20 ? "…" : "")) : null,
-    h("div", { class: "表捲" }, h("table", { class: "表", id: "認領碼表" },
-      h("thead", null, h("tr", null, ["姓名", "服務機關", "服務單位", "認領碼", "有效期限"].map(function (t) { return h("th", null, t); }))),
-      h("tbody", null, 列們.map(function (r) { return h("tr", null, h("td", null, r.姓名), h("td", null, r.機關), h("td", null, r.單位), h("td", { style: "font-family:monospace;font-size:1.05rem" }, r.碼), h("td", null, r.到期)); }))))
-  ], [
-    { 文字: "匯出 Excel", 動作: function () { 匯出表格("認領碼_" + 今天(), [["姓名", "服務機關", "服務單位", "認領碼", "有效期限"]].concat(列們.map(function (r) { return [r.姓名, r.機關, r.單位, r.碼, r.到期]; })), "xlsx"); return false; } },
-    { 文字: "列印紙條", 動作: function () { 列印(h("div", null, 列們.map(紙條)), false); return false; } },
-    { 文字: "關閉", 主: true }
-  ], { 寬: true });
-}
-
 // ===== 申請審核（入會申請、帳號連結申請）=====
 註冊頁面("申請審核", {
   圖示: "✅",
   可見: 是幹部,
-  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後一律建立一筆新的會員資料並連結帳號；名冊上已有相同公務信箱的會員時不能核准，請退回，並請申請人改用「連結會員資料」（輸入認領碼或送連結申請），再到「帳號連結」核對後連結。退回時填寫原因，申請人登入後看得到。",
+  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後一律建立一筆新的會員資料並連結帳號；名冊上已有相同公務信箱的會員時不能核准，請退回，並請申請人改送「連結申請」，再到「帳號連結」核對後連結（或由具管理權限的幹部在「會員管理」替那位會員建立登入帳號）。退回時填寫原因，申請人登入後看得到。",
   繪製: async function (容器, 參數) {
     const [申們, 連們, 名冊] = await Promise.all([查詢("applications", null, "created_at.desc"), 查詢("link_requests", null, "created_at.desc"), 查詢("members", null, "member_no.asc")]);
     const 待連 = 連們.filter(function (a) { return a.status === "待審"; }).length;
@@ -552,7 +544,7 @@ function 繪製入會審核(區, 申們, 名冊) {
         const 撞名冊 = r.email && 名冊信箱[r.email.toLowerCase()];
         if (撞名冊) {
           return [h("span", { class: "標記 警", title: "名冊已有這個公務信箱：" + 撞名冊.member_no + " " + 撞名冊.name }, "名冊已有此信箱（" + 撞名冊.name + "）"), " ",
-            h("button", { class: "鈕 小 危", type: "button", onclick: function (e) { e.stopPropagation(); 退回申請("reject_application", r, "名冊上已有您的資料，請改用「連結會員資料」（輸入協會給的認領碼，或送出連結申請）"); } }, "退回")];
+            h("button", { class: "鈕 小 危", type: "button", onclick: function (e) { e.stopPropagation(); 退回申請("reject_application", r, "名冊上已有您的資料，請改到「連結會員資料」送出連結申請（或請協會直接替您建立登入帳號）"); } }, "退回")];
         }
         return [h("button", { class: "鈕 小 主", type: "button", onclick: async function (e) {
           e.stopPropagation();

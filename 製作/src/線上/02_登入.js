@@ -2,19 +2,38 @@
 
 const 線上 = {
   會員: null,      // 自己的會員資料（members 一筆）；還不是會員時為 null
-  幹部: "",        // 幹部角色：理事長、秘書長、總幹事、會計、承辦人；一般會員為空字串
+  幹部: "",        // 幹部角色（例如理事長、秘書長、總幹事、會計、承辦人）；一般會員為空字串
   申請: null,      // 最近一次入會申請（還不是會員時用）
-  連結申請: null   // 最近一次帳號連結申請（還沒連結會員資料時用）
+  連結申請: null,  // 最近一次帳號連結申請（還沒連結會員資料時用）
+  角色們: [],      // 系統設定的幹部角色 [{name, is_admin, sort}]
+  職稱們: []       // 系統設定的理監事職稱 [{title, board_role, sort}]
 };
+
+// 資料庫還沒更新到有「系統設定」時用的預設清單
+const 預設角色們 = [{ name: "理事長", is_admin: true }, { name: "秘書長", is_admin: true }, { name: "總幹事", is_admin: true }, { name: "會計", is_admin: false }, { name: "承辦人", is_admin: false }];
+const 預設職稱們 = [{ title: "理事長", board_role: "理事" }, { title: "常務理事", board_role: "理事" }, { title: "理事", board_role: "理事" },
+  { title: "監事會召集人", board_role: "監事" }, { title: "常務監事", board_role: "監事" }, { title: "監事", board_role: "監事" }];
 
 // 是否為幹部
 function 是幹部() {
   return !!線上.幹部;
 }
 
-// 是否可指派幹部角色（理事長、秘書長、總幹事）
+// 是否為具管理權限的幹部（可指派幹部角色、建立登入帳號、修改系統設定；預設是理事長、秘書長、總幹事）
 function 是管理者() {
-  return 線上.幹部 === "理事長" || 線上.幹部 === "秘書長" || 線上.幹部 === "總幹事";
+  const 角 = 線上.角色們.find(function (r) { return r.name === 線上.幹部; });
+  return !!(線上.幹部 && 角 && 角.is_admin);
+}
+
+// 讀取系統設定（幹部角色、理監事職稱）；資料庫還沒更新時用預設清單
+async function 讀取系統設定() {
+  try {
+    const [角, 職] = await Promise.all([查詢("staff_roles", null, "sort.asc", "name"), 查詢("board_titles", null, "sort.asc", "title")]);
+    線上.角色們 = 角; 線上.職稱們 = 職;
+  } catch (e) {
+    if (e.需重新登入 || e.網路) throw e;
+    線上.角色們 = 預設角色們; 線上.職稱們 = 預設職稱們;
+  }
 }
 
 // 建立置中的卡片畫面（登入、註冊等用）
@@ -40,7 +59,7 @@ function 輸入欄(標題, 屬性) {
 
 // 顯示登入畫面
 function 顯示登入頁(訊息) {
-  線上.會員 = null; 線上.幹部 = ""; 線上.申請 = null;
+  線上.會員 = null; 線上.幹部 = ""; 線上.申請 = null; 線上.角色們 = []; 線上.職稱們 = [];
   更新外框();
   const 信 = 輸入欄("Email", { id: "登入信箱", type: "email", autocomplete: "username" });
   const 密 = 輸入欄("密碼", { id: "登入密碼", type: "password", autocomplete: "current-password" });
@@ -60,7 +79,7 @@ function 顯示登入頁(訊息) {
       h("button", { class: "鈕 主", type: "button", id: "登入鈕", onclick: 送出 }, "登入"),
       h("button", { class: "鈕 文字", type: "button", onclick: 顯示註冊頁 }, "第一次使用？註冊帳號"),
       h("button", { class: "鈕 文字", type: "button", onclick: 顯示忘記密碼頁 }, "忘記密碼")),
-    h("p", { class: "小字 次要字" }, "請用您的個人 Email 註冊（公務信箱收不到外部驗證信）。註冊登入後，輸入協會給您的「認領碼」或送出「連結申請」，就能連到名冊上的會員資料；還不是會員的同仁可線上申請入會。為保護個資，登入資訊不會留在瀏覽器，重新整理頁面需要重新登入。")
+    h("p", { class: "小字 次要字" }, "協會替您建立的帳號，直接用協會給您的 Email 與密碼登入（登入後可在「我的資料」修改密碼）。自己註冊請用收得到外部信的個人 Email；註冊登入後送出「連結申請」，協會核對後就能連到名冊上的會員資料；還不是會員的同仁可線上申請入會。為保護個資，登入資訊不會留在瀏覽器，重新整理頁面需要重新登入。")
   ]);
   信.欄.focus();
 }
@@ -141,7 +160,7 @@ function 顯示設定新密碼頁() {
 }
 
 // 處理信中連結帶回來的結果（網址 # 或 ? 後面），處理完就從網址列移除。
-// 為防止有人把「自己的登入憑證」做成連結騙別人點（之後輸入的認領碼就會連到對方帳號），
+// 為防止有人把「自己的登入憑證」做成連結騙別人點（之後送出的申請就會記在對方帳號），
 // 驗證信連結一律不直接登入，只告知驗證完成、請用密碼登入；只有重設密碼連結會暫時使用憑證來設定新密碼。
 async function 處理信件連結() {
   const 參 = new URLSearchParams(location.hash.replace(/^#/, ""));
@@ -171,6 +190,7 @@ async function 處理信件連結() {
 async function 登入後() {
   try {
     if (!連線.帳號) await 取得帳號();
+    await 讀取系統設定();
     await 重新讀取我的資料();
     更新外框();
     前往(線上.會員 ? "我的資料" : "連結會員資料");

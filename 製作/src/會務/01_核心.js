@@ -257,7 +257,9 @@ function 表單對話框(標題, 欄位們, 初值, 儲存, 選項) {
   const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } },
     欄位們.map(function (f) { return 表單欄位(f, 初值[f.key] == null ? f.預設 : 初值[f.key]); }));
   const 錯誤區 = h("p", { class: "錯誤", role: "alert" });
-  return 對話框(標題, [表單, 錯誤區], ((選項 && 選項.額外按鈕) || []).concat([
+  // 選項.前言：表單上方的說明文字
+  const 前言 = 選項 && 選項.前言 ? h("p", { class: "次要字 保留換行" }, 選項.前言) : null;
+  return 對話框(標題, [前言, 表單, 錯誤區].filter(Boolean), ((選項 && 選項.額外按鈕) || []).concat([
     { 文字: "取消", 值: null },
     {
       文字: (選項 && 選項.儲存文字) || "儲存", 主: true, 動作: async function () {
