@@ -148,5 +148,65 @@ await 兩種順序([A, C], H6, [["王小明",1,"財政部賦稅署","稅制組",
 await 兩種順序([X], H6, [["陳美玲",0,"財政部賦稅署","稅制組","科員",""], ["陳美玲",0,"財政部賦稅署","法務組","科員","w@example.org"]]);
 await 兩種順序([], 員, [["趙五",1,"財政部國庫署","","","q@example.org","E5"], ["趙五",1,"財政部國庫署","","","q@example.org","E6"]]);
 
+// 列的所有排列（最多 4 列）
+const 排列 = (a) => a.length <= 1 ? [a] : a.flatMap((x, i) => 排列([...a.slice(0, i), ...a.slice(i + 1)]).map((r) => [x, ...r]));
+// 所有排列都跑一次：新增／更新筆數、被更新的會員、新增的人（姓名／Email／員工編號）必須一樣（其他欄位依「後面的列覆蓋前面」本來就會不同）
+async function 各種順序(名冊, 標題, 列們) {
+  const 結果們 = [];
+  for (const 序 of 排列(列們)) {
+    const r = await run(名冊, [標題, ...序]);
+    結果們.push({ r, 指紋: JSON.stringify([r.計, [...new Set(r.patches.map((p) => p.id))].sort(), r.inserts.map((x) => [x.name, x.email || "", String(x.employee_no || "").toLowerCase()].join("/")).sort()]) });
+  }
+  return { 一致: 結果們.every((x) => x.指紋 === 結果們[0].指紋), 結果們, r: 結果們[0].r };
+}
+console.log("S20 名冊 M（有 Email、沒有員工編號）；檔案 M 的 Email 列＋兩列同名同機關、沒填 Email、員工編號不同");
+{
+  const M = { id:"M", name:"王小明", agency:"財政部賦稅署", unit:"稅制組", email:"wang@example.org" };
+  const x = await 各種順序([M], 員, [["王小明",1,"財政部賦稅署","稅制組","科員","wang@example.org",""], ["王小明",1,"財政部賦稅署","稅制組","科員","","A1001"], ["王小明",1,"財政部賦稅署","法務組","科員","","A1002"]]);
+  檢查(x.一致 && x.結果們.every((y) => !by(y.r.db,"M").employee_no && by(y.r.db,"M").unit === "稅制組" && /都對應到名冊上的「王小明」/.test(y.r.預覽)), "六種順序結果相同：M 不寫入任何員工編號，兩列都略過並說明");
+}
+console.log("S21 調職：名冊 M 在國庫署（沒有 Email、員工編號），檔案有舊機關與新機關兩列（員工編號相同）");
+{
+  const M = { id:"M", name:"王小明", agency:"財政部國庫署", unit:"國庫組" };
+  const x = await 各種順序([M], 員, [["王小明",1,"財政部國庫署","國庫組","科員","","A1234"], ["王小明",1,"財政部賦稅署","稅制組","科員","","A1234"]]);
+  檢查(x.一致 && x.r.計.join() === "0,1" && x.結果們.every((y) => by(y.r.db,"M").employee_no === "A1234"), "兩種順序都更新 M，不重複新增");
+  const x2 = await 各種順序([M], H6, [["王小明",1,"財政部國庫署","國庫組","科員","w@example.org"], ["王小明",1,"財政部賦稅署","稅制組","科員","w@example.org"]]);
+  檢查(x2.一致 && x2.r.計.join() === "0,1", "用同一個 Email 時也一樣");
+}
+console.log("S22 名冊 L（賦稅署、有 Email）調到北區國稅局：檔案有新機關 Email 列、舊機關空白列、新機關空白列");
+{
+  const L = { id:"L", name:"林志明", agency:"財政部賦稅署", unit:"稅制組", email:"lin@example.org" };
+  const x = await 各種順序([L], H6, [["林志明",1,"財政部北區國稅局","審查科","科員","lin@example.org"], ["林志明",1,"財政部賦稅署","稅制組","科員",""], ["林志明",1,"財政部北區國稅局","審查科","科員",""]]);
+  檢查(x.一致 && x.r.計.join() === "0,1", "六種順序都只更新 L，不重複新增");
+}
+console.log("S23 名冊 陳美玲（chen@）；檔案有 陳美玲 空白 Email 列，與複製時忘了改 Email 的 王小明（chen@）");
+{
+  const M = { id:"M", name:"陳美玲", agency:"財政部賦稅署", unit:"稅制組", email:"chen@example.org" };
+  const x = await 各種順序([M], H6, [["陳美玲",0,"財政部賦稅署","稅制組","科員",""], ["王小明",1,"財政部賦稅署","法務組","科員","chen@example.org"]]);
+  檢查(x.一致 && x.結果們.every((y) => /但姓名不同/.test(y.r.預覽) && y.r.inserts.length === 0), "兩種順序結果相同，陳美玲那列因姓名不同而略過並說明");
+}
+console.log("S24 名冊兩位同名、員工編號也相同（各機關各自編號）；檔案一列 Email 唯一對到其中一位");
+{
+  const A1 = { id:"A", name:"陳建宏", agency:"財政部賦稅署", email:"chen.jh@example.org", employee_no:"00123" }, B1 = { id:"B", name:"陳建宏", agency:"財政部國庫署", email:"jhchen@example.org", employee_no:"00123" };
+  const r = await run([A1, B1], [員, ["陳建宏",1,"財政部賦稅署","法務組","科長","chen.jh@example.org","00123"]]);
+  檢查(r.patches.length === 1 && r.patches[0].id === "A" && by(r.db,"B").unit === undefined, "依 Email 更新賦稅署那位");
+}
+console.log("S25 隨機情境：所有列的排列結果都相同");
+{
+  let 種子 = 20261008;
+  const 亂 = (n) => { 種子 = (種子 * 1103515245 + 12345) % 2147483648; return 種子 % n; };
+  const 選 = (a) => a[亂(a.length)];
+  const 名們 = ["王一", "陳二"], 機們 = ["甲署", "乙署"], 信們 = ["a@example.org", "b@example.org", ""], 編們 = ["E1", "e1", "E2", ""];
+  let 不一致 = 0, 例 = "";
+  for (let 次 = 0; 次 < 3000; 次++) {
+    const 名冊 = Array.from({ length: 亂(3) }, (_, i) => ({ id: "R" + i, name: 選(名們), agency: 選(機們), email: "", employee_no: 選(["", "", "E1", "E2"]) }));
+    名冊.forEach((m, i) => { if (亂(2)) m.email = "r" + i + "@example.org"; });
+    const 列們 = Array.from({ length: 2 + 亂(3) }, () => [選(名們), 1, 選(機們), "單位" + 亂(3), "科員", 選(信們.concat(名冊.map((m) => m.email).filter(Boolean))), 選(編們)]);
+    const x = await 各種順序(名冊, 員, 列們);
+    if (!x.一致) { 不一致++; if (!例) 例 = JSON.stringify({ 名冊, 列們 }); }
+  }
+  檢查(不一致 === 0, "3000 組隨機名冊與檔案（2～4 列），各種列的順序結果都相同" + (例 ? "（例：" + 例 + "）" : ""));
+}
+
 console.log("\n匯入比對測試：通過 " + 通過 + " 項，失敗 " + 失敗 + " 項");
 process.exit(失敗 ? 1 : 0);

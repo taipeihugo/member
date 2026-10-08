@@ -43,12 +43,17 @@ alter table public.members add constraint members_staff_role_check
 create unique index if not exists members_email_uniq on public.members (lower(email)) where email <> '';
 -- 帳號連結是否由理事長、秘書長、總幹事（或 SQL Editor）建立或核准（v1.8）。
 -- 會計、承辦人連結的帳號，要先改由管理者重新連結，才能被指派為幹部，避免有人先把分身帳號連到日後會當幹部的會員
--- 第一次加這個欄位時（從 v1.7 以前升級），目前已是幹部的那幾筆視為管理者連結（舊版只有管理者或 SQL Editor 能連結幹部）
+-- 升級時只做一次（以欄位說明當作「已回填」標記，v1.8、v1.9 的資料庫也會補做）：
+-- 目前已是幹部的那幾筆視為管理者連結（舊版只有管理者或 SQL Editor 能連結幹部）
 do $$
 begin
   if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'members' and column_name = 'linked_by_admin') then
     alter table public.members add column linked_by_admin boolean not null default false;
-    update public.members set linked_by_admin = true where user_id is not null and staff_role <> '';
+  end if;
+  if col_description('public.members'::regclass,
+      (select attnum from pg_attribute where attrelid = 'public.members'::regclass and attname = 'linked_by_admin')) is distinct from '帳號連結由管理者建立（已回填既有幹部）' then
+    update public.members set linked_by_admin = true where user_id is not null and staff_role <> '' and not linked_by_admin;
+    comment on column public.members.linked_by_admin is '帳號連結由管理者建立（已回填既有幹部）';
   end if;
 end $$;
 
@@ -189,8 +194,8 @@ begin
       and (new.name, new.email, new.employee_no) is distinct from (old.name, lower(trim(old.email)), old.employee_no) then
     new.linked_by_admin := false;
   end if;
-  -- 指派幹部角色時，這筆的帳號連結必須是管理者建立或核准的（SQL Editor 不受限）
-  if auth.uid() is not null and tg_op = 'UPDATE' and old.staff_role = '' and new.staff_role <> ''
+  -- 指派或變更幹部角色時（取消角色除外），這筆的帳號連結必須是管理者建立或核准的（SQL Editor 不受限）
+  if auth.uid() is not null and tg_op = 'UPDATE' and new.staff_role is distinct from old.staff_role and new.staff_role <> ''
       and new.user_id is not null and not new.linked_by_admin then
     raise exception '「%」的帳號連結不是由理事長、秘書長或總幹事建立的（例如由會計、承辦人連結，v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請先「解除帳號連結」，再由理事長、秘書長或總幹事產生認領碼交給本人重新連結，之後再指派', new.name;
   end if;

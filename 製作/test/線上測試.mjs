@@ -63,6 +63,8 @@ function 排序SQL(參數) {
 // 處理資料 API（/rest/v1/…）
 async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
   const rpc = 路徑.match(/^\/rest\/v1\/rpc\/([a-z_]+)$/);
+  // 指定某個資料庫函式回應延遲（在切換身分之前等，不影響其他同時進行的請求）
+  if (rpc && 延遲["rpc:" + rpc[1]]) await new Promise((r) => setTimeout(r, 延遲["rpc:" + rpc[1]]));
   return 以身分(db, 使用者, async () => {
     if (rpc) {
       const 名 = rpc[1];
@@ -403,6 +405,21 @@ try {
   const 登入帳號欄 = await 框().locator("[data-key='登入帳號']").inputValue();
   檢查(登入帳號欄.startsWith("jia.home@gmail.example（由理事長、秘書長或總幹事連結）"), "管理者編輯會員時看得到連結的登入帳號與連結方式（" + 登入帳號欄 + "）");
   await page.keyboard.press("Escape");
+  // 連點兩下：只開一個編輯視窗
+  延遲["rpc:member_login_email"] = 300;
+  await page.locator("#內容 tbody tr", { hasText: "甲會員" }).first().dblclick();
+  await page.waitForTimeout(900);
+  檢查((await page.locator("dialog[open]").count()) === 1, "連點兩下會員只開一個編輯視窗");
+  await page.keyboard.press("Escape");
+  // 讀登入帳號期間登出：不會在登入畫面開出會員資料
+  延遲["rpc:member_login_email"] = 1500;
+  await page.locator("#內容 tbody tr", { hasText: "甲會員" }).first().click();
+  await page.waitForTimeout(200);
+  await page.click("#登出鈕");
+  await page.waitForTimeout(2000);
+  延遲["rpc:member_login_email"] = 0;
+  檢查(await page.isVisible("#登入信箱") && (await page.locator("dialog[open]").count()) === 0, "開啟會員資料途中登出：登入畫面上不會出現會員資料視窗");
+  await 登入("sec@example.org", "staffpass1");
   await 選單("申請審核");
   await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator("button", { hasText: "核准" }).click();
   檢查((await 框().locator("[data-key='member'] option:checked").innerText()).includes("乙理事長"), "核准連結時自動預選名冊上對應的會員（公務信箱相同）");
@@ -566,6 +583,28 @@ try {
   延遲.寫入 = 0;
   檢查(半途.寫入者.length > 0 && 半途.寫入者.every((e) => e === "sec@example.org") && 半途.有框 === 0, "匯入到一半登出並換人登入：後面的資料不會用下一位的身分寫入、結果不會顯示在下一位畫面（寫入者：" + 半途.寫入者.join("、") + "）");
   await page.click("#登出鈕");
+  await 登入("sec@example.org", "staffpass1");
+  // 匯入到一半登入失效（沒有其他人登入）：仍顯示「匯入中斷」與重新登入後的處理方式（只有筆數，沒有個資）
+  await 選單("會員管理");
+  延遲.寫入 = 300;
+  {
+    const 檔 = path.join(輸出, "半途逾時.csv");
+    fs.writeFileSync(檔, "\uFEFF姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱\n" + Array.from({ length: 6 }, (_, i) => "批次會員" + (i + 1) + ",1,財政部財政資訊中心,逾時組,科員,batch" + (i + 1) + "@example.org\n").join(""));
+    const [選] = await Promise.all([page.waitForEvent("filechooser"), page.click("#匯入名冊鈕")]);
+    await 選.setFiles(檔);
+    await 框().waitFor();
+    await 框().locator("button", { hasText: "開始匯入" }).click();
+    await page.waitForTimeout(450);
+    模擬.刷新拒絕 = true;
+    模擬.過期.add(await page.evaluate(() => window.__T.連線.憑證));
+    await page.waitForSelector("#登入信箱");
+    await page.waitForTimeout(800);
+    模擬.刷新拒絕 = false;
+  }
+  延遲.寫入 = 0;
+  const 中斷文字 = (await page.locator("dialog[open]").count()) ? await 框().innerText() : "";
+  檢查(/匯入中斷/.test(中斷文字) && /請重新登入後/.test(中斷文字), "匯入到一半登入失效：回到登入畫面並顯示「匯入中斷」與重新登入後的處理方式");
+  await page.keyboard.press("Escape");
   await 登入("sec@example.org", "staffpass1");
   // 存取憑證過期：讀資料收到 401 → 自動延長後重送，畫面正常
   模擬.過期.add(await page.evaluate(() => window.__T.連線.憑證));

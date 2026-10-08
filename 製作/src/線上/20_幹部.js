@@ -63,11 +63,20 @@ function 顯示信箱(列) {
 }
 
 // 新增或編輯一位會員（理監事職稱單選，會員代表另外勾選）；管理者另外看得到這位會員連結的登入帳號，指派幹部前可以核對
+let 編輯開啟中 = false;
 async function 編輯線上會員(原, 機關們, 完成後) {
+  // 讀登入帳號期間又點一次（例如連點兩下）：不重複開視窗
+  if (編輯開啟中) return;
   let 登入帳號 = "";
   if (原 && 原.user_id && 是管理者()) {
-    try { 登入帳號 = await 呼叫("member_login_email", { p_member: 原.id }) || ""; } catch (e) { 登入帳號 = "（無法讀取：" + e.message + "）"; }
-    登入帳號 += 原.linked_by_admin ? "（由理事長、秘書長或總幹事連結）" : "（不是由理事長、秘書長或總幹事連結：要指派幹部前，請先解除連結並重新發碼）";
+    const 場 = 連線.場次;
+    編輯開啟中 = true;
+    try { 登入帳號 = await 呼叫("member_login_email", { p_member: 原.id }) || ""; }
+    catch (e) { if (連線.場次 === 場) 登入帳號 = "（無法讀取：" + e.message + "）"; }
+    finally { 編輯開啟中 = false; }
+    // 讀取期間登出或換人登入：不開視窗（避免個資出現在登入畫面或下一位的畫面）
+    if (連線.場次 !== 場 || !連線.帳號) return;
+    登入帳號 += 原.linked_by_admin ? "（由理事長、秘書長或總幹事連結）" : "（不是由理事長、秘書長或總幹事連結：要指派或變更幹部角色前，請先解除連結並重新發碼）";
   }
   const 欄位們 = [
     { key: "name", 標題: "姓名", 必填: true }, { key: "gender", 標題: "性別", 類型: "選單", 選項: ["女", "男"] },
@@ -213,9 +222,16 @@ async function 匯入線上名冊(名冊, 完成後) {
   const 首列 = function (人) { return Math.min.apply(null, 人.列們.map(function (x) { return x.列號; })); };
   const 略過 = function (人, 文字) { 人.略過 = true; 問題(首列(人), "第 " + 列號們(人) + " 列「" + 人.列們[0].資料.name + "」" + 文字 + "，已略過"); };
   const 有效 = function (人) { return !人.略過 && !人.併入; };
-  // 把乙併到甲（同一人）；Email 或員工編號有矛盾就略過乙
+  // 一人在檔案裡出現過的各個「姓名＋服務機關」（機關空白的列不算；全部空白時用合併後的）。調職前後的列都算
+  const 名鍵們 = function (人) {
+    const 們 = 不重複(人.列們.filter(function (x) { return x.資料.agency; }).map(function (x) { return 名鍵(x.資料); }));
+    return 們.length ? 們 : [名鍵(資料of(人))];
+  };
+  // 兩人可不可以視為同一人：姓名相同，Email、員工編號也沒有矛盾
+  const 可合 = function (甲, 乙) { const a = 資料of(甲), b = 資料of(乙); return a.name === b.name && 相容(a, b); };
+  // 把乙併到甲（同一人）；姓名、Email 或員工編號有矛盾就略過乙
   const 合入 = function (甲, 乙, 對象名) {
-    if (!相容(資料of(甲), 資料of(乙))) return 略過(乙, "與第 " + 列號們(甲) + " 列都對應到名冊上的「" + 對象名 + "」，但 Email 或員工編號不同，無法判斷");
+    if (!可合(甲, 乙)) return 略過(乙, "與第 " + 列號們(甲) + " 列都對應到名冊上的「" + 對象名 + "」，但姓名、Email 或員工編號不同，無法判斷");
     甲.列們 = 甲.列們.concat(乙.列們);
     乙.併入 = 甲;
   };
@@ -253,14 +269,15 @@ async function 匯入線上名冊(名冊, 完成後) {
     let 編原 = null;
     if (d.employee_no) {
       const 們 = (依員編[編鍵(d.employee_no)] || []).filter(function (m) { return 同名(m, d); });
-      if (們.length > 1) return 略過(人, "名冊上有 " + 們.length + " 位同名且員工編號相同的會員，無法判斷是誰");
-      編原 = 們[0] || null;
+      // 各機關各自編號，可能有同名又同號的人：Email 已唯一對到其中一位就用那一位
+      if (們.length > 1 && 們.indexOf(信原) < 0) return 略過(人, "名冊上有 " + 們.length + " 位同名且員工編號相同的會員，無法判斷是誰");
+      編原 = 們.length > 1 ? 信原 : 們[0] || null;
     }
     if (信原) {
       // Email 相同就是同一人；但姓名、員工編號明顯指向名冊上另一位時（多半是 Email 填錯），略過
       const 員編不合 = !不衝突(d.employee_no, 信原.employee_no);
       const 另有其人 = 名冊.some(function (m) {
-        return m !== 信原 && 同名(m, d) && (d.employee_no && m.employee_no ? 不衝突(m.employee_no, d.employee_no) : 用姓名 && 名鍵(m) === 名鍵(d));
+        return m !== 信原 && 同名(m, d) && (d.employee_no && m.employee_no ? 不衝突(m.employee_no, d.employee_no) : 用姓名 && 名鍵們(人).indexOf(名鍵(m)) >= 0);
       });
       if ((!同名(信原, d) && (員編不合 || 另有其人)) || (員編不合 && 另有其人)) return 略過(人, "的 Email 屬於名冊上的「" + 信原.name + "」，姓名或員工編號卻指向另一位會員（請檢查 Email）");
     }
@@ -273,27 +290,34 @@ async function 匯入線上名冊(名冊, 完成後) {
   // 同一位會員被兩人對應（一個用 Email、一個用員工編號）：沒有矛盾就合併，有矛盾就略過員工編號那一位
   Object.keys(強).forEach(function (id) { 強[id].slice(1).forEach(function (人) { 合入(強[id][0], 人, 強[id][0].原.name); }); });
 
-  // 三、其餘有 Email 或員工編號的人：用姓名＋服務機關找名冊（只有一位、沒有矛盾才算）
-  const 弱 = {};
+  // 三、其餘有 Email 或員工編號的人：用姓名＋服務機關找名冊（只有一位、沒有矛盾才算；這人在檔案裡出現過的各個機關都比對）
+  const 弱 = {}, 附 = {};
   if (用姓名) 人們.forEach(function (人) {
     if (!有效(人) || 人.原) return;
     const d = 資料of(人);
-    const 候 = (依姓名機關[名鍵(d)] || []).filter(function (m) { return 相容(d, m); });
+    const 候 = 不重複([].concat.apply([], 名鍵們(人).map(function (k) { return 依姓名機關[k] || []; }))).filter(function (m) { return 相容(d, m); });
     let m = 候[0] || null;
     if (候.length > 1) {
       // 名冊上有多位同名同機關：排除已被別人用 Email 或員工編號認定的，只剩一位才算
       const 未用 = 候.filter(function (x) { return !強[x.id]; });
-      if (未用.length !== 1) return 略過(人, "名冊上有 " + 候.length + " 位同名同機關的會員，無法判斷是誰（請補上 Email 或員工編號）");
+      if (未用.length !== 1) return 略過(人, "名冊上有 " + 候.length + " 位同名且機關相符的會員，無法判斷是誰（請補上 Email 或員工編號）");
       m = 未用[0];
     }
     if (!m) return;
-    if (強[m.id]) return 合入(強[m.id][0], 人, m.name);
-    放(弱, m.id, 人);
+    // 先收集起來，最後整組判斷（與列的順序無關）
+    放(強[m.id] ? 附 : 弱, m.id, 人);
+  });
+  // 兩兩都可視為同一人
+  const 全可合 = function (組) { return 組.every(function (甲, i) { return 組.slice(i + 1).every(function (乙) { return 可合(甲, 乙); }); }); };
+  // 對應到已用 Email／員工編號認定的會員：連同那一位整組比對，全部沒有矛盾才合併，否則這幾位都略過
+  Object.keys(附).forEach(function (id) {
+    const 主 = 強[id][0], 們 = 附[id];
+    if (!全可合([主].concat(們))) return 們.forEach(function (人) { 略過(人, "與第 " + 列號們(主) + " 列都對應到名冊上的「" + 主.原.name + "」，但姓名、Email 或員工編號不同，無法判斷"); });
+    們.forEach(function (人) { 主.列們 = 主.列們.concat(人.列們); 人.併入 = 主; });
   });
   Object.keys(弱).forEach(function (id) {
     const 們 = 弱[id];
-    const 全相容 = 們.every(function (甲, i) { return 們.slice(i + 1).every(function (乙) { return 相容(資料of(甲), 資料of(乙)); }); });
-    if (!全相容) return 們.forEach(function (人) { 略過(人, "與檔案裡其他列都對應到名冊上的「" + 們[0].列們[0].資料.name + "」，但 Email 或員工編號不同，無法判斷"); });
+    if (!全可合(們)) return 們.forEach(function (人) { 略過(人, "與檔案裡其他列都對應到名冊上的「" + 們[0].列們[0].資料.name + "」，但 Email 或員工編號不同，無法判斷"); });
     們[0].原 = 名冊.find(function (m) { return m.id === id; });
     們.slice(1).forEach(function (人) { 們[0].列們 = 們[0].列們.concat(人.列們); 人.併入 = 們[0]; });
   });
@@ -306,6 +330,9 @@ async function 匯入線上名冊(名冊, 完成後) {
   else {
     const 依鍵 = {};
     無識別.forEach(function (x) { 放(依鍵, 名鍵(x.資料), x); });
+    // 先記下有 Email 或員工編號的人此刻的各個「姓名＋機關」，後面附加的列不影響比對（與列的順序無關）
+    const 識別鍵 = new Map();
+    人們.forEach(function (人) { if (有效(人)) 識別鍵.set(人, 名鍵們(人)); });
     Object.keys(依鍵).forEach(function (k) {
       const 們 = 依鍵[k];
       const 名冊同 = 依姓名機關[k] || [];
@@ -316,11 +343,12 @@ async function 匯入線上名冊(名冊, 完成後) {
         人們.push(人); 認[未用[0].id] = 人;
       } else if (名冊同.length === 1) {
         const m = 名冊同[0];
+        if (認[m.id] && 資料of(認[m.id]).name !== 們[0].資料.name) return 們.forEach(function (x) { 問題(x.列號, x.列名 + "與第 " + 列號們(認[m.id]) + " 列都對應到名冊上的「" + m.name + "」，但姓名不同，無法判斷，已略過"); });
         if (認[m.id]) 認[m.id].列們 = 認[m.id].列們.concat(們);
         else { const 人 = { 列們: 們, 原: m }; 人們.push(人); 認[m.id] = 人; }
       } else {
         // 名冊上沒有：檔案裡有同名同機關、有 Email 或員工編號的人就是他（只有一位才算）
-        const 同 = 人們.filter(function (人) { return 有效(人) && 人.列們.some(function (x) { return x.資料.email || x.資料.employee_no; }) && 名鍵(資料of(人)) === k; });
+        const 同 = 人們.filter(function (人) { return 有效(人) && 識別鍵.has(人) && 識別鍵.get(人).indexOf(k) >= 0; });
         if (同.length > 1) return 們.forEach(function (x) { 問題(x.列號, x.列名 + "與檔案裡第 " + 同.map(列號們).join("、") + " 列可能是同一人，無法判斷是哪一位，已略過（請補上 Email 或員工編號）"); });
         if (同.length === 1) 同[0].列們 = 同[0].列們.concat(們);
         else 人們.push({ 列們: 們 });
@@ -373,8 +401,10 @@ async function 匯入線上名冊(名冊, 完成後) {
     try { await 修改("members", { id: u.id }, u.資料); 已更新++; }
     catch (e) { if (暫時錯誤(e)) { 中斷 = e; break; } 失敗.push(u.資料.name + "：" + e.message); }
   }
-  // 匯入期間登出或換人登入：不在別人的畫面上顯示結果（後面的資料已因登入狀態變更而停止送出）
-  if (連線.場次 !== 場 || !連線.帳號) return;
+  // 匯入期間換人登入：不在下一位的畫面上顯示結果（後面的資料已因登入狀態變更而停止送出）
+  if (連線.場次 !== 場 && 連線.帳號) return;
+  // 登入逾時或登出（沒有人登入）：仍顯示中斷說明（只有筆數，沒有個資），提醒重新登入後怎麼處理
+  if (!連線.帳號 && !中斷) return;
   if (中斷) {
     對話框("匯入中斷", [
       h("p", { class: "錯誤" }, "已新增 " + 已新增 + " 人、更新 " + 已更新 + " 人後中斷：" + 中斷.message),

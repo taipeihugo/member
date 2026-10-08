@@ -304,6 +304,14 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [R列]), "不是由理事長"), "理事長指派那筆為幹部時被擋（防止改名冒充後奪權）");
     檢查((await 以身分(db, 分身4, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "", "上述被擋後，分身帳號仍不是幹部");
     await 以身分(db, 分身4, () => db.query("select public.update_my_profile('男', '財政部國庫署', '國庫組', '科員', '分機 1')"));
+    // 2i. 已是幹部的會計把自己那筆改成將升任者的姓名、員工編號 → 理事長把那筆從會計改成秘書長時被擋
+    const 計帳 = await 新("acct@gmail.example");
+    await db.query("select public.make_staff('acct@gmail.example', '會計', '測試會計', 'acct@fia.example.gov')");
+    const 計列 = (await db.query("select id from public.members where email = 'acct@fia.example.gov'")).rows[0].id;
+    await 以身分(db, 計帳, () => db.query("update public.members set name = '王將任', employee_no = 'E777' where id = $1", [計列]));
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [計列]), "不是由理事長"), "會計改了自己那筆的姓名、員工編號後，不能被直接改指派為秘書長");
+    await 長("update public.members set staff_role = '' where id = $1", [計列]);
+    檢查((await db.query("select staff_role from public.members where id = $1", [計列])).rows[0].staff_role === "", "取消幹部角色不受影響");
     // 管理者可以看登入帳號（個人 Email）核對；其他人不行
     檢查((await 長("select public.member_login_email($1) as e", [R列])).rows[0].e === "clerk.alt4@gmail.example", "管理者看得到某位會員連結的登入帳號");
     檢查(await 應失敗(() => 辦("select public.member_login_email($1)", [R列]), "只有理事長"), "承辦人不能查登入帳號");
