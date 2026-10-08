@@ -27,7 +27,7 @@ create table if not exists public.members (
   board_role text not null default '' check (board_role in ('', '理事', '監事')),
   board_title text not null default '',
   is_representative boolean not null default false,
-  staff_role text not null default '' check (staff_role in ('', '理事長', '秘書長', '會計', '承辦人')),
+  staff_role text not null default '',
   note text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -36,6 +36,10 @@ create table if not exists public.members (
     or (board_role = '理事' and board_title in ('理事長', '常務理事', '理事'))
     or (board_role = '監事' and board_title in ('監事會召集人', '常務監事', '監事')))
 );
+-- 幹部角色（另外寫成可重複執行的約束，舊資料庫升級時也會更新允許的角色）
+alter table public.members drop constraint if exists members_staff_role_check;
+alter table public.members add constraint members_staff_role_check
+  check (staff_role in ('', '理事長', '秘書長', '總幹事', '會計', '承辦人'));
 create unique index if not exists members_email_uniq on public.members (lower(email)) where email <> '';
 
 -- 活動：meal_option 為 true 時，報名要選葷或素
@@ -128,10 +132,10 @@ language sql stable security definer set search_path = public as $$
   select public.my_staff_role() <> ''
 $$;
 
--- 是否為理事長或秘書長（可以指派幹部角色）
+-- 是否為理事長、秘書長或總幹事（可以指派幹部角色）
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select public.my_staff_role() in ('理事長', '秘書長')
+  select public.my_staff_role() in ('理事長', '秘書長', '總幹事')
 $$;
 
 -- 產生下一個會員編號（M0001…）
@@ -159,9 +163,9 @@ begin
   new.updated_at := now();
   if auth.uid() is not null and not public.is_admin() then
     if tg_op = 'INSERT' and new.staff_role <> '' then
-      raise exception '只有理事長或秘書長可以指派幹部角色';
+      raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
     elsif tg_op = 'UPDATE' and new.staff_role is distinct from old.staff_role then
-      raise exception '只有理事長或秘書長可以指派幹部角色';
+      raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
     end if;
   end if;
   return new;
@@ -374,6 +378,9 @@ create or replace function public.make_staff(p_login_email text, p_role text, p_
 returns text language plpgsql security definer set search_path = public as $$
 declare 帳號 uuid; 名冊信箱 text := lower(trim(coalesce(nullif(p_office_email, ''), p_login_email)));
 begin
+  if p_role not in ('理事長', '秘書長', '總幹事', '會計', '承辦人') then
+    raise exception '角色只能是：理事長、秘書長、總幹事、會計、承辦人（您填的是「%」）', p_role;
+  end if;
   select id into 帳號 from auth.users where lower(email) = lower(trim(p_login_email));
   if 帳號 is not null and exists (select 1 from public.members where user_id = 帳號 and email <> 名冊信箱) then
     raise exception '這個登入帳號已連結其他會員資料';
@@ -550,7 +557,7 @@ end $$;
 create or replace function public.unlink_member(p_member uuid)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_admin() then raise exception '只有理事長或秘書長可以解除帳號連結'; end if;
+  if not public.is_admin() then raise exception '只有理事長、秘書長或總幹事可以解除帳號連結'; end if;
   update public.members set user_id = null where id = p_member;
 end $$;
 

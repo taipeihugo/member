@@ -90,7 +90,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   console.log("四、幹部角色");
   await 秘("update public.members set staff_role = '承辦人' where email = $1", [帳.乙.email]);
   檢查((await 以身分(db, 帳.乙, () => db.query("select count(*)::int as n from public.members"))).rows[0].n === 3, "承辦人可看到全部名冊");
-  檢查(await 應失敗(() => 以身分(db, 帳.乙, () => db.query("update public.members set staff_role = '秘書長' where email = $1", [帳.乙.email])), "只有理事長或秘書長"), "承辦人不能把自己升為秘書長");
+  檢查(await 應失敗(() => 以身分(db, 帳.乙, () => db.query("update public.members set staff_role = '秘書長' where email = $1", [帳.乙.email])), "只有理事長"), "承辦人不能把自己升為秘書長");
   await 秘("update public.members set staff_role = '' where email = $1", [帳.乙.email]);
   檢查((await 以身分(db, 帳.乙, () => db.query("select count(*)::int as n from public.members"))).rows[0].n === 1, "取消幹部角色後立即只看得到自己");
 
@@ -164,7 +164,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   await 秘("select public.approve_link_request($1, $2)", [申請id, 戊id]);
   檢查((await 以身分(db, 戊帳, () => db.query("select name, email from public.members"))).rows.map((r) => r.name + r.email).join() === "戊會員wu@mail.mof.gov.tw", "幹部核准後連結成功，名冊公務信箱不變");
   檢查((await db.query("select count(*)::int as n from public.claim_codes where member_id = $1", [戊id])).rows[0].n === 0, "核准連結後舊認領碼作廢");
-  檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select public.unlink_member($1)", [丁id])), "只有理事長或秘書長"), "一般會員不能解除連結");
+  檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select public.unlink_member($1)", [丁id])), "只有理事長"), "一般會員不能解除連結");
   await 秘("select public.unlink_member($1)", [丁id]);
   檢查((await 以身分(db, 丁帳, () => db.query("select count(*)::int as n from public.members"))).rows[0].n === 0, "秘書長解除連結後，該帳號看不到會員資料");
   // 入會申請可填公務信箱
@@ -179,6 +179,12 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   console.log("  " + (await db.query("select public.make_staff('geng.personal@gmail.example', '理事長', '', 'geng@mail.mof.gov.tw') as r")).rows[0].r);
   const 庚 = (await 以身分(db, 庚帳, () => db.query("select name, email, staff_role from public.members where user_id = auth.uid()"))).rows[0];
   檢查(庚 && 庚.name === "庚理事長" && 庚.email === "geng@mail.mof.gov.tw" && 庚.staff_role === "理事長", "make_staff 可用個人登入信箱＋名冊公務信箱設定幹部（不重複建立）");
+
+  檢查(await 應失敗(() => db.query("select public.make_staff('x@gmail.example', '會長', 'X')"), "角色只能是"), "make_staff 填錯角色會清楚提示");
+  const 辛帳 = await 新帳("xin.personal@gmail.example");
+  await db.query("select public.make_staff('xin.personal@gmail.example', '總幹事', '辛總幹事', 'xin@fia.example.gov')");
+  await 以身分(db, 辛帳, () => db.query("update public.members set staff_role = '承辦人' where email = 'geng@mail.mof.gov.tw'"));
+  檢查((await db.query("select staff_role from public.members where email = 'geng@mail.mof.gov.tw'")).rows[0].staff_role === "承辦人", "總幹事可以指派幹部角色");
 
   console.log("九、未登入者");
   for (const 表 of ["members", "activities", "registrations", "fees", "applications", "claim_codes", "link_requests"]) {
