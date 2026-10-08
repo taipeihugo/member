@@ -1,0 +1,154 @@
+/* 共用主題：官網與會務系統共用的配色（深藍＋金）、深淺色、基本元件樣式 */
+
+/* 淺色（預設）配色 */
+:root {
+  --navy: #2a2854;
+  --gold: #c6951c;
+  --gold-soft: #f3e7c6;
+  --bg: #f5f4ef;
+  --surface: #ffffff;
+  --surface-2: #eeedf4;
+  --text: #1d1c2b;
+  --muted: #5d5c70;
+  --line: #d9d7e3;
+  --brand: #2a2854;
+  --brand-text: #ffffff;
+  --link: #2f2c8f;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
+  --ok: #1f7a4d;
+  --ok-soft: #e3f4ea;
+  --warn: #9a6400;
+  --warn-soft: #fdf1d8;
+  --focus: #c6951c;
+  --shadow: 0 1px 2px rgba(20, 18, 50, .08), 0 4px 14px rgba(20, 18, 50, .06);
+  --radius: 10px;
+  --font: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", sans-serif;
+  --font-kai: "DFKai-SB", "標楷體", "BiauKai", "TW-Kai", serif;
+  color-scheme: light;
+}
+
+/* 深色配色：系統偏好深色、且使用者沒有手動選淺色時 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --gold: #d9aa3a;
+    --gold-soft: #3b3220;
+    --bg: #131226;
+    --surface: #1d1c36;
+    --surface-2: #26254a;
+    --text: #ecebf5;
+    --muted: #aeadc6;
+    --line: #36355e;
+    --brand: #3b3880;
+    --link: #b9b6ff;
+    --danger: #ff8a7a;
+    --danger-soft: #3d1d1d;
+    --ok: #6fd6a0;
+    --ok-soft: #173326;
+    --warn: #f0c060;
+    --warn-soft: #3a2f16;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}
+
+/* 深色配色：使用者手動切成深色時 */
+:root[data-theme="dark"] {
+  --gold: #d9aa3a;
+  --gold-soft: #3b3220;
+  --bg: #131226;
+  --surface: #1d1c36;
+  --surface-2: #26254a;
+  --text: #ecebf5;
+  --muted: #aeadc6;
+  --line: #36355e;
+  --brand: #3b3880;
+  --link: #b9b6ff;
+  --danger: #ff8a7a;
+  --danger-soft: #3d1d1d;
+  --ok: #6fd6a0;
+  --ok-soft: #173326;
+  --warn: #f0c060;
+  --warn-soft: #3a2f16;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+
+/* 基本版面 */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.65;
+}
+a { color: var(--link); }
+img { max-width: 100%; }
+h1, h2, h3, h4 { line-height: 1.35; margin: 0 0 .6em; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.隱藏 { display: none !important; }
+.次要字 { color: var(--muted); }
+.小字 { font-size: .875rem; }
+.右 { text-align: right; }
+.置中 { text-align: center; }
+.不換行 { white-space: nowrap; }
+
+/* 按鈕 */
+.鈕 {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35em;
+  min-height: 38px; padding: .4em 1em;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: .95rem; cursor: pointer; text-decoration: none;
+}
+.鈕:hover { border-color: var(--gold); }
+.鈕:disabled { opacity: .5; cursor: not-allowed; }
+.鈕.主 { background: var(--brand); color: var(--brand-text); border-color: var(--brand); }
+.鈕.金 { background: var(--gold); color: #1d1c2b; border-color: var(--gold); }
+.鈕.危 { color: var(--danger); border-color: var(--danger); }
+.鈕.小 { min-height: 30px; padding: .15em .65em; font-size: .85rem; }
+.鈕.文字 { border-color: transparent; background: transparent; color: var(--link); }
+
+/* 輸入欄位 */
+input, select, textarea {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: .45em .6em; min-height: 38px;
+  max-width: 100%;
+}
+textarea { min-height: 6em; width: 100%; resize: vertical; }
+input[type="checkbox"], input[type="radio"] { min-height: 0; width: 1.1em; height: 1.1em; accent-color: var(--brand); }
+label { cursor: pointer; }
+
+/* 卡片 */
+.卡 {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem 1.2rem;
+}
+
+/* 標記（狀態小方塊） */
+.標記 {
+  display: inline-block; padding: 0 .55em; border-radius: 999px;
+  font-size: .8rem; line-height: 1.7; background: var(--surface-2); color: var(--muted);
+  white-space: nowrap;
+}
+.標記.成 { background: var(--ok-soft); color: var(--ok); }
+.標記.危 { background: var(--danger-soft); color: var(--danger); }
+.標記.警 { background: var(--warn-soft); color: var(--warn); }
+.標記.金 { background: var(--gold-soft); color: var(--warn); }
+
+/* 範例資料提示條 */
+.範例條 {
+  background: repeating-linear-gradient(-45deg, var(--warn-soft), var(--warn-soft) 10px, transparent 10px, transparent 20px);
+  color: var(--warn); border: 1px dashed var(--warn); border-radius: 8px;
+  padding: .3em .8em; font-size: .85rem; text-align: center;
+}
+
+/* 表格 */
+.表 { width: 100%; border-collapse: collapse; font-size: .93rem; }
+.表 th, .表 td { padding: .5em .6em; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.表 th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+.表 td.數, .表 th.數 { text-align: right; font-variant-numeric: tabular-nums; }
+.表捲 { overflow-x: auto; -webkit-overflow-scrolling: touch; }

@@ -1,0 +1,13 @@
+{
+  "name": "association-build-tools",
+  "private": true,
+  "description": "建置與測試用（發給同仁時不附）",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs --test && node test/run_tests.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

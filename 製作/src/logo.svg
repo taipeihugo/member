@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="協會會徽">
+  <!-- 協會會徽（自製，可替換）：深藍圓底、金色外環，三個人形代表會員同心 -->
+  <circle cx="32" cy="32" r="31" fill="#2a2854"/>
+  <circle cx="32" cy="32" r="27" fill="none" stroke="#c6951c" stroke-width="2.5"/>
+  <circle cx="32" cy="19.5" r="5.2" fill="#c6951c"/>
+  <circle cx="19.5" cy="25" r="4.2" fill="#c6951c"/>
+  <circle cx="44.5" cy="25" r="4.2" fill="#c6951c"/>
+  <path d="M21.5 44.5c0-7.4 4.7-12.6 10.5-12.6s10.5 5.2 10.5 12.6z" fill="#c6951c"/>
+  <path d="M11.5 44.5c0-6 3.6-10.2 8-10.2 2 0 3.8.8 5.2 2.2-1.9 2.2-3.1 5-3.5 8z" fill="#c6951c"/>
+  <path d="M52.5 44.5c0-6-3.6-10.2-8-10.2-2 0-3.8.8-5.2 2.2 1.9 2.2 3.1 5 3.5 8z" fill="#c6951c"/>
+  <rect x="13" y="46.5" width="38" height="3" rx="1.5" fill="#c6951c"/>
+</svg>
