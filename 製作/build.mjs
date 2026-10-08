@@ -35,13 +35,13 @@ function 收集程式(資料夾) {
 }
 
 // 檢查程式內容：不能有 </script、不能用禁用的 API、不能出現參考廠商名稱
-function 檢查內容(名稱, 內容) {
+function 檢查內容(名稱, 內容, 允許網路) {
   const 錯誤 = [];
   if (/<\/script/i.test(內容)) 錯誤.push("含有 </script");
   const 禁用 = [
     [/\beval\s*\(/, "eval"], [/new\s+Function\s*\(/, "new Function"], [/document\.write/, "document.write"],
     [/insertAdjacentHTML/, "insertAdjacentHTML"], [/localStorage/, "localStorage"], [/sessionStorage/, "sessionStorage"],
-    [/indexedDB/i, "indexedDB"], [/document\.cookie/, "document.cookie"], [/\bfetch\s*\(/, "fetch"],
+    [/indexedDB/i, "indexedDB"], [/document\.cookie/, "document.cookie"], [允許網路 ? /(?!)/ : /\bfetch\s*\(/, "fetch"],
     [/XMLHttpRequest/, "XMLHttpRequest"], [/WebSocket/, "WebSocket"], [/\.outerHTML\s*=/, "outerHTML 指定"]
   ];
   for (const [規則, 名] of 禁用) if (規則.test(內容)) 錯誤.push("使用了禁用的 " + 名);
@@ -154,7 +154,8 @@ function 建置官網() {
   const 輸出資料夾 = 測試版 ? path.join(根目錄, "製作", "test", "output", "官網") : path.join(根目錄, "官網");
   for (const p of 官網頁面) {
     const 選單 = 官網頁面.map((q) =>
-      '<a href="' + q.檔 + '"' + (q.檔 === p.檔 ? ' aria-current="page"' : "") + ">" + q.標題 + "</a>").join("\n        ");
+      '<a href="' + q.檔 + '"' + (q.檔 === p.檔 ? ' aria-current="page"' : "") + ">" + q.標題 + "</a>").join("\n        ") +
+      '\n        <a href="portal/index.html" class="會員專區連結">會員專區</a>';
     const html = 套版(樣板, { CSP, 版本, 會徽, 樣式, 程式, 標題: p.標題, 頁: p.頁, 選單 });
     const 發行檔 = path.join(輸出資料夾, p.檔);
     if (!測試版) 保留舊版(發行檔, 版本);
@@ -167,6 +168,30 @@ function 建置官網() {
   }
 }
 
+// ===== 會員專區（線上系統，連 Supabase）=====
+// 產生 官網/portal/index.html；連線設定.js 不存在時建立空白範本（已存在就不覆蓋）
+function 建置線上系統() {
+  const 程式檔 = 共用程式.concat(["會務/01_核心.js", "會務/02_試算表.js", "會務/05_資料表.js"].map((f) => ({ 名稱: f, 內容: 讀(f) })), 收集程式("線上"));
+  程式檔.forEach((f) => 檢查內容(f.名稱, f.內容, true));
+  const 開頭設定 = "const 版本 = " + JSON.stringify(版本) + ";\nconst 建置日期 = " + JSON.stringify(建置日期) +
+    ";\nconst 測試模式 = " + (測試版 ? "true" : "false") + ";\n";
+  const 程式 = 接程式(程式檔, 開頭設定);
+  const 樣式 = 主題樣式 + "\n" + 讀("會務/樣式.css") + "\n" + 讀("線上/樣式.css");
+  const CSP = "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; " +
+    "connect-src https://*.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'";
+  const html = 套版(讀("線上/版面.html"), { CSP, 版本, 會徽, 樣式, 程式 });
+  const 夾 = 測試版 ? path.join(根目錄, "製作", "test", "output", "官網", "portal") : path.join(根目錄, "官網", "portal");
+  const 發行檔 = path.join(夾, "index.html");
+  if (!測試版) 保留舊版(發行檔, 版本);
+  寫出(發行檔, html);
+  const 設定檔 = path.join(夾, "連線設定.js");
+  if (!fs.existsSync(設定檔)) {
+    寫出(設定檔, "/* 會員專區連線設定：填入 Supabase 專案網址與公開金鑰（anon key）。公開金鑰本身沒有讀取權限，資料由資料庫權限保護。 */\n" +
+      "window.PORTAL_CONFIG = {\n  url: \"\",\n  anonKey: \"\"\n};\n");
+  }
+}
+
 建置會務系統();
 建置官網();
+建置線上系統();
 console.log("建置完成：" + 版本 + (測試版 ? "（測試版）" : ""));

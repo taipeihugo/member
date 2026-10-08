@@ -109,3 +109,6 @@ details.問答[open] summary { border-bottom: 1px dashed var(--line); margin-bot
 .申請書 table { width: 100%; border-collapse: collapse; }
 .申請書 th, .申請書 td { border: 1px solid #000; padding: 3mm; text-align: left; font-size: 12pt; }
 .申請書 th { width: 25%; background: #f2f2f2; }
+
+/* 主選單裡的「會員專區」用金色強調 */
+.主選單 a.會員專區連結 { color: var(--gold); font-weight: 700; }

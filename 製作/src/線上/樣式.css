@@ -1,0 +1,3 @@
+/* 會員專區額外樣式：未登入時不顯示側欄、表頭會徽連回官網 */
+.側欄:empty { display: none; }
+.表頭 a { display: inline-flex; }

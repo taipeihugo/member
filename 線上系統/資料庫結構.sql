@@ -388,3 +388,15 @@ grant execute on function public.my_member_id(), public.my_staff_role(), public.
   public.approve_application(uuid), public.reject_application(uuid, text),
   public.record_fees(uuid[], int, text, int, date, text) to authenticated;
 revoke execute on function public.make_staff(text, text, text), public.next_member_no(), public.members_before_write() from authenticated;
+
+-- 各公開活動的報名人數（只有人數，不含個資），讓會員看得到「已報名 23／40」
+create or replace function public.activity_counts()
+returns table (activity_id uuid, confirmed int, waitlisted int)
+language sql stable security definer set search_path = public as $$
+  select a.id, count(r.id) filter (where r.status = '正取')::int, count(r.id) filter (where r.status = '候補')::int
+  from public.activities a left join public.registrations r on r.activity_id = a.id
+  where a.is_public or public.is_staff()
+  group by a.id
+$$;
+revoke execute on function public.activity_counts() from public, anon;
+grant execute on function public.activity_counts() to authenticated;

@@ -265,15 +265,6 @@ async function 衝突對話框(衝突們) {
   ], { 寬: true });
 }
 
-// 把欄位值轉成好讀的文字（陣列用頓號連接）
-function 顯示值(v) {
-  if (v == null) return "";
-  if (Array.isArray(v)) return v.map(function (x) { return typeof x === "object" ? JSON.stringify(x) : x; }).join("、");
-  if (typeof v === "object") return JSON.stringify(v);
-  if (typeof v === "boolean") return v ? "是" : "否";
-  return String(v);
-}
-
 // 依使用者的選擇修正合併結果
 function 套用衝突選擇(資料, 衝突們, 選擇) {
   衝突們.forEach(function (c, i) {

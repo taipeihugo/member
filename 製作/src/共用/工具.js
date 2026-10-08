@@ -225,3 +225,12 @@ function 比較(a, b) {
 function 深拷貝(o) {
   return o == null ? o : JSON.parse(JSON.stringify(o));
 }
+
+// 把欄位值轉成好讀的文字（陣列用頓號連接）
+function 顯示值(v) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(function (x) { return typeof x === "object" ? JSON.stringify(x) : x; }).join("、");
+  if (typeof v === "object") return JSON.stringify(v);
+  if (typeof v === "boolean") return v ? "是" : "否";
+  return String(v);
+}

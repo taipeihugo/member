@@ -111,6 +111,8 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查(await 應失敗(() => 以身分(db, 帳.乙, () => db.query("select public.cancel_registration($1)", [我的報名[0].id])), "沒有權限"), "不能取消別人的報名");
   await 以身分(db, 帳.甲, () => db.query("select public.cancel_registration($1)", [我的報名[0].id]));
   檢查((await db.query("select status from public.registrations where member_id = (select id from public.members where email = $1)", [帳.乙.email])).rows[0].status === "正取", "正取取消後候補自動遞補");
+  const 人數 = (await 以身分(db, 帳.甲, () => db.query("select * from public.activity_counts() where activity_id = $1", [活]))).rows[0];
+  檢查(人數.confirmed === 1 && 人數.waitlisted === 0, "會員看得到活動報名人數（不含個資）");
   const 統計 = (await 秘("select meal, count(*)::int as n from public.registrations where activity_id = $1 and status <> '取消' group by meal", [活])).rows;
   檢查(統計.length === 1 && 統計[0].meal === "葷", "幹部可統計葷素人數");
   檢查(await 應失敗(() => 以身分(db, 帳.甲, () => db.query("insert into public.registrations (activity_id, member_id) values ($1, $2)", [活, 甲id]))), "會員不能繞過函式直接寫報名表");
