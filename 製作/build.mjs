@@ -186,7 +186,7 @@ function 建置線上系統() {
   寫出(發行檔, html);
   const 設定檔 = path.join(夾, "連線設定.js");
   if (!fs.existsSync(設定檔)) {
-    寫出(設定檔, "/* 會員專區連線設定：填入 Supabase 專案網址與公開金鑰（anon key）。公開金鑰本身沒有讀取權限，資料由資料庫權限保護。 */\n" +
+    寫出(設定檔, "/* 會員專區連線設定：填入 Supabase 專案網址與公開金鑰（publishable key，sb_publishable_ 開頭；舊版專案可用 anon key）。公開金鑰本身沒有讀取權限，資料由資料庫權限保護。Secret key（sb_secret_）與 service_role 金鑰絕對不能放在這裡。 */\n" +
       "window.PORTAL_CONFIG = {\n  url: \"\",\n  anonKey: \"\"\n};\n");
   }
 }

@@ -2,8 +2,8 @@
 -- 財政部公務人員協會 線上會員系統：資料庫結構與權限
 -- 用法：在 Supabase 專案的「SQL Editor」貼上全文，按 Run（可重複執行）。
 -- 權限原則：每張表都開啟「列層級安全」（RLS），預設誰都看不到；
---   一般會員只看得到自己的資料，幹部（理事長、秘書長、會計、承辦人）才看得到全部。
---   網頁上的公開金鑰（anon key）本身沒有任何讀取權限，所有保護都在資料庫這一層。
+--   一般會員只看得到自己的資料，幹部（理事長、秘書長、總幹事、會計、承辦人）才看得到全部。
+--   網頁上的公開金鑰（publishable key，舊版稱 anon key）本身沒有任何讀取權限，所有保護都在資料庫這一層。
 -- =====================================================================
 
 -- ---------- 資料表 ----------
@@ -434,6 +434,7 @@ begin
   end if;
   if found then
     update public.members set staff_role = p_role, status = '有效', user_id = 帳號 where id = 列.id;
+    delete from public.claim_codes where member_id = 列.id;
   else
     insert into public.members (user_id, name, email, staff_role, join_date)
       values (帳號, coalesce(nullif(p_name, ''), split_part(名冊信箱, '@', 1)), 名冊信箱, p_role, current_date);
@@ -451,14 +452,19 @@ grant execute on function public.my_member_id(), public.my_staff_role(), public.
   public.record_fees(uuid[], int, text, int, date, text) to authenticated;
 revoke execute on function public.make_staff(text, text, text, text), public.next_member_no(), public.members_before_write() from authenticated;
 
--- 各公開活動的報名人數（只有人數，不含個資），讓會員看得到「已報名 23／40」
-create or replace function public.activity_counts()
-returns table (activity_id uuid, confirmed int, waitlisted int)
+-- 各公開活動的報名人數（只有人數，不含個資），讓會員看得到「已報名 23／40」。
+-- 回傳一個 JSON 陣列 [{activity_id, confirmed, waitlisted}]（單一值，不受 Supabase 每次最多回傳筆數的限制）
+drop function if exists public.activity_counts();
+create function public.activity_counts()
+returns json
 language sql stable security definer set search_path = public as $$
-  select a.id, count(r.id) filter (where r.status = '正取')::int, count(r.id) filter (where r.status = '候補')::int
-  from public.activities a left join public.registrations r on r.activity_id = a.id
-  where a.is_public or public.is_staff()
-  group by a.id
+  select coalesce(json_agg(json_build_object('activity_id', t.id, 'confirmed', t.c, 'waitlisted', t.w)), '[]'::json)
+  from (
+    select a.id, count(r.id) filter (where r.status = '正取')::int as c, count(r.id) filter (where r.status = '候補')::int as w
+    from public.activities a left join public.registrations r on r.activity_id = a.id
+    where a.is_public or public.is_staff()
+    group by a.id
+  ) t
 $$;
 revoke execute on function public.activity_counts() from public, anon;
 grant execute on function public.activity_counts() to authenticated;
@@ -468,14 +474,30 @@ grant execute on function public.activity_counts() to authenticated;
 -- 再用「認領碼」或「申請連結（幹部核對後核准）」連到名冊上的自己。
 -- =====================================================================
 
--- 認領碼：幹部替尚未連結帳號的會員產生，一次性、30 天有效
+-- 認領碼：幹部替尚未連結帳號的會員產生，一次性、30 天有效。
+-- 資料庫只存認領碼的雜湊值（code_hash），明碼只在產生當下回傳給幹部一次；
+-- by_admin 記錄是否由理事長、秘書長或總幹事產生（幹部那幾筆只認管理者發的碼）
 create table if not exists public.claim_codes (
   member_id uuid primary key references public.members (id) on delete cascade,
-  code text not null unique,
+  code_hash text,
+  by_admin boolean not null default false,
   expires_at timestamptz not null default now() + interval '30 days',
   created_by text not null default '',
   created_at timestamptz not null default now()
 );
+-- v1.7 升級：舊版以明碼存認領碼，改存雜湊；舊碼一律作廢（請幹部重新產生）
+alter table public.claim_codes add column if not exists code_hash text;
+alter table public.claim_codes add column if not exists by_admin boolean not null default false;
+delete from public.claim_codes where code_hash is null;
+alter table public.claim_codes drop column if exists code;
+alter table public.claim_codes alter column code_hash set not null;
+create unique index if not exists claim_codes_code_hash_key on public.claim_codes (code_hash);
+
+-- 認領碼的雜湊值（先整理成「XXXXX-XXXXX」大寫格式再算 SHA-256）
+create or replace function public.claim_code_hash(p_code text) returns text
+language sql immutable set search_path = public as $$
+  select encode(sha256(convert_to(p_code, 'UTF8')), 'hex')
+$$;
 
 -- 連結申請：會員填寫姓名、機關、公務信箱，由幹部核對名冊後指定對應的會員
 create table if not exists public.link_requests (
@@ -500,19 +522,23 @@ create unique index if not exists link_requests_one_pending on public.link_reque
 
 alter table public.claim_codes enable row level security;
 alter table public.link_requests enable row level security;
+-- 認領碼表任何人都不能直接讀寫（連幹部也不行），只能透過下面的函式產生與使用
 revoke all on public.claim_codes, public.link_requests from anon, authenticated;
-grant select on public.claim_codes, public.link_requests to authenticated;
+grant select on public.link_requests to authenticated;
 
 drop policy if exists claim_codes_select on public.claim_codes;
-create policy claim_codes_select on public.claim_codes for select to authenticated using (public.is_staff());
 drop policy if exists link_requests_select on public.link_requests;
 create policy link_requests_select on public.link_requests for select to authenticated using (user_id = auth.uid() or public.is_staff());
 
 -- 帳號一連結到會員資料（不論透過認領碼、核准連結、核准入會或 make_staff），
--- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請
+-- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請；
+-- 會員資料的帳號連結或幹部角色一有變動，這筆的認領碼立即作廢（避免舊碼被拿來認領幹部資料）
 create or replace function public.members_after_link() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+  if tg_op = 'UPDATE' and (new.user_id is distinct from old.user_id or new.staff_role is distinct from old.staff_role) then
+    delete from public.claim_codes where member_id = new.id;
+  end if;
   if new.user_id is not null and (tg_op = 'INSERT' or new.user_id is distinct from old.user_id) then
     update public.link_requests set status = '核准', member_id = new.id, reviewed_by = '系統（帳號已連結）', reviewed_at = now()
       where user_id = new.user_id and status = '待審';
@@ -522,15 +548,16 @@ begin
   return null;
 end $$;
 drop trigger if exists members_after_link on public.members;
-create trigger members_after_link after insert or update of user_id on public.members
+create trigger members_after_link after insert or update of user_id, staff_role on public.members
   for each row execute function public.members_after_link();
 revoke execute on function public.members_after_link() from public, anon, authenticated;
 
--- 幹部產生認領碼（只針對尚未連結帳號的會員；重新產生會取代舊碼）；回傳 會員id、姓名、認領碼、到期日
+-- 幹部產生認領碼（只針對尚未連結帳號的會員；重新產生會取代舊碼）；回傳 會員id、姓名、認領碼、到期日。
+-- 明碼只在這裡回傳一次，資料庫只留雜湊值
 create or replace function public.generate_claim_codes(p_members uuid[])
 returns table (member_id uuid, name text, code text, expires_at timestamptz)
 language plpgsql security definer set search_path = public as $$
-declare 人 public.members; 碼 text; 我名 text;
+declare 人 public.members; 碼 text; 我名 text; 管理者 boolean := public.is_admin();
   -- 不用 0、O、1、I、L，避免抄錯
   字表 constant text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 begin
@@ -538,33 +565,39 @@ begin
   select m.name into 我名 from public.members m where m.user_id = auth.uid();
   -- 幹部那幾筆（有幹部角色）只有理事長、秘書長、總幹事能產生認領碼
   for 人 in select * from public.members m where m.id = any(p_members) and m.user_id is null
-      and (m.staff_role = '' or public.is_admin()) loop
+      and (m.staff_role = '' or 管理者) loop
     loop
       碼 := '';
       for i in 1..10 loop 碼 := 碼 || substr(字表, 1 + floor(random() * length(字表))::int, 1); end loop;
       碼 := substr(碼, 1, 5) || '-' || substr(碼, 6, 5);
-      exit when not exists (select 1 from public.claim_codes c where c.code = 碼);
+      exit when not exists (select 1 from public.claim_codes c where c.code_hash = public.claim_code_hash(碼));
     end loop;
-    insert into public.claim_codes as c (member_id, code, expires_at, created_by)
-      values (人.id, 碼, now() + interval '30 days', coalesce(我名, ''))
-      on conflict on constraint claim_codes_pkey do update set code = excluded.code, expires_at = excluded.expires_at, created_by = excluded.created_by, created_at = now();
+    insert into public.claim_codes as c (member_id, code_hash, by_admin, expires_at, created_by)
+      values (人.id, public.claim_code_hash(碼), 管理者, now() + interval '30 days', coalesce(我名, ''))
+      on conflict on constraint claim_codes_pkey do update set code_hash = excluded.code_hash, by_admin = excluded.by_admin,
+        expires_at = excluded.expires_at, created_by = excluded.created_by, created_at = now();
     member_id := 人.id; name := 人.name; code := 碼; expires_at := now() + interval '30 days';
     return next;
   end loop;
 end $$;
 
--- 會員輸入認領碼連結自己的會員資料（碼用過即作廢）
+-- 會員輸入認領碼連結自己的會員資料（碼用過即作廢；幹部那幾筆只認理事長、秘書長、總幹事發的碼）
 create or replace function public.claim_with_code(p_code text)
 returns uuid language plpgsql security definer set search_path = public as $$
-declare 碼 public.claim_codes; 整理 text;
+declare 碼 public.claim_codes; 整理 text; 角色 text;
 begin
   if auth.uid() is null then raise exception '請先登入'; end if;
   if public.my_member_id() is not null then raise exception '您的帳號已經連結會員資料'; end if;
   整理 := upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g'));
   if length(整理) <> 10 then raise exception '認領碼不正確'; end if;
   整理 := substr(整理, 1, 5) || '-' || substr(整理, 6, 5);
-  select * into 碼 from public.claim_codes where code = 整理 for update;
+  select * into 碼 from public.claim_codes where code_hash = public.claim_code_hash(整理) for update;
   if not found or 碼.expires_at < now() then raise exception '認領碼不正確或已過期，請洽協會重新產生'; end if;
+  select staff_role into 角色 from public.members where id = 碼.member_id;
+  if coalesce(角色, '') <> '' and not 碼.by_admin then
+    delete from public.claim_codes where member_id = 碼.member_id;
+    raise exception '這組認領碼不能用於幹部的會員資料，請洽理事長、秘書長或總幹事重新產生';
+  end if;
   update public.members set user_id = auth.uid() where id = 碼.member_id and user_id is null;
   if not found then raise exception '這筆會員資料已連結其他帳號，請洽協會'; end if;
   delete from public.claim_codes where member_id = 碼.member_id;
@@ -624,9 +657,12 @@ returns void language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_admin() then raise exception '只有理事長、秘書長或總幹事可以解除帳號連結'; end if;
   update public.members set user_id = null where id = p_member;
+  -- 解除後舊的認領碼不會復活；要重新連結請重新產生認領碼
+  delete from public.claim_codes where member_id = p_member;
 end $$;
 
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
+revoke execute on function public.claim_code_hash(text) from public, anon, authenticated;
 revoke execute on function public.generate_claim_codes(uuid[]), public.claim_with_code(text),
   public.submit_link_request(text, text, text, text, text, text, text), public.approve_link_request(uuid, uuid),
   public.reject_link_request(uuid, text), public.unlink_member(uuid) from public, anon;

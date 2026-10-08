@@ -166,9 +166,9 @@ function 對話框(標題, 內容, 按鈕, 選項) {
   });
 }
 
-// 確認對話框：回傳 true（確定）或 false
+// 確認對話框：回傳 true（確定）或 false（訊息裡的換行照樣顯示）
 async function 確認(訊息, 確定文字) {
-  const v = await 對話框("請確認", h("p", null, 訊息), [
+  const v = await 對話框("請確認", h("p", { class: "保留換行" }, 訊息), [
     { 文字: "取消", 值: false }, { 文字: 確定文字 || "確定", 主: true, 值: true }]);
   return v === true;
 }

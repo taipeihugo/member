@@ -2,13 +2,13 @@
 
 const 連線 = {
   網址: "",        // Supabase 專案網址（在 連線設定.js 填寫）
-  金鑰: "",        // Supabase 公開金鑰（anon key，本身沒有讀取權限，資料由資料庫權限保護）
+  金鑰: "",        // Supabase 公開金鑰（publishable key，舊版稱 anon key；本身沒有讀取權限，資料由資料庫權限保護）
   憑證: "",        // 登入後的存取憑證（只在記憶體）
   更新憑證: "",    // 用來延長登入的憑證（只在記憶體）
   計時器: 0,
   到期: 0,         // 存取憑證到期的時間（毫秒）
-  延長中: false,
-  重試: 0,
+  延長承諾: null,  // 正在進行的延長登入（同一時間只送一個，大家共用結果）
+  重試: 0,         // 延長登入連續暫時失敗的次數
   帳號: null       // {id, email}
 };
 
@@ -20,27 +20,55 @@ function 讀連線設定() {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(連線.網址) && 連線.金鑰.length > 20;
 }
 
-// 發出一個網路請求並解析回應；失敗時丟出中文錯誤（錯誤物件帶有 狀態碼，網路不通時帶有 網路＝true）
-// 選項.要標頭 為 true 時回傳 {資料, 標頭}（分頁讀取要看 Content-Range）
-async function 請求(路徑, 選項) {
-  選項 = 選項 || {};
+// 是否為暫時性的錯誤（網路中斷、逾時、伺服器忙碌），這時不知道資料有沒有寫入，也不代表登入失效
+function 暫時錯誤(e) { return !!(e.網路 || e.需重新登入 || !e.狀態碼 || e.狀態碼 >= 500 || e.狀態碼 === 408 || e.狀態碼 === 429); }
+
+// 實際送出一個請求並讀完回應內容；超過時間自動中止。網路不通或逾時丟出 網路＝true 的錯誤
+async function 送出(路徑, 選項, 帶憑證) {
   const 標頭 = Object.assign({ apikey: 連線.金鑰, "Content-Type": "application/json" }, 選項.標頭 || {});
-  if (連線.憑證 && !選項.不帶憑證) 標頭.Authorization = "Bearer " + 連線.憑證;
-  let 回應;
+  if (帶憑證 && 連線.憑證) 標頭.Authorization = "Bearer " + 連線.憑證;
+  const 控制 = new AbortController();
+  const 計時 = setTimeout(function () { 控制.abort(); }, 選項.逾時 || 45000);
   try {
-    回應 = await fetch(連線.網址 + 路徑, { method: 選項.方法 || "GET", headers: 標頭, body: 選項.內容 === undefined ? undefined : JSON.stringify(選項.內容) });
+    const 回應 = await fetch(連線.網址 + 路徑, { method: 選項.方法 || "GET", headers: 標頭, body: 選項.內容 === undefined ? undefined : JSON.stringify(選項.內容), signal: 控制.signal });
+    return { 回應: 回應, 文字: await 回應.text() };
   } catch (e) {
-    const 錯 = new Error("無法連線，請檢查網路");
+    const 錯 = new Error(控制.signal.aborted ? "連線逾時，請檢查網路後再試" : "無法連線，請檢查網路");
     錯.網路 = true;
     throw 錯;
+  } finally {
+    clearTimeout(計時);
   }
-  const 文字 = await 回應.text();
+}
+
+// 發出一個網路請求並解析回應；失敗時丟出中文錯誤（錯誤物件帶有 狀態碼，網路不通時帶有 網路＝true，登入確定失效時帶有 需重新登入＝true）
+// 存取憑證快到期會先延長；遇到 401（憑證剛過期）會延長登入後重送一次。選項.要標頭 為 true 時回傳 {資料, 標頭}（分頁讀取要看 Content-Range）
+async function 請求(路徑, 選項) {
+  選項 = 選項 || {};
+  const 帶憑證 = !!連線.憑證 && !選項.不帶憑證;
+  const 誰 = 連線.帳號 && 連線.帳號.id;
+  if (帶憑證 && 連線.更新憑證 && Date.now() > 連線.到期 - 30000) await 延長登入();
+  let 結果 = await 送出(路徑, 選項, 帶憑證);
+  let 延長暫停 = false;
+  // 資料庫在檢查憑證時就拒絕，請求還沒有執行，所以延長後重送是安全的
+  if (結果.回應.status === 401 && 帶憑證 && 連線.更新憑證) {
+    const 舊 = 連線.憑證;
+    const 成功 = await 延長登入();
+    if (成功 && 連線.憑證 && 連線.憑證 !== 舊 && 連線.帳號 && 連線.帳號.id === 誰) 結果 = await 送出(路徑, 選項, true);
+    else if (連線.更新憑證) 延長暫停 = true;
+  }
+  const 回應 = 結果.回應, 文字 = 結果.文字;
   let 資料 = null;
   try { 資料 = 文字 ? JSON.parse(文字) : null; } catch (e) { 資料 = 文字; }
   if (!回應.ok) {
     const 錯 = new Error(翻譯錯誤(資料, 回應.status));
     錯.狀態碼 = 回應.status;
     錯.代碼 = (資料 && (資料.error_code || 資料.code)) || "";
+    if (回應.status === 401 && 帶憑證) {
+      // 延長登入暫時失敗（網路不穩）：保留登入，稍後自動重試；確定失效才要求重新登入
+      if (延長暫停) { 錯.message = "網路不穩，正在自動延長登入，請稍後再試"; 錯.網路 = true; }
+      else 錯.需重新登入 = true;
+    }
     throw 錯;
   }
   return 選項.要標頭 ? { 資料: 資料, 標頭: 回應.headers } : 資料;
@@ -102,29 +130,40 @@ function 排程延長(毫秒) {
   連線.計時器 = setTimeout(延長登入, 等);
 }
 
-// 用更新憑證延長登入；網路暫時不通就稍後重試，伺服器拒絕才回到登入畫面
-async function 延長登入() {
-  if (!連線.更新憑證 || 連線.延長中) return;
+// 用更新憑證延長登入。同一時間只送一個請求，同時呼叫的人共用結果；回傳 true＝已延長，false＝沒有延長。
+// 網路中斷、逾時、伺服器忙碌：保留登入，間隔 8、16、32、60 秒…持續重試（網路恢復或電腦喚醒時也會立刻再試）；
+// 伺服器明確拒絕（更新憑證已失效）才回到登入畫面
+function 延長登入() {
+  if (!連線.更新憑證) return Promise.resolve(false);
+  if (連線.延長承諾) return 連線.延長承諾;
   const 這次 = 連線.更新憑證;
-  連線.延長中 = true;
-  try {
-    const r = await 請求("/auth/v1/token?grant_type=refresh_token", { 方法: "POST", 內容: { refresh_token: 這次 }, 不帶憑證: true });
-    if (連線.更新憑證 !== 這次) return;   // 這段期間已經登出或換人登入
-    設定憑證(r);
-  } catch (e) {
-    if (連線.更新憑證 !== 這次) return;
-    if (e.網路 && 連線.重試 < 6) {
-      連線.重試++;
-      提示("網路暫時中斷，稍後自動重新連線");
-      排程延長(8000);
-      return;
+  const 承諾 = (async function () {
+    try {
+      const r = await 請求("/auth/v1/token?grant_type=refresh_token", { 方法: "POST", 內容: { refresh_token: 這次 }, 不帶憑證: true, 逾時: 20000 });
+      if (連線.更新憑證 !== 這次) return false;   // 這段期間已經登出或換人登入
+      const 曾中斷 = 連線.重試 > 0;
+      設定憑證(r);
+      if (曾中斷) 提示("連線已恢復");
+      return true;
+    } catch (e) {
+      if (連線.更新憑證 !== 這次) return false;
+      const 被拒 = e.狀態碼 >= 400 && e.狀態碼 < 500 && e.狀態碼 !== 408 && e.狀態碼 !== 429;
+      if (!被拒) {
+        連線.重試++;
+        if (連線.重試 === 1) 提示("網路暫時中斷，恢復後會自動重新連線（不必重新登入）");
+        排程延長(Math.min(60000, 8000 * Math.pow(2, 連線.重試 - 1)));
+        return false;
+      }
+      清除登入();
+      提示("登入已逾時，請重新登入", true);
+      顯示登入頁();
+      return false;
+    } finally {
+      if (連線.延長承諾 === 承諾) 連線.延長承諾 = null;
     }
-    清除登入();
-    提示("登入已逾時，請重新登入", true);
-    顯示登入頁();
-  } finally {
-    連線.延長中 = false;
-  }
+  })();
+  連線.延長承諾 = 承諾;
+  return 承諾;
 }
 
 // 電腦從休眠喚醒或網路恢復時：憑證快到期（或已到期）就立刻延長
@@ -170,7 +209,7 @@ async function 登出帳號() {
 // 清除記憶體中的登入資訊，並讓還在讀取中的畫面作廢、關掉開著的對話框
 function 清除登入() {
   clearTimeout(連線.計時器);
-  連線.憑證 = ""; 連線.更新憑證 = ""; 連線.帳號 = null; 連線.到期 = 0; 連線.重試 = 0;
+  連線.憑證 = ""; 連線.更新憑證 = ""; 連線.帳號 = null; 連線.到期 = 0; 連線.重試 = 0; 連線.延長承諾 = null;
   狀態.導覽序 = (狀態.導覽序 || 0) + 1;
   狀態.目前頁 = "";
   狀態.頁參數 = null;

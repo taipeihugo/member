@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://*.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
-<meta name="app-version" content="v1.7">
+<meta name="app-version" content="v1.6">
 <meta name="referrer" content="no-referrer">
 <title>會員專區</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E">
@@ -267,7 +267,6 @@ dialog.對話框::backdrop { background: rgba(14, 12, 40, .55); }
 .對話框 .框頭 .關 { margin-left: auto; }
 .對話框 .框身 { padding: 1rem 1.2rem; overflow-y: auto; max-height: calc(100vh - 180px); }
 .對話框 .框尾 { display: flex; gap: .5rem; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--line); }
-.保留換行 { white-space: pre-line; }
 
 /* 提示訊息 */
 .提示區 { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column; gap: .5rem; }
@@ -340,7 +339,7 @@ dialog.對話框::backdrop { background: rgba(14, 12, 40, .55); }
     <a href="../index.html"><img class="會徽" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E" alt="回官網首頁" width="36" height="36"></a>
     <div class="表頭名">
       <div class="協會名">財政部公務人員協會</div>
-      <div class="小字 次要字">會員專區 v1.7</div>
+      <div class="小字 次要字">會員專區 v1.6</div>
     </div>
     <div class="表頭右">
       <button class="鈕 小" id="主題鈕" type="button" title="切換深色／淺色">深淺色</button>
@@ -374,7 +373,7 @@ dialog.對話框::backdrop { background: rgba(14, 12, 40, .55); }
  * ===================== */
 (function () {
 "use strict";
-const 版本 = "v1.7";
+const 版本 = "v1.6";
 const 建置日期 = "2026-10-08";
 const 測試模式 = false;
 
@@ -854,9 +853,9 @@ function 對話框(標題, 內容, 按鈕, 選項) {
   });
 }
 
-// 確認對話框：回傳 true（確定）或 false（訊息裡的換行照樣顯示）
+// 確認對話框：回傳 true（確定）或 false
 async function 確認(訊息, 確定文字) {
-  const v = await 對話框("請確認", h("p", { class: "保留換行" }, 訊息), [
+  const v = await 對話框("請確認", h("p", null, 訊息), [
     { 文字: "取消", 值: false }, { 文字: 確定文字 || "確定", 主: true, 值: true }]);
   return v === true;
 }
@@ -1424,13 +1423,13 @@ function 資料表(設定) {
 
 const 連線 = {
   網址: "",        // Supabase 專案網址（在 連線設定.js 填寫）
-  金鑰: "",        // Supabase 公開金鑰（publishable key，舊版稱 anon key；本身沒有讀取權限，資料由資料庫權限保護）
+  金鑰: "",        // Supabase 公開金鑰（anon key，本身沒有讀取權限，資料由資料庫權限保護）
   憑證: "",        // 登入後的存取憑證（只在記憶體）
   更新憑證: "",    // 用來延長登入的憑證（只在記憶體）
   計時器: 0,
   到期: 0,         // 存取憑證到期的時間（毫秒）
-  延長承諾: null,  // 正在進行的延長登入（同一時間只送一個，大家共用結果）
-  重試: 0,         // 延長登入連續暫時失敗的次數
+  延長中: false,
+  重試: 0,
   帳號: null       // {id, email}
 };
 
@@ -1442,55 +1441,27 @@ function 讀連線設定() {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(連線.網址) && 連線.金鑰.length > 20;
 }
 
-// 是否為暫時性的錯誤（網路中斷、逾時、伺服器忙碌），這時不知道資料有沒有寫入，也不代表登入失效
-function 暫時錯誤(e) { return !!(e.網路 || e.需重新登入 || !e.狀態碼 || e.狀態碼 >= 500 || e.狀態碼 === 408 || e.狀態碼 === 429); }
-
-// 實際送出一個請求並讀完回應內容；超過時間自動中止。網路不通或逾時丟出 網路＝true 的錯誤
-async function 送出(路徑, 選項, 帶憑證) {
-  const 標頭 = Object.assign({ apikey: 連線.金鑰, "Content-Type": "application/json" }, 選項.標頭 || {});
-  if (帶憑證 && 連線.憑證) 標頭.Authorization = "Bearer " + 連線.憑證;
-  const 控制 = new AbortController();
-  const 計時 = setTimeout(function () { 控制.abort(); }, 選項.逾時 || 45000);
-  try {
-    const 回應 = await fetch(連線.網址 + 路徑, { method: 選項.方法 || "GET", headers: 標頭, body: 選項.內容 === undefined ? undefined : JSON.stringify(選項.內容), signal: 控制.signal });
-    return { 回應: 回應, 文字: await 回應.text() };
-  } catch (e) {
-    const 錯 = new Error(控制.signal.aborted ? "連線逾時，請檢查網路後再試" : "無法連線，請檢查網路");
-    錯.網路 = true;
-    throw 錯;
-  } finally {
-    clearTimeout(計時);
-  }
-}
-
-// 發出一個網路請求並解析回應；失敗時丟出中文錯誤（錯誤物件帶有 狀態碼，網路不通時帶有 網路＝true，登入確定失效時帶有 需重新登入＝true）
-// 存取憑證快到期會先延長；遇到 401（憑證剛過期）會延長登入後重送一次。選項.要標頭 為 true 時回傳 {資料, 標頭}（分頁讀取要看 Content-Range）
+// 發出一個網路請求並解析回應；失敗時丟出中文錯誤（錯誤物件帶有 狀態碼，網路不通時帶有 網路＝true）
+// 選項.要標頭 為 true 時回傳 {資料, 標頭}（分頁讀取要看 Content-Range）
 async function 請求(路徑, 選項) {
   選項 = 選項 || {};
-  const 帶憑證 = !!連線.憑證 && !選項.不帶憑證;
-  const 誰 = 連線.帳號 && 連線.帳號.id;
-  if (帶憑證 && 連線.更新憑證 && Date.now() > 連線.到期 - 30000) await 延長登入();
-  let 結果 = await 送出(路徑, 選項, 帶憑證);
-  let 延長暫停 = false;
-  // 資料庫在檢查憑證時就拒絕，請求還沒有執行，所以延長後重送是安全的
-  if (結果.回應.status === 401 && 帶憑證 && 連線.更新憑證) {
-    const 舊 = 連線.憑證;
-    const 成功 = await 延長登入();
-    if (成功 && 連線.憑證 && 連線.憑證 !== 舊 && 連線.帳號 && 連線.帳號.id === 誰) 結果 = await 送出(路徑, 選項, true);
-    else if (連線.更新憑證) 延長暫停 = true;
+  const 標頭 = Object.assign({ apikey: 連線.金鑰, "Content-Type": "application/json" }, 選項.標頭 || {});
+  if (連線.憑證 && !選項.不帶憑證) 標頭.Authorization = "Bearer " + 連線.憑證;
+  let 回應;
+  try {
+    回應 = await fetch(連線.網址 + 路徑, { method: 選項.方法 || "GET", headers: 標頭, body: 選項.內容 === undefined ? undefined : JSON.stringify(選項.內容) });
+  } catch (e) {
+    const 錯 = new Error("無法連線，請檢查網路");
+    錯.網路 = true;
+    throw 錯;
   }
-  const 回應 = 結果.回應, 文字 = 結果.文字;
+  const 文字 = await 回應.text();
   let 資料 = null;
   try { 資料 = 文字 ? JSON.parse(文字) : null; } catch (e) { 資料 = 文字; }
   if (!回應.ok) {
     const 錯 = new Error(翻譯錯誤(資料, 回應.status));
     錯.狀態碼 = 回應.status;
     錯.代碼 = (資料 && (資料.error_code || 資料.code)) || "";
-    if (回應.status === 401 && 帶憑證) {
-      // 延長登入暫時失敗（網路不穩）：保留登入，稍後自動重試；確定失效才要求重新登入
-      if (延長暫停) { 錯.message = "網路不穩，正在自動延長登入，請稍後再試"; 錯.網路 = true; }
-      else 錯.需重新登入 = true;
-    }
     throw 錯;
   }
   return 選項.要標頭 ? { 資料: 資料, 標頭: 回應.headers } : 資料;
@@ -1552,40 +1523,29 @@ function 排程延長(毫秒) {
   連線.計時器 = setTimeout(延長登入, 等);
 }
 
-// 用更新憑證延長登入。同一時間只送一個請求，同時呼叫的人共用結果；回傳 true＝已延長，false＝沒有延長。
-// 網路中斷、逾時、伺服器忙碌：保留登入，間隔 8、16、32、60 秒…持續重試（網路恢復或電腦喚醒時也會立刻再試）；
-// 伺服器明確拒絕（更新憑證已失效）才回到登入畫面
-function 延長登入() {
-  if (!連線.更新憑證) return Promise.resolve(false);
-  if (連線.延長承諾) return 連線.延長承諾;
+// 用更新憑證延長登入；網路暫時不通就稍後重試，伺服器拒絕才回到登入畫面
+async function 延長登入() {
+  if (!連線.更新憑證 || 連線.延長中) return;
   const 這次 = 連線.更新憑證;
-  const 承諾 = (async function () {
-    try {
-      const r = await 請求("/auth/v1/token?grant_type=refresh_token", { 方法: "POST", 內容: { refresh_token: 這次 }, 不帶憑證: true, 逾時: 20000 });
-      if (連線.更新憑證 !== 這次) return false;   // 這段期間已經登出或換人登入
-      const 曾中斷 = 連線.重試 > 0;
-      設定憑證(r);
-      if (曾中斷) 提示("連線已恢復");
-      return true;
-    } catch (e) {
-      if (連線.更新憑證 !== 這次) return false;
-      const 被拒 = e.狀態碼 >= 400 && e.狀態碼 < 500 && e.狀態碼 !== 408 && e.狀態碼 !== 429;
-      if (!被拒) {
-        連線.重試++;
-        if (連線.重試 === 1) 提示("網路暫時中斷，恢復後會自動重新連線（不必重新登入）");
-        排程延長(Math.min(60000, 8000 * Math.pow(2, 連線.重試 - 1)));
-        return false;
-      }
-      清除登入();
-      提示("登入已逾時，請重新登入", true);
-      顯示登入頁();
-      return false;
-    } finally {
-      if (連線.延長承諾 === 承諾) 連線.延長承諾 = null;
+  連線.延長中 = true;
+  try {
+    const r = await 請求("/auth/v1/token?grant_type=refresh_token", { 方法: "POST", 內容: { refresh_token: 這次 }, 不帶憑證: true });
+    if (連線.更新憑證 !== 這次) return;   // 這段期間已經登出或換人登入
+    設定憑證(r);
+  } catch (e) {
+    if (連線.更新憑證 !== 這次) return;
+    if (e.網路 && 連線.重試 < 6) {
+      連線.重試++;
+      提示("網路暫時中斷，稍後自動重新連線");
+      排程延長(8000);
+      return;
     }
-  })();
-  連線.延長承諾 = 承諾;
-  return 承諾;
+    清除登入();
+    提示("登入已逾時，請重新登入", true);
+    顯示登入頁();
+  } finally {
+    連線.延長中 = false;
+  }
 }
 
 // 電腦從休眠喚醒或網路恢復時：憑證快到期（或已到期）就立刻延長
@@ -1631,7 +1591,7 @@ async function 登出帳號() {
 // 清除記憶體中的登入資訊，並讓還在讀取中的畫面作廢、關掉開著的對話框
 function 清除登入() {
   clearTimeout(連線.計時器);
-  連線.憑證 = ""; 連線.更新憑證 = ""; 連線.帳號 = null; 連線.到期 = 0; 連線.重試 = 0; 連線.延長承諾 = null;
+  連線.憑證 = ""; 連線.更新憑證 = ""; 連線.帳號 = null; 連線.到期 = 0; 連線.重試 = 0;
   狀態.導覽序 = (狀態.導覽序 || 0) + 1;
   狀態.目前頁 = "";
   狀態.頁參數 = null;
@@ -2176,7 +2136,7 @@ function 報名對話框(a) {
   圖示: "👥",
   分隔: true,
   可見: 是幹部,
-  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長、總幹事能指派。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同、員工編號與姓名都相同，或姓名＋服務機關相同（名冊上只有一位且 Email、員工編號沒有矛盾）的視為同一人並更新資料，其他新增；無法判斷的列會列出並略過，更新時空白的儲存格不會清掉原有資料。會員用個人 Email 註冊後，有兩種連結方式：勾選會員按「產生認領碼」交給本人輸入，或由會員送「連結申請」再到「申請審核」核准。「帳號」欄可篩出還沒連結的人。",
+  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長、總幹事能指派。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同的會員會更新資料，其他新增。會員用個人 Email 註冊後，有兩種連結方式：勾選會員按「產生認領碼」交給本人輸入，或由會員送「連結申請」再到「申請審核」核准。「帳號」欄可篩出還沒連結的人。",
   繪製: async function (容器) {
     let 名冊 = await 查詢("members", null, "member_no.asc");
     const 統計 = h("p", { class: "次要字" });
@@ -2307,13 +2267,7 @@ function 轉理監事(v) {
   return null;
 }
 
-// 兩個值是否不衝突：任一邊空白，或兩邊相同（不分大小寫）
-function 不衝突(a, b) { return !a || !b || String(a).toLowerCase() === String(b).toLowerCase(); }
-
-// 兩筆資料的 Email、員工編號都沒有矛盾（才可能是同一人）
-function 相容(甲, 乙) { return 不衝突(甲.email, 乙.email) && 不衝突(甲.employee_no, 乙.employee_no); }
-
-// 匯入名冊：讀檔、對應欄位、比對是否為名冊上的同一人（相同就更新，沒有就新增）
+// 匯入名冊：讀檔、對應欄位、依 Email 比對（相同就更新，沒有就新增）
 async function 匯入線上名冊(名冊, 完成後) {
   const f = (await 選擇檔案(".xlsx,.ods,.csv"))[0];
   if (!f) return;
@@ -2327,128 +2281,76 @@ async function 匯入線上名冊(名冊, 完成後) {
     if (i >= 0) 對應[k] = i;
   });
   if (對應.name == null) return 提示("找不到「姓名」欄", true);
-  // 重新讀一次名冊，比對最新的資料（畫面上的可能已被其他幹部修改）
-  try { 名冊 = await 查詢("members", null, "member_no.asc"); } catch (e) { return 提示("讀取名冊失敗：" + e.message, true); }
-  // 沒有服務機關欄時，不用「姓名」判斷同一人（不同機關的同名同姓太多）
-  const 用姓名 = 對應.agency != null;
-  const 名鍵 = function (d) { return d.name + "｜" + (d.agency || ""); };
-  const 放 = function (表, k, v) { (表[k] = 表[k] || []).push(v); };
-  // 名冊上既有的人：依 Email、員工編號、姓名＋服務機關建索引
+  // 比對名冊上既有的人：先比 Email，再比員工編號，最後比「姓名＋服務機關」（唯一才算）
   const 依信箱 = {}, 依員編 = {}, 依姓名機關 = {};
   名冊.forEach(function (m) {
     if (m.email) 依信箱[m.email.toLowerCase()] = m;
-    if (m.employee_no) 放(依員編, m.employee_no, m);
-    放(依姓名機關, 名鍵(m), m);
+    if (m.employee_no) 依員編[m.employee_no] = m;
+    const k = m.name + "｜" + (m.agency || "");
+    (依姓名機關[k] = 依姓名機關[k] || []).push(m);
   });
-  const 項們 = [], 問題 = [];
-  // 檔案裡已經出現過的人（每一項＝待新增或待更新的一位，記住來自第幾列）
-  const 檔信 = {}, 檔編 = {}, 檔名 = {}, 已對應 = {};
-  // 把一項登記到檔案內索引（合併後補上的 Email、員工編號也要登記）
-  const 登記 = function (項) {
-    if (項.資料.email && !檔信[項.資料.email]) 檔信[項.資料.email] = 項;
-    if (項.資料.employee_no && !檔編[項.資料.employee_no]) 檔編[項.資料.employee_no] = 項;
-    if (用姓名 && !項.已登名) { 項.已登名 = true; 放(檔名, 名鍵(項.資料), 項); }
-    if (項.原) 已對應[項.原.id] = 項;
-  };
-  // 把後面的列合併到前面同一人那一項（空白不覆蓋）
-  const 合併 = function (項, 資料, 列號) {
-    Object.keys(資料).forEach(function (k) { if (資料[k] !== "") 項.資料[k] = 資料[k]; });
-    登記(項);
-    問題.push("第 " + 列號 + " 列「" + 資料.name + "」和第 " + 項.列號 + " 列是同一人，已合併");
-  };
+  const 新增們 = [], 更新們 = [], 問題 = [];
+  const 檔內 = {};   // 檔案裡已經出現過的人（Email、員工編號或姓名＋機關）→ 待新增或待更新的那一筆
   列.slice(1).forEach(function (r, i) {
     const 列號 = i + 2;
     const 取 = function (k) { return 對應[k] == null ? "" : String(r[對應[k]] == null ? "" : r[對應[k]]).trim(); };
     const 資料 = { name: 取("name") };
     if (!資料.name) return;
-    const 列名 = "第 " + 列號 + " 列「" + 資料.name + "」";
     if (對應.gender != null) { const g = 取("gender"); 資料.gender = g === "0" || g === "女" ? "女" : g === "1" || g === "男" ? "男" : ""; }
     ["agency", "unit", "title", "phone", "employee_no"].forEach(function (k) { if (對應[k] != null) 資料[k] = 取(k); });
     if (對應.email != null) 資料.email = 取("email").toLowerCase();
+    let 理監事看不懂 = false;
     if (對應.理監事 != null) {
       const 理 = 轉理監事(取("理監事"));
-      if (!理) 問題.push(列名 + "理監事欄看不懂（" + 取("理監事") + "）：新增者設為「無」，既有會員保留原值");
+      if (!理) { 理監事看不懂 = true; 問題.push("第 " + 列號 + " 列「" + 資料.name + "」理監事欄看不懂（" + 取("理監事") + "）：新增者設為「無」，既有會員保留原值"); }
       else { 資料.board_role = 理[0]; 資料.board_title = 理[1]; }
     }
     if (對應.會員代表 != null) 資料.is_representative = /^(1|是|y|yes|v|✔|ｖ)$/i.test(取("會員代表"));
-
-    // 一、檔案內重複的人：Email 或員工編號相同（另一項不矛盾），或姓名＋服務機關相同且沒有矛盾
-    const 信前 = 資料.email ? 檔信[資料.email] : null, 編前 = 資料.employee_no ? 檔編[資料.employee_no] : null;
-    if (信前 && 編前 && 信前 !== 編前) { 問題.push(列名 + "的 Email 與第 " + 信前.列號 + " 列相同、員工編號卻與第 " + 編前.列號 + " 列相同，無法判斷，已略過"); return; }
-    const 識別前 = 信前 || 編前;
-    if (識別前) {
-      if (!相容(資料, 識別前.資料)) { 問題.push(列名 + "與第 " + 識別前.列號 + " 列的 Email 或員工編號相同、另一項卻不同，無法判斷是不是同一人，已略過"); return; }
-      return 合併(識別前, 資料, 列號);
+    // 檔案內重複的人：合併到前面那一筆
+    const 鍵們 = [資料.email ? "信:" + 資料.email : "", 資料.employee_no ? "編:" + 資料.employee_no : "", "名:" + 資料.name + "｜" + (資料.agency || "")].filter(Boolean);
+    const 前筆 = 鍵們.map(function (k) { return 檔內[k]; }).find(Boolean);
+    if (前筆) {
+      Object.keys(資料).forEach(function (k) { if (資料[k] !== "" && !(k === "board_role" && 理監事看不懂)) 前筆[k] = 資料[k]; });
+      問題.push("第 " + 列號 + " 列「" + 資料.name + "」和檔案前面的列是同一人，已合併");
+      return;
     }
-    // 這列的 Email 已在名冊上時，只跟對應到同一位會員的列合併
-    const 信原 = 資料.email ? 依信箱[資料.email] || null : null;
-    if (用姓名) {
-      const 同名前 = (檔名[名鍵(資料)] || []).filter(function (x) { return 相容(資料, x.資料) && (!信原 || x.原 === 信原); });
-      if (同名前.length > 1) { 問題.push(列名 + "與檔案裡第 " + 同名前.map(function (x) { return x.列號; }).join("、") + " 列同名同機關，無法判斷是哪一位，已略過（請補上 Email 或員工編號）"); return; }
-      if (同名前.length === 1) return 合併(同名前[0], 資料, 列號);
+    // 名冊上既有的人
+    let 原 = (資料.email && 依信箱[資料.email]) || (資料.employee_no && 依員編[資料.employee_no]) || null;
+    if (!原) {
+      const 同名 = 依姓名機關[資料.name + "｜" + (資料.agency || "")] || [];
+      if (同名.length === 1 && (!資料.email || !同名[0].email)) 原 = 同名[0];
+      else if (同名.length > 1) { 問題.push("第 " + 列號 + " 列「" + 資料.name + "」名冊上有 " + 同名.length + " 位同名同機關的會員，無法判斷是誰，已略過"); return; }
     }
-
-    // 二、名冊上既有的人：Email 相同；或員工編號相同且姓名相同；或姓名＋服務機關相同且只有一位、Email 與員工編號不矛盾
-    let 原 = 信原;
-    if (!原 && 資料.employee_no) {
-      const 編們 = (依員編[資料.employee_no] || []).filter(function (m) { return m.name === 資料.name && 相容(資料, m); });
-      if (編們.length > 1) { 問題.push(列名 + "名冊上有 " + 編們.length + " 位同名且員工編號相同的會員，無法判斷是誰，已略過"); return; }
-      原 = 編們[0] || null;
+    let 目標;
+    if (原) { 目標 = 資料; 更新們.push({ id: 原.id, 資料: 目標 }); }
+    else {
+      目標 = Object.assign({ status: "有效", join_date: 今天() }, 對應.理監事 != null ? { board_role: "", board_title: "" } : {}, 資料);
+      新增們.push(目標);
     }
-    if (!原 && 用姓名) {
-      const 同名 = (依姓名機關[名鍵(資料)] || []).filter(function (m) { return 相容(資料, m); });
-      if (同名.length > 1) { 問題.push(列名 + "名冊上有 " + 同名.length + " 位同名同機關的會員，無法判斷是誰，已略過（請補上 Email 或員工編號）"); return; }
-      原 = 同名[0] || null;
-    }
-    // 兩列對應到名冊上同一位：沒有矛盾就合併，有矛盾就略過
-    if (原 && 已對應[原.id]) {
-      const 前 = 已對應[原.id];
-      if (!相容(資料, 前.資料)) { 問題.push(列名 + "與第 " + 前.列號 + " 列都對應到名冊上的「" + 原.name + "」，但 Email 或員工編號不同，已略過"); return; }
-      return 合併(前, 資料, 列號);
-    }
-    const 項 = { 列號: 列號, 原: 原, 資料: 原 ? 資料 : Object.assign({ status: "有效", join_date: 今天() }, 對應.理監事 != null ? { board_role: "", board_title: "" } : {}, 資料) };
-    項們.push(項);
-    登記(項);
-  });
-  const 新增們 = 項們.filter(function (x) { return !x.原; }).map(function (x) { return x.資料; });
-  // 更新既有會員時，空白的儲存格不覆蓋原有資料（理監事欄空白＝「無」，照樣寫入）
-  const 更新們 = 項們.filter(function (x) { return x.原; }).map(function (x) {
-    const 資料 = {};
-    Object.keys(x.資料).forEach(function (k) { if (x.資料[k] !== "" || k === "board_role" || k === "board_title") 資料[k] = x.資料[k]; });
-    return { id: x.原.id, 資料: 資料 };
+    鍵們.forEach(function (k) { 檔內[k] = 目標; });
   });
   const 好 = await 對話框("匯入名冊：" + f.name, [
-    h("p", null, "新增 " + 新增們.length + " 人、更新 " + 更新們.length + " 人。"),
-    h("p", { class: "次要字 小字" }, "判斷同一人的方式：Email 相同；或員工編號、姓名都相同；或姓名＋服務機關相同且名冊上只有一位、Email 與員工編號沒有矛盾。更新時空白的儲存格不會清掉原有資料。"),
+    h("p", null, "新增 " + 新增們.length + " 人、更新 " + 更新們.length + " 人（Email、員工編號或姓名＋服務機關相同的視為同一人）。"),
     h("p", { class: "次要字 小字" }, "對應到的欄位：" + Object.keys(對應).map(function (k) { return 列[0][對應[k]]; }).join("、")),
     問題.length ? h("ul", { class: "錯誤" }, 問題.slice(0, 15).map(function (p) { return h("li", null, p); }), 問題.length > 15 ? h("li", null, "…等共 " + 問題.length + " 項") : null) : null
   ], [{ 文字: "取消" }, { 文字: "開始匯入", 主: true, 值: true }]);
   if (!好) return;
   const 失敗 = [];
-  let 已新增 = 0, 已更新 = 0, 中斷 = "";
-  for (let i = 0; i < 新增們.length && !中斷; i += 200) {
+  let 已新增 = 0, 已更新 = 0;
+  for (let i = 0; i < 新增們.length; i += 200) {
     const 批 = 新增們.slice(i, i + 200);
     try { await 新增("members", 批); 已新增 += 批.length; }
     catch (e) {
-      // 網路中斷或伺服器忙碌：不知道這批有沒有寫入，停下來，不要逐筆重送（會重複新增）
-      if (暫時錯誤(e)) { 中斷 = e.message; break; }
-      // 伺服器明確拒絕整批（整批都沒有寫入）：改成一筆一筆新增，找出是哪幾筆有問題
+      // 整批失敗時改成一筆一筆新增，找出是哪幾筆有問題
       for (const 筆 of 批) {
-        try { await 新增("members", [筆]); 已新增++; }
-        catch (e2) { if (暫時錯誤(e2)) { 中斷 = e2.message; break; } 失敗.push(筆.name + "：" + e2.message); }
+        try { await 新增("members", [筆]); 已新增++; } catch (e2) { 失敗.push(筆.name + "：" + e2.message); }
       }
     }
   }
   for (const u of 更新們) {
-    if (中斷) break;
-    try { await 修改("members", { id: u.id }, u.資料); 已更新++; }
-    catch (e) { if (暫時錯誤(e)) { 中斷 = e.message; break; } 失敗.push(u.資料.name + "：" + e.message); }
+    try { await 修改("members", { id: u.id }, u.資料); 已更新++; } catch (e) { 失敗.push(u.資料.name + "：" + e.message); }
   }
-  if (中斷) {
-    對話框("匯入中斷", [
-      h("p", { class: "錯誤" }, "已新增 " + 已新增 + " 人、更新 " + 已更新 + " 人後中斷：" + 中斷),
-      h("p", null, "最後送出的那一批可能已寫入，也可能沒有。請等網路恢復後重新整理名冊，再匯入同一個檔案一次：已在名冊上的人會比對為同一人並更新，不會重複新增。")]);
-  } else if (失敗.length) {
+  if (失敗.length) {
     對話框("匯入完成（有 " + 失敗.length + " 筆沒有成功）", [
       h("p", null, "新增 " + 已新增 + " 人、更新 " + 已更新 + " 人。下列資料沒有匯入，請修正後再匯入一次："),
       h("ul", { class: "錯誤" }, 失敗.slice(0, 30).map(function (x) { return h("li", null, x); }))]);
@@ -2463,17 +2365,10 @@ async function 產生認領碼(列) {
   const 未連 = 列.filter(function (m) { return !m.user_id; });
   if (!未連.length) return 提示("勾選的會員都已連結帳號", true);
   if (!(await 確認("替 " + 未連.length + " 位尚未連結帳號的會員產生認領碼？（30 天有效；已有的舊碼會作廢）", "產生"))) return;
-  // 每 500 人送一次（伺服器一次回傳的筆數有上限，分批才不會漏掉）
-  let 碼們 = [], 錯誤 = "";
-  for (let i = 0; i < 未連.length; i += 500) {
-    try { 碼們 = 碼們.concat(await 呼叫("generate_claim_codes", { p_members: 未連.slice(i, i + 500).map(function (m) { return m.id; }) }) || []); }
-    catch (e) { 錯誤 = e.message; break; }
-  }
-  if (!碼們.length) return 提示(錯誤 || "沒有產生任何認領碼（幹部那幾筆只有理事長、秘書長、總幹事能產生）", true);
-  const 依編號 = {}, 有碼 = {};
+  let 碼們;
+  try { 碼們 = await 呼叫("generate_claim_codes", { p_members: 未連.map(function (m) { return m.id; }) }); } catch (e) { return 提示(e.message, true); }
+  const 依編號 = {};
   未連.forEach(function (m) { 依編號[m.id] = m; });
-  碼們.forEach(function (c) { 有碼[c.member_id] = true; });
-  const 沒碼 = 未連.filter(function (m) { return !有碼[m.id]; });
   const 列們 = 碼們.map(function (c) { const m = 依編號[c.member_id] || {}; return { 姓名: c.name, 機關: m.agency || "", 單位: m.unit || "", 碼: c.code, 到期: 民國(String(c.expires_at).slice(0, 10)) }; });
   const 網址 = location.origin + location.pathname;
   // 一張紙條：給會員的認領碼與操作步驟
@@ -2486,8 +2381,6 @@ async function 產生認領碼(列) {
   };
   對話框("認領碼（" + 列們.length + " 人）", [
     h("p", { class: "提醒" }, "認領碼等同開門鑰匙，請只交給會員本人（當面、紙條或私訊），不要張貼在群組。關閉這個視窗後無法再看到，需要時可重新產生。"),
-    沒碼.length ? h("p", { class: "錯誤" }, "下列 " + 沒碼.length + " 位沒有產生認領碼" + (錯誤 ? "（" + 錯誤 + "）" : "（幹部那幾筆只有理事長、秘書長、總幹事能產生，或剛好已連結帳號）") + "：" +
-      沒碼.slice(0, 20).map(function (m) { return m.name; }).join("、") + (沒碼.length > 20 ? "…" : "")) : null,
     h("div", { class: "表捲" }, h("table", { class: "表", id: "認領碼表" },
       h("thead", null, h("tr", null, ["姓名", "服務機關", "服務單位", "認領碼", "有效期限"].map(function (t) { return h("th", null, t); }))),
       h("tbody", null, 列們.map(function (r) { return h("tr", null, h("td", null, r.姓名), h("td", null, r.機關), h("td", null, r.單位), h("td", { style: "font-family:monospace;font-size:1.05rem" }, r.碼), h("td", null, r.到期)); }))))
@@ -2502,7 +2395,7 @@ async function 產生認領碼(列) {
 註冊頁面("申請審核", {
   圖示: "✅",
   可見: 是幹部,
-  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後一律建立一筆新的會員資料並連結帳號；名冊上已有相同公務信箱的會員時不能核准，請退回，並請申請人改用「連結會員資料」（輸入認領碼或送連結申請），再到「帳號連結」核對後連結。退回時填寫原因，申請人登入後看得到。",
+  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後建立會員資料並連結帳號（名冊已有相同公務信箱的會員時直接連結）。退回時填寫原因，申請人登入後看得到。",
   繪製: async function (容器, 參數) {
     const [申們, 連們, 名冊] = await Promise.all([查詢("applications", null, "created_at.desc"), 查詢("link_requests", null, "created_at.desc"), 查詢("members", null, "member_no.asc")]);
     const 待連 = 連們.filter(function (a) { return a.status === "待審"; }).length;
@@ -2805,8 +2698,7 @@ async function 前往(名稱, 參數) {
   } catch (e) {
     if (!仍有效()) return;
     清空(內容).appendChild(h("p", { class: "錯誤" }, "讀取失敗：" + e.message));
-    // 只有登入確定失效（延長登入被伺服器拒絕）才回到登入畫面；網路暫時不穩只顯示錯誤，稍後可再試
-    if (e.需重新登入) { 清除登入(); 顯示登入頁("登入已逾時，請重新登入"); }
+    if (e.狀態碼 === 401 || /逾時|JWT/.test(e.message)) { 清除登入(); 顯示登入頁("登入已逾時，請重新登入"); }
   }
   window.scrollTo(0, 0);
 }
@@ -2865,7 +2757,7 @@ async function 啟動() {
     置中卡片("會員專區尚未啟用", [h("p", null, "協會尚未完成線上系統設定（連線設定.js）。請洽協會。")]);
     return;
   }
-  if (測試模式) window.__T = { 連線: 連線, 線上: 線上, 狀態: 狀態, 延長登入: 延長登入 };
+  if (測試模式) window.__T = { 連線: 連線, 線上: 線上, 狀態: 狀態 };
   if (await 處理信件連結()) return;
   顯示登入頁();
 }

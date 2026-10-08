@@ -101,6 +101,7 @@ dialog.對話框::backdrop { background: rgba(14, 12, 40, .55); }
 .對話框 .框頭 .關 { margin-left: auto; }
 .對話框 .框身 { padding: 1rem 1.2rem; overflow-y: auto; max-height: calc(100vh - 180px); }
 .對話框 .框尾 { display: flex; gap: .5rem; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--line); }
+.保留換行 { white-space: pre-line; }
 
 /* 提示訊息 */
 .提示區 { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column; gap: .5rem; }

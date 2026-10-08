@@ -5,7 +5,7 @@
   圖示: "👥",
   分隔: true,
   可見: 是幹部,
-  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長、總幹事能指派。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同的會員會更新資料，其他新增。會員用個人 Email 註冊後，有兩種連結方式：勾選會員按「產生認領碼」交給本人輸入，或由會員送「連結申請」再到「申請審核」核准。「帳號」欄可篩出還沒連結的人。",
+  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存。幹部角色只有理事長、秘書長、總幹事能指派。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同、員工編號與姓名都相同，或姓名＋服務機關相同（名冊上只有一位且 Email、員工編號沒有矛盾）的視為同一人並更新資料，其他新增；無法判斷的列會列出並略過，更新時空白的儲存格不會清掉原有資料。會員用個人 Email 註冊後，有兩種連結方式：勾選會員按「產生認領碼」交給本人輸入，或由會員送「連結申請」再到「申請審核」核准。「帳號」欄可篩出還沒連結的人。",
   繪製: async function (容器) {
     let 名冊 = await 查詢("members", null, "member_no.asc");
     const 統計 = h("p", { class: "次要字" });
@@ -136,7 +136,13 @@ function 轉理監事(v) {
   return null;
 }
 
-// 匯入名冊：讀檔、對應欄位、依 Email 比對（相同就更新，沒有就新增）
+// 兩個值是否不衝突：任一邊空白，或兩邊相同（不分大小寫）
+function 不衝突(a, b) { return !a || !b || String(a).toLowerCase() === String(b).toLowerCase(); }
+
+// 兩筆資料的 Email、員工編號都沒有矛盾（才可能是同一人）
+function 相容(甲, 乙) { return 不衝突(甲.email, 乙.email) && 不衝突(甲.employee_no, 乙.employee_no); }
+
+// 匯入名冊：讀檔、對應欄位、比對是否為名冊上的同一人（相同就更新，沒有就新增）
 async function 匯入線上名冊(名冊, 完成後) {
   const f = (await 選擇檔案(".xlsx,.ods,.csv"))[0];
   if (!f) return;
@@ -150,76 +156,128 @@ async function 匯入線上名冊(名冊, 完成後) {
     if (i >= 0) 對應[k] = i;
   });
   if (對應.name == null) return 提示("找不到「姓名」欄", true);
-  // 比對名冊上既有的人：先比 Email，再比員工編號，最後比「姓名＋服務機關」（唯一才算）
+  // 重新讀一次名冊，比對最新的資料（畫面上的可能已被其他幹部修改）
+  try { 名冊 = await 查詢("members", null, "member_no.asc"); } catch (e) { return 提示("讀取名冊失敗：" + e.message, true); }
+  // 沒有服務機關欄時，不用「姓名」判斷同一人（不同機關的同名同姓太多）
+  const 用姓名 = 對應.agency != null;
+  const 名鍵 = function (d) { return d.name + "｜" + (d.agency || ""); };
+  const 放 = function (表, k, v) { (表[k] = 表[k] || []).push(v); };
+  // 名冊上既有的人：依 Email、員工編號、姓名＋服務機關建索引
   const 依信箱 = {}, 依員編 = {}, 依姓名機關 = {};
   名冊.forEach(function (m) {
     if (m.email) 依信箱[m.email.toLowerCase()] = m;
-    if (m.employee_no) 依員編[m.employee_no] = m;
-    const k = m.name + "｜" + (m.agency || "");
-    (依姓名機關[k] = 依姓名機關[k] || []).push(m);
+    if (m.employee_no) 放(依員編, m.employee_no, m);
+    放(依姓名機關, 名鍵(m), m);
   });
-  const 新增們 = [], 更新們 = [], 問題 = [];
-  const 檔內 = {};   // 檔案裡已經出現過的人（Email、員工編號或姓名＋機關）→ 待新增或待更新的那一筆
+  const 項們 = [], 問題 = [];
+  // 檔案裡已經出現過的人（每一項＝待新增或待更新的一位，記住來自第幾列）
+  const 檔信 = {}, 檔編 = {}, 檔名 = {}, 已對應 = {};
+  // 把一項登記到檔案內索引（合併後補上的 Email、員工編號也要登記）
+  const 登記 = function (項) {
+    if (項.資料.email && !檔信[項.資料.email]) 檔信[項.資料.email] = 項;
+    if (項.資料.employee_no && !檔編[項.資料.employee_no]) 檔編[項.資料.employee_no] = 項;
+    if (用姓名 && !項.已登名) { 項.已登名 = true; 放(檔名, 名鍵(項.資料), 項); }
+    if (項.原) 已對應[項.原.id] = 項;
+  };
+  // 把後面的列合併到前面同一人那一項（空白不覆蓋）
+  const 合併 = function (項, 資料, 列號) {
+    Object.keys(資料).forEach(function (k) { if (資料[k] !== "") 項.資料[k] = 資料[k]; });
+    登記(項);
+    問題.push("第 " + 列號 + " 列「" + 資料.name + "」和第 " + 項.列號 + " 列是同一人，已合併");
+  };
   列.slice(1).forEach(function (r, i) {
     const 列號 = i + 2;
     const 取 = function (k) { return 對應[k] == null ? "" : String(r[對應[k]] == null ? "" : r[對應[k]]).trim(); };
     const 資料 = { name: 取("name") };
     if (!資料.name) return;
+    const 列名 = "第 " + 列號 + " 列「" + 資料.name + "」";
     if (對應.gender != null) { const g = 取("gender"); 資料.gender = g === "0" || g === "女" ? "女" : g === "1" || g === "男" ? "男" : ""; }
     ["agency", "unit", "title", "phone", "employee_no"].forEach(function (k) { if (對應[k] != null) 資料[k] = 取(k); });
     if (對應.email != null) 資料.email = 取("email").toLowerCase();
-    let 理監事看不懂 = false;
     if (對應.理監事 != null) {
       const 理 = 轉理監事(取("理監事"));
-      if (!理) { 理監事看不懂 = true; 問題.push("第 " + 列號 + " 列「" + 資料.name + "」理監事欄看不懂（" + 取("理監事") + "）：新增者設為「無」，既有會員保留原值"); }
+      if (!理) 問題.push(列名 + "理監事欄看不懂（" + 取("理監事") + "）：新增者設為「無」，既有會員保留原值");
       else { 資料.board_role = 理[0]; 資料.board_title = 理[1]; }
     }
     if (對應.會員代表 != null) 資料.is_representative = /^(1|是|y|yes|v|✔|ｖ)$/i.test(取("會員代表"));
-    // 檔案內重複的人：合併到前面那一筆
-    const 鍵們 = [資料.email ? "信:" + 資料.email : "", 資料.employee_no ? "編:" + 資料.employee_no : "", "名:" + 資料.name + "｜" + (資料.agency || "")].filter(Boolean);
-    const 前筆 = 鍵們.map(function (k) { return 檔內[k]; }).find(Boolean);
-    if (前筆) {
-      Object.keys(資料).forEach(function (k) { if (資料[k] !== "" && !(k === "board_role" && 理監事看不懂)) 前筆[k] = 資料[k]; });
-      問題.push("第 " + 列號 + " 列「" + 資料.name + "」和檔案前面的列是同一人，已合併");
-      return;
+
+    // 一、檔案內重複的人：Email 或員工編號相同（另一項不矛盾），或姓名＋服務機關相同且沒有矛盾
+    const 信前 = 資料.email ? 檔信[資料.email] : null, 編前 = 資料.employee_no ? 檔編[資料.employee_no] : null;
+    if (信前 && 編前 && 信前 !== 編前) { 問題.push(列名 + "的 Email 與第 " + 信前.列號 + " 列相同、員工編號卻與第 " + 編前.列號 + " 列相同，無法判斷，已略過"); return; }
+    const 識別前 = 信前 || 編前;
+    if (識別前) {
+      if (!相容(資料, 識別前.資料)) { 問題.push(列名 + "與第 " + 識別前.列號 + " 列的 Email 或員工編號相同、另一項卻不同，無法判斷是不是同一人，已略過"); return; }
+      return 合併(識別前, 資料, 列號);
     }
-    // 名冊上既有的人
-    let 原 = (資料.email && 依信箱[資料.email]) || (資料.employee_no && 依員編[資料.employee_no]) || null;
-    if (!原) {
-      const 同名 = 依姓名機關[資料.name + "｜" + (資料.agency || "")] || [];
-      if (同名.length === 1 && (!資料.email || !同名[0].email)) 原 = 同名[0];
-      else if (同名.length > 1) { 問題.push("第 " + 列號 + " 列「" + 資料.name + "」名冊上有 " + 同名.length + " 位同名同機關的會員，無法判斷是誰，已略過"); return; }
+    // 這列的 Email 已在名冊上時，只跟對應到同一位會員的列合併
+    const 信原 = 資料.email ? 依信箱[資料.email] || null : null;
+    if (用姓名) {
+      const 同名前 = (檔名[名鍵(資料)] || []).filter(function (x) { return 相容(資料, x.資料) && (!信原 || x.原 === 信原); });
+      if (同名前.length > 1) { 問題.push(列名 + "與檔案裡第 " + 同名前.map(function (x) { return x.列號; }).join("、") + " 列同名同機關，無法判斷是哪一位，已略過（請補上 Email 或員工編號）"); return; }
+      if (同名前.length === 1) return 合併(同名前[0], 資料, 列號);
     }
-    let 目標;
-    if (原) { 目標 = 資料; 更新們.push({ id: 原.id, 資料: 目標 }); }
-    else {
-      目標 = Object.assign({ status: "有效", join_date: 今天() }, 對應.理監事 != null ? { board_role: "", board_title: "" } : {}, 資料);
-      新增們.push(目標);
+
+    // 二、名冊上既有的人：Email 相同；或員工編號相同且姓名相同；或姓名＋服務機關相同且只有一位、Email 與員工編號不矛盾
+    let 原 = 信原;
+    if (!原 && 資料.employee_no) {
+      const 編們 = (依員編[資料.employee_no] || []).filter(function (m) { return m.name === 資料.name && 相容(資料, m); });
+      if (編們.length > 1) { 問題.push(列名 + "名冊上有 " + 編們.length + " 位同名且員工編號相同的會員，無法判斷是誰，已略過"); return; }
+      原 = 編們[0] || null;
     }
-    鍵們.forEach(function (k) { 檔內[k] = 目標; });
+    if (!原 && 用姓名) {
+      const 同名 = (依姓名機關[名鍵(資料)] || []).filter(function (m) { return 相容(資料, m); });
+      if (同名.length > 1) { 問題.push(列名 + "名冊上有 " + 同名.length + " 位同名同機關的會員，無法判斷是誰，已略過（請補上 Email 或員工編號）"); return; }
+      原 = 同名[0] || null;
+    }
+    // 兩列對應到名冊上同一位：沒有矛盾就合併，有矛盾就略過
+    if (原 && 已對應[原.id]) {
+      const 前 = 已對應[原.id];
+      if (!相容(資料, 前.資料)) { 問題.push(列名 + "與第 " + 前.列號 + " 列都對應到名冊上的「" + 原.name + "」，但 Email 或員工編號不同，已略過"); return; }
+      return 合併(前, 資料, 列號);
+    }
+    const 項 = { 列號: 列號, 原: 原, 資料: 原 ? 資料 : Object.assign({ status: "有效", join_date: 今天() }, 對應.理監事 != null ? { board_role: "", board_title: "" } : {}, 資料) };
+    項們.push(項);
+    登記(項);
+  });
+  const 新增們 = 項們.filter(function (x) { return !x.原; }).map(function (x) { return x.資料; });
+  // 更新既有會員時，空白的儲存格不覆蓋原有資料（理監事欄空白＝「無」，照樣寫入）
+  const 更新們 = 項們.filter(function (x) { return x.原; }).map(function (x) {
+    const 資料 = {};
+    Object.keys(x.資料).forEach(function (k) { if (x.資料[k] !== "" || k === "board_role" || k === "board_title") 資料[k] = x.資料[k]; });
+    return { id: x.原.id, 資料: 資料 };
   });
   const 好 = await 對話框("匯入名冊：" + f.name, [
-    h("p", null, "新增 " + 新增們.length + " 人、更新 " + 更新們.length + " 人（Email、員工編號或姓名＋服務機關相同的視為同一人）。"),
+    h("p", null, "新增 " + 新增們.length + " 人、更新 " + 更新們.length + " 人。"),
+    h("p", { class: "次要字 小字" }, "判斷同一人的方式：Email 相同；或員工編號、姓名都相同；或姓名＋服務機關相同且名冊上只有一位、Email 與員工編號沒有矛盾。更新時空白的儲存格不會清掉原有資料。"),
     h("p", { class: "次要字 小字" }, "對應到的欄位：" + Object.keys(對應).map(function (k) { return 列[0][對應[k]]; }).join("、")),
     問題.length ? h("ul", { class: "錯誤" }, 問題.slice(0, 15).map(function (p) { return h("li", null, p); }), 問題.length > 15 ? h("li", null, "…等共 " + 問題.length + " 項") : null) : null
   ], [{ 文字: "取消" }, { 文字: "開始匯入", 主: true, 值: true }]);
   if (!好) return;
   const 失敗 = [];
-  let 已新增 = 0, 已更新 = 0;
-  for (let i = 0; i < 新增們.length; i += 200) {
+  let 已新增 = 0, 已更新 = 0, 中斷 = "";
+  for (let i = 0; i < 新增們.length && !中斷; i += 200) {
     const 批 = 新增們.slice(i, i + 200);
     try { await 新增("members", 批); 已新增 += 批.length; }
     catch (e) {
-      // 整批失敗時改成一筆一筆新增，找出是哪幾筆有問題
+      // 網路中斷或伺服器忙碌：不知道這批有沒有寫入，停下來，不要逐筆重送（會重複新增）
+      if (暫時錯誤(e)) { 中斷 = e.message; break; }
+      // 伺服器明確拒絕整批（整批都沒有寫入）：改成一筆一筆新增，找出是哪幾筆有問題
       for (const 筆 of 批) {
-        try { await 新增("members", [筆]); 已新增++; } catch (e2) { 失敗.push(筆.name + "：" + e2.message); }
+        try { await 新增("members", [筆]); 已新增++; }
+        catch (e2) { if (暫時錯誤(e2)) { 中斷 = e2.message; break; } 失敗.push(筆.name + "：" + e2.message); }
       }
     }
   }
   for (const u of 更新們) {
-    try { await 修改("members", { id: u.id }, u.資料); 已更新++; } catch (e) { 失敗.push(u.資料.name + "：" + e.message); }
+    if (中斷) break;
+    try { await 修改("members", { id: u.id }, u.資料); 已更新++; }
+    catch (e) { if (暫時錯誤(e)) { 中斷 = e.message; break; } 失敗.push(u.資料.name + "：" + e.message); }
   }
-  if (失敗.length) {
+  if (中斷) {
+    對話框("匯入中斷", [
+      h("p", { class: "錯誤" }, "已新增 " + 已新增 + " 人、更新 " + 已更新 + " 人後中斷：" + 中斷),
+      h("p", null, "最後送出的那一批可能已寫入，也可能沒有。請等網路恢復後重新整理名冊，再匯入同一個檔案一次：已在名冊上的人會比對為同一人並更新，不會重複新增。")]);
+  } else if (失敗.length) {
     對話框("匯入完成（有 " + 失敗.length + " 筆沒有成功）", [
       h("p", null, "新增 " + 已新增 + " 人、更新 " + 已更新 + " 人。下列資料沒有匯入，請修正後再匯入一次："),
       h("ul", { class: "錯誤" }, 失敗.slice(0, 30).map(function (x) { return h("li", null, x); }))]);
@@ -234,10 +292,17 @@ async function 產生認領碼(列) {
   const 未連 = 列.filter(function (m) { return !m.user_id; });
   if (!未連.length) return 提示("勾選的會員都已連結帳號", true);
   if (!(await 確認("替 " + 未連.length + " 位尚未連結帳號的會員產生認領碼？（30 天有效；已有的舊碼會作廢）", "產生"))) return;
-  let 碼們;
-  try { 碼們 = await 呼叫("generate_claim_codes", { p_members: 未連.map(function (m) { return m.id; }) }); } catch (e) { return 提示(e.message, true); }
-  const 依編號 = {};
+  // 每 500 人送一次（伺服器一次回傳的筆數有上限，分批才不會漏掉）
+  let 碼們 = [], 錯誤 = "";
+  for (let i = 0; i < 未連.length; i += 500) {
+    try { 碼們 = 碼們.concat(await 呼叫("generate_claim_codes", { p_members: 未連.slice(i, i + 500).map(function (m) { return m.id; }) }) || []); }
+    catch (e) { 錯誤 = e.message; break; }
+  }
+  if (!碼們.length) return 提示(錯誤 || "沒有產生任何認領碼（幹部那幾筆只有理事長、秘書長、總幹事能產生）", true);
+  const 依編號 = {}, 有碼 = {};
   未連.forEach(function (m) { 依編號[m.id] = m; });
+  碼們.forEach(function (c) { 有碼[c.member_id] = true; });
+  const 沒碼 = 未連.filter(function (m) { return !有碼[m.id]; });
   const 列們 = 碼們.map(function (c) { const m = 依編號[c.member_id] || {}; return { 姓名: c.name, 機關: m.agency || "", 單位: m.unit || "", 碼: c.code, 到期: 民國(String(c.expires_at).slice(0, 10)) }; });
   const 網址 = location.origin + location.pathname;
   // 一張紙條：給會員的認領碼與操作步驟
@@ -250,6 +315,8 @@ async function 產生認領碼(列) {
   };
   對話框("認領碼（" + 列們.length + " 人）", [
     h("p", { class: "提醒" }, "認領碼等同開門鑰匙，請只交給會員本人（當面、紙條或私訊），不要張貼在群組。關閉這個視窗後無法再看到，需要時可重新產生。"),
+    沒碼.length ? h("p", { class: "錯誤" }, "下列 " + 沒碼.length + " 位沒有產生認領碼" + (錯誤 ? "（" + 錯誤 + "）" : "（幹部那幾筆只有理事長、秘書長、總幹事能產生，或剛好已連結帳號）") + "：" +
+      沒碼.slice(0, 20).map(function (m) { return m.name; }).join("、") + (沒碼.length > 20 ? "…" : "")) : null,
     h("div", { class: "表捲" }, h("table", { class: "表", id: "認領碼表" },
       h("thead", null, h("tr", null, ["姓名", "服務機關", "服務單位", "認領碼", "有效期限"].map(function (t) { return h("th", null, t); }))),
       h("tbody", null, 列們.map(function (r) { return h("tr", null, h("td", null, r.姓名), h("td", null, r.機關), h("td", null, r.單位), h("td", { style: "font-family:monospace;font-size:1.05rem" }, r.碼), h("td", null, r.到期)); }))))
@@ -264,7 +331,7 @@ async function 產生認領碼(列) {
 註冊頁面("申請審核", {
   圖示: "✅",
   可見: 是幹部,
-  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後建立會員資料並連結帳號（名冊已有相同公務信箱的會員時直接連結）。退回時填寫原因，申請人登入後看得到。",
+  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後一律建立一筆新的會員資料並連結帳號；名冊上已有相同公務信箱的會員時不能核准，請退回，並請申請人改用「連結會員資料」（輸入認領碼或送連結申請），再到「帳號連結」核對後連結。退回時填寫原因，申請人登入後看得到。",
   繪製: async function (容器, 參數) {
     const [申們, 連們, 名冊] = await Promise.all([查詢("applications", null, "created_at.desc"), 查詢("link_requests", null, "created_at.desc"), 查詢("members", null, "member_no.asc")]);
     const 待連 = 連們.filter(function (a) { return a.status === "待審"; }).length;

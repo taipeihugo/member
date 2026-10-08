@@ -123,8 +123,8 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查(await 應失敗(() => 以身分(db, 帳.乙, () => db.query("select public.cancel_registration($1)", [我的報名[0].id])), "沒有權限"), "不能取消別人的報名");
   await 以身分(db, 帳.甲, () => db.query("select public.cancel_registration($1)", [我的報名[0].id]));
   檢查((await db.query("select status from public.registrations where member_id = (select id from public.members where email = $1)", [帳.乙.email])).rows[0].status === "正取", "正取取消後候補自動遞補");
-  const 人數 = (await 以身分(db, 帳.甲, () => db.query("select * from public.activity_counts() where activity_id = $1", [活]))).rows[0];
-  檢查(人數.confirmed === 1 && 人數.waitlisted === 0, "會員看得到活動報名人數（不含個資）");
+  const 人數 = (await 以身分(db, 帳.甲, () => db.query("select public.activity_counts() as j"))).rows[0].j.find((x) => x.activity_id === 活);
+  檢查(人數 && 人數.confirmed === 1 && 人數.waitlisted === 0 && Object.keys(人數).length === 3, "會員看得到活動報名人數（不含個資）");
   const 統計 = (await 秘("select meal, count(*)::int as n from public.registrations where activity_id = $1 and status <> '取消' group by meal", [活])).rows;
   檢查(統計.length === 1 && 統計[0].meal === "葷", "幹部可統計葷素人數");
   檢查(await 應失敗(() => 以身分(db, 帳.甲, () => db.query("insert into public.registrations (activity_id, member_id) values ($1, $2)", [活, 甲id]))), "會員不能繞過函式直接寫報名表");
@@ -159,7 +159,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select * from public.generate_claim_codes(array[$1::uuid])", [丁id])), "沒有權限"), "會員不能自己產生認領碼");
   const 碼們 = (await 秘("select * from public.generate_claim_codes(array[$1::uuid, $2::uuid, $3::uuid])", [丁id, 戊id, 甲id])).rows;
   檢查(碼們.length === 2 && 碼們.every((c) => /^[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/.test(c.code)), "幹部產生認領碼（已連結帳號的人略過，格式 XXXXX-XXXXX）");
-  檢查((await 以身分(db, 丁帳, () => db.query("select count(*)::int as n from public.claim_codes"))).rows[0].n === 0, "會員看不到認領碼表");
+  檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select count(*)::int as n from public.claim_codes"))), "會員不能讀認領碼表");
   const 丁碼 = 碼們.find((c) => c.member_id === 丁id).code;
   檢查(await 應失敗(() => 以身分(db, 冒充, () => db.query("select public.claim_with_code('ABCDE-FGHJK')")), "不正確"), "亂猜的認領碼無效");
   await 以身分(db, 丁帳, () => db.query("select public.claim_with_code($1)", [丁碼.toLowerCase().replace("-", " ")]));
@@ -246,7 +246,32 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查((await 辦("select * from public.generate_claim_codes(array[$1::uuid])", [預建列])).rows.length === 0, "承辦人不能替未連結的幹部列產生認領碼");
     const 分身申請 = (await 以身分(db, 分身, () => db.query("select public.submit_link_request('預建秘書長', '', '', '', 'pre@fia.example.gov', '', '') as id"))).rows[0].id;
     檢查(await 應失敗(() => 辦("select public.approve_link_request($1, $2)", [分身申請, 預建列]), "只有理事長"), "承辦人不能把連結申請核准到幹部列");
-    檢查((await 以身分(db, 長帳, () => db.query("select * from public.generate_claim_codes(array[$1::uuid])", [預建列]))).rows.length === 1, "理事長可以替未連結的幹部列產生認領碼");
+    const 長發碼 = (await 以身分(db, 長帳, () => db.query("select * from public.generate_claim_codes(array[$1::uuid])", [預建列]))).rows;
+    檢查(長發碼.length === 1, "理事長可以替未連結的幹部列產生認領碼");
+    // 2b. 認領碼表：幹部也不能直接讀；資料庫只存雜湊值
+    檢查(await 應失敗(() => 辦("select * from public.claim_codes")), "承辦人不能直接讀認領碼表（看不到理事長替幹部列發的碼）");
+    const 欄們 = (await db.query("select column_name from information_schema.columns where table_schema = 'public' and table_name = 'claim_codes'")).rows.map((r) => r.column_name);
+    檢查(!欄們.includes("code") && (await db.query("select count(*)::int as n from public.claim_codes where code_hash = public.claim_code_hash($1)", [長發碼[0].code])).rows[0].n === 1, "認領碼只存雜湊值，不存明碼");
+    檢查(await 應失敗(() => 辦("select public.claim_code_hash('AAAAA-BBBBB')")), "登入者不能直接呼叫雜湊函式");
+    // 2c. 承辦人發給一般會員的碼，該會員之後被設為幹部 → 舊碼作廢
+    const 升任列 = (await db.query("insert into public.members (name, email) values ('將升任', 'promote@fia.example.gov') returning id")).rows[0].id;
+    const 升任碼 = (await 辦("select code from public.generate_claim_codes(array[$1::uuid])", [升任列])).rows[0].code;
+    await 以身分(db, 長帳, () => db.query("update public.members set staff_role = '總幹事' where id = $1", [升任列]));
+    檢查(await 應失敗(() => 以身分(db, 分身, () => db.query("select public.claim_with_code($1)", [升任碼])), "不正確"), "一般會員升任幹部後，承辦人先前發的認領碼作廢");
+    檢查((await db.query("select user_id from public.members where id = $1", [升任列])).rows[0].user_id === null, "上述被拒後，幹部列仍未被連走");
+    // 2d. 非管理者發的碼即使留在表裡（例如舊版遺留），也不能認領幹部列
+    await db.query("insert into public.claim_codes (member_id, code_hash, by_admin) values ($1, public.claim_code_hash('AAAAA-BBBBB'), false)", [升任列]);
+    檢查(await 應失敗(() => 以身分(db, 分身, () => db.query("select public.claim_with_code('AAAAA-BBBBB')")), "不能用於幹部"), "非管理者發的認領碼不能認領幹部列");
+    // 2e. make_staff 連結後再解除連結：之前發的碼不會復活
+    const 換人列 = (await db.query("insert into public.members (name, email) values ('換信箱幹部', 'swap@fia.example.gov') returning id")).rows[0].id;
+    const 換人碼 = (await 辦("select code from public.generate_claim_codes(array[$1::uuid])", [換人列])).rows[0].code;
+    await 新("swap@gmail.example");
+    await db.query("select public.make_staff('swap@gmail.example', '會計', '', 'swap@fia.example.gov')");
+    await 以身分(db, 長帳, () => db.query("select public.unlink_member($1)", [換人列]));
+    檢查(await 應失敗(() => 以身分(db, 分身, () => db.query("select public.claim_with_code($1)", [換人碼])), "不正確"), "make_staff 連結→解除連結後，舊認領碼不能再用");
+    // 2f. 管理者替幹部列發的碼，本人可以正常認領
+    await 以身分(db, 預建帳, () => db.query("select public.claim_with_code($1)", [長發碼[0].code]));
+    檢查((await 以身分(db, 預建帳, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "秘書長", "理事長替幹部列發的認領碼，本人認領後取得該角色");
     // 3. 入會申請不依自填信箱連到既有會員
     const 冒用 = await 新("fake.applicant@gmail.example");
     const 冒申 = (await 以身分(db, 冒用, () => db.query("select public.submit_application('新人張三', '', '', '財政部賦稅署', '', '', '', '', 'bing3@fia.example.gov') as id"))).rows[0].id;

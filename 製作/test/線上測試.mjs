@@ -27,8 +27,11 @@ function 檢查(條件, 說明) {
 // ===== 模擬 Supabase =====
 const db = await 建立資料庫();
 const 帳號們 = new Map();   // email → {id, 密碼}
-// 產生假的存取憑證（測試用，不簽章）
-const 憑證 = (u) => "h." + Buffer.from(JSON.stringify({ sub: u.id, email: u.email })).toString("base64url") + ".s";
+// 產生假的存取憑證（測試用，不簽章；每次都不同，才測得出延長後換了新憑證）
+let 憑證序 = 0;
+const 憑證 = (u) => "h." + Buffer.from(JSON.stringify({ sub: u.id, email: u.email, n: ++憑證序 })).toString("base64url") + ".s";
+// 模擬異常：延長登入回 503、連線中斷、更新憑證被拒；已過期的存取憑證
+const 模擬 = { 刷新503: 0, 刷新中斷: 0, 刷新拒絕: false, 刷新次數: 0, 過期: new Set() };
 // 從請求標頭解出登入者
 const 解憑證 = (標頭) => {
   const t = String(標頭.authorization || "").replace(/^Bearer /, "");
@@ -68,7 +71,8 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
       const 回傳集合 = (await db.query("select proretset from pg_proc where proname = $1", [名])).rows[0];
       const sql = `select * from public.${名}(${參.map((k, i) => `${k} => $${i + 1}`).join(", ")})`;
       const r = await db.query(sql, 值們);
-      return 回傳集合 && 回傳集合.proretset ? r.rows : (r.rows[0] ? Object.values(r.rows[0])[0] : null);
+      // 回傳多列的函式比照 Supabase 的 Max rows，一次最多回「最多列數」筆
+      return 回傳集合 && 回傳集合.proretset ? r.rows.slice(0, 最多列數) : (r.rows[0] ? Object.values(r.rows[0])[0] : null);
     }
     const 表 = 路徑.match(/^\/rest\/v1\/([a-z_]+)$/)[1];
     const 值們 = [];
@@ -92,11 +96,16 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
       // 比照 PostgREST：一次新增多筆時，每筆的欄位必須完全相同
       const 第一 = Object.keys(列[0] || {}).sort().join(",");
       if (列.some((r) => Object.keys(r).sort().join(",") !== 第一)) throw Object.assign(new Error("All object keys must match"), { 狀態: 400 });
+      // 比照 PostgREST：一次新增多筆在同一個交易裡，任何一筆失敗整批都不寫入
       const 結果 = [];
-      for (const 筆 of 列) {
-        const 欄 = Object.keys(筆);
-        結果.push(...(await db.query(`insert into public.${表} (${欄.map((k) => `"${k}"`).join(", ")}) values (${欄.map((_, i) => "$" + (i + 1)).join(", ")}) returning *`, 欄.map((k) => 筆[k]))).rows);
-      }
+      await db.exec("begin");
+      try {
+        for (const 筆 of 列) {
+          const 欄 = Object.keys(筆);
+          結果.push(...(await db.query(`insert into public.${表} (${欄.map((k) => `"${k}"`).join(", ")}) values (${欄.map((_, i) => "$" + (i + 1)).join(", ")}) returning *`, 欄.map((k) => 筆[k]))).rows);
+        }
+        await db.exec("commit");
+      } catch (e) { await db.exec("rollback"); throw e; }
       return 結果;
     }
     throw new Error("不支援的方法");
@@ -120,6 +129,9 @@ async function 登入API(方法, 路徑, 參數, 內容, 使用者) {
     return 帳號回應(u);
   }
   if (路徑 === "/auth/v1/token" && 參數.get("grant_type") === "refresh_token") {
+    模擬.刷新次數++;
+    if (模擬.刷新503 > 0) { 模擬.刷新503--; throw Object.assign(new Error("Service Unavailable"), { 狀態: 503 }); }
+    if (模擬.刷新拒絕) throw Object.assign(new Error("Invalid Refresh Token: Refresh Token Not Found"), { 狀態: 400 });
     const u = [...帳號們.values()].find((x) => "r-" + x.id === 內容.refresh_token);
     return 帳號回應(u);
   }
@@ -137,7 +149,12 @@ async function 攔截(route) {
   const u = new URL(req.url());
   const 內容 = req.postData() ? JSON.parse(req.postData()) : undefined;
   const 使用者 = 解憑證(req.headers());
-  if (process.env.DEBUG_PORTAL) console.log("請求", req.method(), u.pathname, JSON.stringify(req.headers()).slice(0, 300));
+  if (process.env.DEBUG_PORTAL) console.log("請求", req.method(), u.pathname + u.search, (req.postData() || "").slice(0, 400));
+  if (u.pathname === "/auth/v1/token" && u.searchParams.get("grant_type") === "refresh_token" && 模擬.刷新中斷 > 0) { 模擬.刷新中斷--; 模擬.刷新次數++; return route.abort("connectionreset"); }
+  const 帶的憑證 = String(req.headers().authorization || "").replace(/^Bearer /, "");
+  if (u.pathname.startsWith("/rest/") && 模擬.過期.has(帶的憑證)) {
+    return route.fulfill({ status: 401, headers: cors, contentType: "application/json", body: JSON.stringify({ code: "PGRST301", message: "JWT expired" }) });
+  }
   try {
     const 結果 = u.pathname.startsWith("/auth/") ? await 登入API(req.method(), u.pathname, u.searchParams, 內容, 使用者)
       : await 資料API(req.method(), u.pathname, u.searchParams, 內容, 使用者);
@@ -240,6 +257,45 @@ try {
   檢查((await page.locator("#內容").innerText()).includes("有效會員 35 人；理事 1 人、監事 1 人、會員代表 2 人"), "匯入後人數統計即時更新（超過單次回傳上限仍完整讀取）");
   檢查((await page.locator(".分頁列").innerText()).includes("共 35 筆"), "會員列表分頁讀取全部 35 筆（模擬上限 25 筆）");
   await 截圖("專區_會員管理");
+  // 同名同機關的不同人、沒有 Email 的重複列、兩列對應到名冊同一人
+  await db.query(`insert into public.members (name, agency, employee_no, email) values ('王同名', '財政部臺北國稅局', 'E001', 'wang.same@example.org'), ('張重複', '財政部高雄國稅局', '', 'z@example.org')`);
+  // 匯入一個檔案，回傳預覽文字，按「開始匯入」並等完成訊息
+  const 匯入檔 = async (檔名, 內容, 完成字) => {
+    const 檔 = path.join(輸出, 檔名);
+    fs.writeFileSync(檔, "\uFEFF" + 內容);
+    const [選] = await Promise.all([page.waitForEvent("filechooser"), page.click("#匯入名冊鈕")]);
+    await 選.setFiles(檔);
+    await 框().waitFor();
+    const 文 = await 框().innerText();
+    await 框().locator("button", { hasText: "開始匯入" }).click();
+    await page.waitForSelector("text=" + 完成字);
+    await page.waitForTimeout(300);
+    return 文;
+  };
+  const 同名預覽 = await 匯入檔("同名.csv", "姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱,員工編號\n" +
+    "陳同名,0,財政部臺北國稅局,審查科,科員,chen.a@example.org,\n" +
+    "陳同名,0,財政部臺北國稅局,徵收科,科員,chen.b@example.org,\n" +
+    "林無信箱,1,財政部臺北國稅局,總務科,科員,,\n" +
+    "林無信箱,1,財政部臺北國稅局,總務科,科長,,\n" +
+    "王同名,1,財政部臺北國稅局,資訊科,科員,,E002\n" +
+    "張重複,1,財政部高雄國稅局,企劃科,科員,,E9\n" +
+    "張重複,1,財政部高雄國稅局,企劃科,科長,z@example.org,E8\n", "匯入完成：新增 4、更新 1");
+  檢查(同名預覽.includes("新增 4 人、更新 1 人"), "同名同機關但 Email 不同、員工編號不同的人分別新增，不會合併");
+  檢查(/第 5 列「林無信箱」和第 4 列是同一人，已合併/.test(同名預覽), "沒有 Email、員工編號的重複列（同名同機關）合併");
+  檢查(/第 8 列「張重複」與第 7 列都對應到名冊上的「張重複」.*已略過/.test(同名預覽), "兩列對應到名冊上同一位、但員工編號矛盾時略過並說明");
+  const 陳們 = (await db.query("select email, unit from public.members where name = '陳同名' order by email")).rows;
+  檢查(陳們.length === 2 && 陳們[0].unit === "審查科" && 陳們[1].unit === "徵收科", "兩位陳同名各自建立，資料沒有互相覆蓋");
+  檢查((await db.query("select count(*)::int as n from public.members where name = '王同名'")).rows[0].n === 2, "名冊上同名同機關但員工編號不同：視為不同人新增");
+  const 再匯 = await 匯入檔("同名再匯.csv", "姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱\n" +
+    "陳同名,0,財政部臺北國稅局,審查科,專員,chen.a@example.org\n" +
+    "陳同名,0,財政部臺北國稅局,徵收科,專員,chen.b@example.org\n" +
+    "林無信箱,1,財政部臺北國稅局,總務科,專員,\n" +
+    "張重複,1,財政部高雄國稅局,,,\n", "匯入完成：新增 0、更新 4");
+  檢查(再匯.includes("新增 0 人、更新 4 人"), "再次匯入同一批人：全部更新、不重複新增");
+  const 陳再 = (await db.query("select email, unit, title from public.members where name = '陳同名' order by email")).rows;
+  檢查(陳再.length === 2 && 陳再.every((r) => r.title === "專員") && 陳再[0].unit === "審查科" && 陳再[1].unit === "徵收科", "再匯入時兩位同名者各自更新");
+  const 張 = (await db.query("select email, unit from public.members where name = '張重複'")).rows;
+  檢查(張.length === 1 && 張[0].email === "z@example.org" && 張[0].unit === "企劃科", "更新時空白儲存格不會清掉原有的 Email、服務單位");
   // 編輯甲：設為常務理事＋會員代表
   await page.fill(".表工具列 input[type=search]", "甲會員");
   await page.locator("#內容 tbody tr").first().click();
@@ -339,6 +395,8 @@ try {
   檢查((await 框().locator("[data-key='member'] option:checked").innerText()).includes("乙理事長"), "核准連結時自動預選名冊上對應的會員（公務信箱相同）");
   await 截圖("專區_核准連結");
   await 框().locator("button", { hasText: "核准連結" }).click();
+  const 確認框 = 框().locator("p.保留換行");
+  檢查((await 確認框.evaluate((e) => getComputedStyle(e).whiteSpace)) === "pre-line" && (await 確認框.innerText()).split("\n").length >= 3, "核准連結前的確認訊息分行顯示（申請人、名冊對象、確認問題）");
   await 框().locator("button", { hasText: "確定連結" }).click();
   await page.waitForSelector("text=已連結：乙理事長");
   檢查((await db.query("select u.email from public.members m join auth.users u on u.id = m.user_id where m.email = 'yi@example.org'")).rows[0].email === "yi.home@gmail.example", "核准後乙的個人帳號連到名冊（公務信箱不變）");
@@ -430,6 +488,38 @@ try {
   延遲.members = 0;
   檢查(await page.isVisible("#登入信箱") && (await page.locator("#內容 tbody tr").count()) === 0, "登出後，前一位使用者還在讀取的名冊不會出現在畫面上");
   await 截圖("專區_手機");
+
+  console.log("十、延長登入：網路或伺服器暫時異常不登出；存取憑證過期自動延長後重送");
+  await 登入("sec@example.org", "staffpass1");
+  await 選單("會員管理");
+  await page.click("#新增會員鈕");
+  await 框().locator("[data-key='name']").fill("還在輸入的資料");
+  const 異常起點 = 主控台錯誤.length;
+  模擬.刷新503 = 1;
+  檢查((await page.evaluate(() => window.__T.延長登入())) === false && (await page.evaluate(() => !!window.__T.連線.帳號)), "延長登入遇到伺服器暫時異常（503）：沒有延長，但也不登出");
+  模擬.刷新中斷 = 1;
+  await page.evaluate(() => window.__T.延長登入());
+  檢查(await 框().isVisible() && (await 框().locator("[data-key='name']").inputValue()) === "還在輸入的資料" && (await page.evaluate(() => !!window.__T.連線.帳號)), "延長登入時網路中斷：保留登入，開著的表單與輸入的內容都還在");
+  const 舊憑 = await page.evaluate(() => window.__T.連線.憑證);
+  檢查((await page.evaluate(() => window.__T.延長登入())) === true && (await page.evaluate(() => window.__T.連線.憑證)) !== 舊憑, "網路恢復後延長成功，換成新的存取憑證");
+  const 前次 = 模擬.刷新次數;
+  await page.evaluate(() => Promise.all([window.__T.延長登入(), window.__T.延長登入(), window.__T.延長登入()]));
+  檢查(模擬.刷新次數 - 前次 === 1, "同時多處要求延長登入，只送出一個請求");
+  await page.keyboard.press("Escape");
+  // 存取憑證過期：讀資料收到 401 → 自動延長後重送，畫面正常
+  模擬.過期.add(await page.evaluate(() => window.__T.連線.憑證));
+  await 選單("活動管理");
+  await page.waitForSelector("#內容 >> text=年終會員聯誼餐敘");
+  檢查(await page.evaluate(() => !!window.__T.連線.帳號), "存取憑證過期時自動延長並重送，不必重新登入");
+  // 更新憑證失效（伺服器拒絕）：才回到登入畫面
+  模擬.刷新拒絕 = true;
+  模擬.過期.add(await page.evaluate(() => window.__T.連線.憑證));
+  await 選單("會員管理");
+  await page.waitForSelector("#登入信箱");
+  檢查(await page.evaluate(() => !window.__T.連線.帳號 && !window.__T.連線.更新憑證), "更新憑證被伺服器拒絕時，才清除登入並回到登入畫面");
+  模擬.刷新拒絕 = false;
+  const 異常錯誤 = 主控台錯誤.splice(異常起點);
+  檢查(異常錯誤.every((e) => /status of (400|401|503)|ERR_CONNECTION_RESET|Failed to fetch/.test(e)), "上述模擬異常只產生預期的網路錯誤（" + 異常錯誤.length + " 筆）");
 } catch (e) {
   失敗.push("測試中斷：" + (e.stack || e.message));
   console.error(e);
