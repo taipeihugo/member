@@ -2,3 +2,12 @@ node_modules/
 *.tmp
 .~lock.*#
 製作/test/output/
+
+# 保護個資：真實的協會資料與名冊不可進入（公開的）GitHub 儲存庫
+協會資料.json
+!會務系統/範例協會資料夾/協會資料.json
+*名冊*.xlsx
+*名冊*.csv
+*名冊*.ods
+入會申請_*.json
+活動報名_*.json
