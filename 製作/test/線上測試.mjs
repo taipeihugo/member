@@ -31,7 +31,7 @@ const 帳號們 = new Map();   // email → {id, 密碼}
 let 憑證序 = 0;
 const 憑證 = (u) => "h." + Buffer.from(JSON.stringify({ sub: u.id, email: u.email, n: ++憑證序 })).toString("base64url") + ".s";
 // 模擬異常：延長登入回 503、連線中斷、更新憑證被拒；已過期的存取憑證
-const 模擬 = { 刷新503: 0, 刷新中斷: 0, 刷新拒絕: false, 刷新次數: 0, 過期: new Set() };
+const 模擬 = { 刷新503: 0, 刷新409: 0, 刷新中斷: 0, 刷新延遲: 0, 刷新拒絕: false, 刷新次數: 0, 資料次數: 0, 過期: new Set() };
 // 從請求標頭解出登入者
 const 解憑證 = (標頭) => {
   const t = String(標頭.authorization || "").replace(/^Bearer /, "");
@@ -130,7 +130,9 @@ async function 登入API(方法, 路徑, 參數, 內容, 使用者) {
   }
   if (路徑 === "/auth/v1/token" && 參數.get("grant_type") === "refresh_token") {
     模擬.刷新次數++;
+    if (模擬.刷新延遲) await new Promise((r) => setTimeout(r, 模擬.刷新延遲));
     if (模擬.刷新503 > 0) { 模擬.刷新503--; throw Object.assign(new Error("Service Unavailable"), { 狀態: 503 }); }
+    if (模擬.刷新409 > 0) { 模擬.刷新409--; throw Object.assign(new Error("Too many concurrent token refresh requests on the same session or refresh token"), { 狀態: 409 }); }
     if (模擬.刷新拒絕) throw Object.assign(new Error("Invalid Refresh Token: Refresh Token Not Found"), { 狀態: 400 });
     const u = [...帳號們.values()].find((x) => "r-" + x.id === 內容.refresh_token);
     return 帳號回應(u);
@@ -152,6 +154,7 @@ async function 攔截(route) {
   if (process.env.DEBUG_PORTAL) console.log("請求", req.method(), u.pathname + u.search, (req.postData() || "").slice(0, 400));
   if (u.pathname === "/auth/v1/token" && u.searchParams.get("grant_type") === "refresh_token" && 模擬.刷新中斷 > 0) { 模擬.刷新中斷--; 模擬.刷新次數++; return route.abort("connectionreset"); }
   const 帶的憑證 = String(req.headers().authorization || "").replace(/^Bearer /, "");
+  if (u.pathname.startsWith("/rest/")) 模擬.資料次數++;
   if (u.pathname.startsWith("/rest/") && 模擬.過期.has(帶的憑證)) {
     return route.fulfill({ status: 401, headers: cors, contentType: "application/json", body: JSON.stringify({ code: "PGRST301", message: "JWT expired" }) });
   }
@@ -505,7 +508,32 @@ try {
   const 前次 = 模擬.刷新次數;
   await page.evaluate(() => Promise.all([window.__T.延長登入(), window.__T.延長登入(), window.__T.延長登入()]));
   檢查(模擬.刷新次數 - 前次 === 1, "同時多處要求延長登入，只送出一個請求");
+  模擬.刷新409 = 1;
+  檢查((await page.evaluate(() => window.__T.延長登入())) === false && (await page.evaluate(() => !!window.__T.連線.更新憑證)), "延長登入遇到 409（同時延長衝突）視為暫時異常，不登出");
+  await page.evaluate(() => window.__T.延長登入());
   await page.keyboard.press("Escape");
+  // 存取憑證已過期、延長又一直失敗：每次讀資料只試延長一次，也不送出注定被拒的請求
+  const 原到期 = await page.evaluate(() => window.__T.連線.到期);
+  模擬.刷新503 = 99;
+  await page.evaluate(() => { window.__T.連線.到期 = Date.now() - 1000; });
+  const [刷前, 資前] = [模擬.刷新次數, 模擬.資料次數];
+  const 斷訊 = await page.evaluate(() => window.__T.請求("/rest/v1/activities?select=id").then(() => "成功", (e) => e.message + (e.網路 ? "（網路）" : "") + (e.需重新登入 ? "（需重新登入）" : "")));
+  檢查(模擬.刷新次數 - 刷前 === 1 && 模擬.資料次數 === 資前 && /網路不穩/.test(斷訊) && /（網路）/.test(斷訊) && !/需重新登入/.test(斷訊), "憑證過期且延長失敗：只試延長一次、不送出請求、不登出（" + 斷訊 + "）");
+  模擬.刷新503 = 0;
+  await page.evaluate((t) => { window.__T.連線.到期 = t; window.__T.連線.重試 = 0; }, 原到期);
+  // 等候延長登入期間登出、換人登入：前一位使用者的請求不會用後一位的身分送出
+  模擬.刷新延遲 = 2500;
+  await page.evaluate(() => { window.__T.連線.到期 = Date.now() + 5000; window.__換人結果 = window.__T.請求("/rest/v1/rpc/activity_counts", { 方法: "POST", 內容: {} }).then(() => "送出了", (e) => e.message); });
+  await page.waitForTimeout(200);
+  await page.click("#登出鈕");
+  await page.fill("#登入信箱", "jia.home@gmail.example"); await page.fill("#登入密碼", "newpass123");
+  await page.click("#登入鈕");
+  await page.waitForSelector("#側欄 button");
+  const 換人結果 = await page.evaluate(() => window.__換人結果);
+  模擬.刷新延遲 = 0;
+  檢查(換人結果 === "登入狀態已變更，請重新操作", "延長登入等候中登出並換人登入：前一位的請求不送出（" + 換人結果 + "）");
+  await page.click("#登出鈕");
+  await 登入("sec@example.org", "staffpass1");
   // 存取憑證過期：讀資料收到 401 → 自動延長後重送，畫面正常
   模擬.過期.add(await page.evaluate(() => window.__T.連線.憑證));
   await 選單("活動管理");
@@ -519,7 +547,7 @@ try {
   檢查(await page.evaluate(() => !window.__T.連線.帳號 && !window.__T.連線.更新憑證), "更新憑證被伺服器拒絕時，才清除登入並回到登入畫面");
   模擬.刷新拒絕 = false;
   const 異常錯誤 = 主控台錯誤.splice(異常起點);
-  檢查(異常錯誤.every((e) => /status of (400|401|503)|ERR_CONNECTION_RESET|Failed to fetch/.test(e)), "上述模擬異常只產生預期的網路錯誤（" + 異常錯誤.length + " 筆）");
+  檢查(異常錯誤.every((e) => /status of (400|401|409|503)|ERR_CONNECTION_RESET|Failed to fetch/.test(e)), "上述模擬異常只產生預期的網路錯誤（" + 異常錯誤.length + " 筆）");
 } catch (e) {
   失敗.push("測試中斷：" + (e.stack || e.message));
   console.error(e);

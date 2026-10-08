@@ -160,6 +160,7 @@ async function 處理信件連結() {
     顯示登入頁("Email 驗證完成，請用 Email 與密碼登入");
     return true;
   }
+  連線.場次++;
   設定憑證({ access_token: 參.get("access_token"), refresh_token: 參.get("refresh_token"), expires_in: 參.get("expires_in") });
   try { await 取得帳號(); } catch (e) { 清除登入(); 顯示登入頁(e.message); return true; }
   顯示設定新密碼頁();

@@ -41,6 +41,9 @@ alter table public.members drop constraint if exists members_staff_role_check;
 alter table public.members add constraint members_staff_role_check
   check (staff_role in ('', '理事長', '秘書長', '總幹事', '會計', '承辦人'));
 create unique index if not exists members_email_uniq on public.members (lower(email)) where email <> '';
+-- 帳號連結是否由理事長、秘書長、總幹事（或 SQL Editor）建立或核准（v1.8）。
+-- 會計、承辦人連結的帳號，要先改由管理者重新連結，才能被指派為幹部，避免有人先把分身帳號連到日後會當幹部的會員
+alter table public.members add column if not exists linked_by_admin boolean not null default false;
 
 -- 活動：meal_option 為 true 時，報名要選葷或素
 create table if not exists public.activities (
@@ -162,6 +165,7 @@ begin
     new.member_no := public.next_member_no();
   end if;
   new.updated_at := now();
+  if new.user_id is null then new.linked_by_admin := false; end if;
   if auth.uid() is not null and not public.is_admin() then
     if tg_op = 'INSERT' and new.staff_role <> '' then
       raise exception '只有理事長、秘書長或總幹事可以指派幹部角色';
@@ -172,6 +176,11 @@ begin
         or (new.user_id is distinct from old.user_id and new.user_id is distinct from auth.uid())) then
       raise exception '只有理事長、秘書長或總幹事可以變更幹部的會籍、Email 或帳號連結';
     end if;
+  end if;
+  -- 指派幹部角色時，這筆的帳號連結必須是管理者建立或核准的（SQL Editor 不受限）
+  if auth.uid() is not null and tg_op = 'UPDATE' and old.staff_role = '' and new.staff_role <> ''
+      and new.user_id is not null and not new.linked_by_admin then
+    raise exception '「%」的帳號是由會計或承辦人連結的，不能直接指派幹部角色。請先「解除帳號連結」，再由理事長、秘書長或總幹事產生認領碼交給本人重新連結，之後再指派', new.name;
   end if;
   return new;
 end $$;
@@ -363,8 +372,8 @@ begin
     raise exception '名冊已有公務信箱 % 的會員「%」。請退回這件申請，並請申請人改用「連結會員資料」（認領碼或連結申請），由幹部核對後連結', 申.email, 既有;
   end if;
   select name into 我名 from public.members where user_id = auth.uid();
-  insert into public.members (user_id, name, gender, employee_no, agency, unit, title, email, phone, join_date, note)
-    values (申.user_id, 申.name, 申.gender, 申.employee_no, 申.agency, 申.unit, 申.title, 申.email, 申.phone, current_date, 申.note)
+  insert into public.members (user_id, linked_by_admin, name, gender, employee_no, agency, unit, title, email, phone, join_date, note)
+    values (申.user_id, public.is_admin(), 申.name, 申.gender, 申.employee_no, 申.agency, 申.unit, 申.title, 申.email, 申.phone, current_date, 申.note)
     returning id, member_no into 新, 編號;
   update public.applications set status = '核准', review_note = '新建會員 ' || coalesce(編號, ''), reviewed_by = coalesce(我名, ''), reviewed_at = now()
     where id = 申.id;
@@ -433,11 +442,11 @@ begin
       名冊信箱, coalesce(已連信箱, '已刪除的帳號'), 名冊信箱;
   end if;
   if found then
-    update public.members set staff_role = p_role, status = '有效', user_id = 帳號 where id = 列.id;
+    update public.members set staff_role = p_role, status = '有效', user_id = 帳號, linked_by_admin = true where id = 列.id;
     delete from public.claim_codes where member_id = 列.id;
   else
-    insert into public.members (user_id, name, email, staff_role, join_date)
-      values (帳號, coalesce(nullif(p_name, ''), split_part(名冊信箱, '@', 1)), 名冊信箱, p_role, current_date);
+    insert into public.members (user_id, linked_by_admin, name, email, staff_role, join_date)
+      values (帳號, true, coalesce(nullif(p_name, ''), split_part(名冊信箱, '@', 1)), 名冊信箱, p_role, current_date);
   end if;
   return '已將 ' || 名冊信箱 || ' 設為' || p_role || '，並連結登入帳號 ' || p_login_email || '。請在會員專區登出後重新登入';
 end $$;
@@ -598,7 +607,7 @@ begin
     delete from public.claim_codes where member_id = 碼.member_id;
     raise exception '這組認領碼不能用於幹部的會員資料，請洽理事長、秘書長或總幹事重新產生';
   end if;
-  update public.members set user_id = auth.uid() where id = 碼.member_id and user_id is null;
+  update public.members set user_id = auth.uid(), linked_by_admin = 碼.by_admin where id = 碼.member_id and user_id is null;
   if not found then raise exception '這筆會員資料已連結其他帳號，請洽協會'; end if;
   delete from public.claim_codes where member_id = 碼.member_id;
   update public.link_requests set status = '核准', member_id = 碼.member_id, reviewed_by = '認領碼', reviewed_at = now()
@@ -632,7 +641,7 @@ begin
   select * into 申 from public.link_requests where id = p_request and status = '待審' for update;
   if not found then raise exception '找不到待審的連結申請'; end if;
   if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結其他會員資料'; end if;
-  update public.members set user_id = 申.user_id where id = p_member and user_id is null;
+  update public.members set user_id = 申.user_id, linked_by_admin = public.is_admin() where id = p_member and user_id is null;
   if not found then raise exception '這位會員已連結其他帳號，或找不到這位會員'; end if;
   delete from public.claim_codes where member_id = p_member;
   select name into 我名 from public.members where user_id = auth.uid();
