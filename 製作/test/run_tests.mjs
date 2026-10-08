@@ -165,6 +165,7 @@ async function 官網測試(browser) {
   await page.click("#下載申請檔鈕");
   檢查(await page.isVisible(".錯誤"), "入會申請未填必填欄位會提示");
   await page.fill("#欄_姓名", "測試申請人");
+  await page.selectOption("#欄_性別", "女");
   await page.fill("#欄_員工編號", "88001");
   await page.selectOption("#欄_服務機關", "財政部賦稅署");
   await page.fill("#欄_單位", "稅制組");
@@ -277,6 +278,29 @@ async function 主要流程測試(browser, 官網檔) {
   await page.waitForSelector("dialog[open] #重複處理");
   await 按對話框(page, "開始匯入");
   await 按對話框(page, "關閉");
+  // 標準格式名冊（姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱），含清單沒有的機關
+  const 標準檔 = path.join(輸出, "標準格式名冊.xlsx");
+  fs.writeFileSync(標準檔, Buffer.from(await page.evaluate(() => Array.from(window.__T.產生xlsx([
+    ["姓名", "女0男1", "服務機關", "服務單位", "職稱", "電子郵件信箱"],
+    ["標準格式甲", 0, "財政部賦稅署", "稅制組", "科員", "std1@example.org"],
+    ["標準格式乙", 1, "財政部新設機關（測試）", "第一科", "專員", "std2@example.org"]
+  ], "名冊")))));
+  await 選檔(page, () => page.click("#匯入會員鈕"), 標準檔);
+  await page.waitForSelector("dialog[open] #重複處理");
+  await 按對話框(page, "開始匯入");
+  const 標準結果 = await 對話框(page).innerText();
+  檢查(標準結果.includes("新增 2 人") && 標準結果.includes("財政部新設機關（測試）"), "標準格式名冊匯入（欄位自動對應、新機關加入清單）");
+  await 按對話框(page, "關閉");
+  const 甲乙 = await page.evaluate(() => window.__T.狀態.資料.會員.filter((m) => m.姓名.startsWith("標準格式")).map((m) => m.性別 + m.單位 + m.Email));
+  檢查(甲乙.join() === "女稅制組std1@example.org,男第一科std2@example.org", "女0男1 轉換正確、服務單位與電子郵件信箱對應正確");
+  await page.fill(".表工具列 input[type=search]", "標準格式");
+  await page.click("#匯出標準名冊鈕");
+  const 標準出 = await 等下載(page, () => 按對話框(page, "CSV"));
+  const 標準內容 = fs.readFileSync(標準出, "utf8").replace(/^\uFEFF/, "").split(/\r?\n/);
+  檢查(標準內容[0] === "姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱" && 標準內容[1] === "標準格式甲,0,財政部賦稅署,稅制組,科員,std1@example.org", "匯出名冊（標準格式）欄位與內容正確");
+  await page.fill(".表工具列 input[type=search]", "");
+  const 範本 = await 等下載(page, () => page.click("#下載範本鈕"));
+  檢查(fs.readFileSync(範本).subarray(0, 2).toString() === "PK", "可下載匯入範本（xlsx）");
   // 匯入官網入會申請 → 核准入會（同時收入會費）
   await 選檔(page, () => page.click("#匯入申請鈕"), 官網檔.申請檔);
   const 申請結果 = await 對話框(page).innerText();
@@ -313,7 +337,7 @@ async function 主要流程測試(browser, 官網檔) {
   await page.keyboard.press("Control+s");
   await page.waitForFunction(() => document.getElementById("存檔狀態").textContent === "已存檔");
   const d1 = 讀資料(夾);
-  檢查(d1.會員.length === 原人數 + 5, "名冊匯入後人數正確（xlsx 2＋csv 1＋ods 1＋入會申請 1）");
+  檢查(d1.會員.length === 原人數 + 7, "名冊匯入後人數正確（xlsx 2＋csv 1＋ods 1＋標準格式 2＋入會申請 1）");
   const 申請人 = d1.會員.find((m) => m.姓名 === "測試申請人");
   檢查(申請人 && 申請人.會籍狀態 === "有效" && d1.會費.some((f) => f.會員id === 申請人.id && f.項目 === "入會費"), "核准入會並登記入會費");
   const 轉調者 = d1.會員.find((m) => m.姓名 === "匯入新會員");

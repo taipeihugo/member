@@ -195,7 +195,9 @@ function 建立表單(欄們, 目的) {
   欄們.forEach(function (f) {
     const id = "欄_" + f.key;
     let 輸入;
-    if (f.key === "服務機關") {
+    if (f.選項) {
+      輸入 = h("select", { id: id, "data-key": f.key }, h("option", { value: "" }, "請選擇"), f.選項.map(function (o) { return h("option", { value: o }, o); }));
+    } else if (f.key === "服務機關") {
       輸入 = h("select", { id: id, "data-key": f.key }, h("option", { value: "" }, "請選擇"), 協.服務機關.map(function (o) { return h("option", { value: o }, o); }), h("option", { value: "其他" }, "其他"));
     } else if (f.多行) {
       輸入 = h("textarea", { id: id, "data-key": f.key, rows: 3 });
@@ -222,6 +224,7 @@ function 建立表單(欄們, 目的) {
 
 const 基本欄位 = [
   { key: "姓名", 標題: "姓名", 必填: true, 自動: "name" },
+  { key: "性別", 標題: "性別", 選項: ["女", "男"] },
   { key: "員工編號", 標題: "員工編號" },
   { key: "服務機關", 標題: "服務機關", 必填: true },
   { key: "單位", 標題: "單位" },
@@ -341,7 +344,7 @@ function 列印申請書(值) {
   區.appendChild(h("div", { class: "申請書" },
     h("h1", null, 協.名稱 + "　入會申請書"),
     h("table", null, h("tbody", null,
-      列("姓名", 值.姓名), 列("員工編號", 值.員工編號), 列("服務機關", 值.服務機關), 列("單位", 值.單位), 列("職稱", 值.職稱),
+      列("姓名", 值.姓名), 列("性別", 值.性別), 列("員工編號", 值.員工編號), 列("服務機關", 值.服務機關), 列("單位", 值.單位), 列("職稱", 值.職稱),
       列("公務電話", 值.公務電話), 列("Email", 值.Email), 列("備註", 值.備註),
       列("申請日期", 民國(今天())), 列("申請人簽章", ""))),
     h("p", null, "本人認同本會宗旨，願遵守本會章程，申請入會。"),

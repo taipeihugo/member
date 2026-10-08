@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-<meta name="app-version" content="v1.0">
+<meta name="app-version" content="v1.1">
 <meta name="referrer" content="no-referrer">
 <title>入會申請</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E">
@@ -318,7 +318,7 @@ details.問答[open] summary { border-bottom: 1px dashed var(--line); margin-bot
  * ===================== */
 (function () {
 "use strict";
-const 版本 = "v1.0";
+const 版本 = "v1.1";
 
 /* ---------- 共用/工具.js ---------- */
 // 檔案說明：共用工具（HTML 跳脫、建立畫面元素、日期與民國年、金額、CSV、下載），官網與會務系統共用
@@ -816,7 +816,9 @@ function 建立表單(欄們, 目的) {
   欄們.forEach(function (f) {
     const id = "欄_" + f.key;
     let 輸入;
-    if (f.key === "服務機關") {
+    if (f.選項) {
+      輸入 = h("select", { id: id, "data-key": f.key }, h("option", { value: "" }, "請選擇"), f.選項.map(function (o) { return h("option", { value: o }, o); }));
+    } else if (f.key === "服務機關") {
       輸入 = h("select", { id: id, "data-key": f.key }, h("option", { value: "" }, "請選擇"), 協.服務機關.map(function (o) { return h("option", { value: o }, o); }), h("option", { value: "其他" }, "其他"));
     } else if (f.多行) {
       輸入 = h("textarea", { id: id, "data-key": f.key, rows: 3 });
@@ -843,6 +845,7 @@ function 建立表單(欄們, 目的) {
 
 const 基本欄位 = [
   { key: "姓名", 標題: "姓名", 必填: true, 自動: "name" },
+  { key: "性別", 標題: "性別", 選項: ["女", "男"] },
   { key: "員工編號", 標題: "員工編號" },
   { key: "服務機關", 標題: "服務機關", 必填: true },
   { key: "單位", 標題: "單位" },
@@ -962,7 +965,7 @@ function 列印申請書(值) {
   區.appendChild(h("div", { class: "申請書" },
     h("h1", null, 協.名稱 + "　入會申請書"),
     h("table", null, h("tbody", null,
-      列("姓名", 值.姓名), 列("員工編號", 值.員工編號), 列("服務機關", 值.服務機關), 列("單位", 值.單位), 列("職稱", 值.職稱),
+      列("姓名", 值.姓名), 列("性別", 值.性別), 列("員工編號", 值.員工編號), 列("服務機關", 值.服務機關), 列("單位", 值.單位), 列("職稱", 值.職稱),
       列("公務電話", 值.公務電話), 列("Email", 值.Email), 列("備註", 值.備註),
       列("申請日期", 民國(今天())), 列("申請人簽章", ""))),
     h("p", null, "本人認同本會宗旨，願遵守本會章程，申請入會。"),
