@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' file: data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="app-version" content="v1.0">
+<meta name="referrer" content="no-referrer">
+<title>聯絡我們</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E">
+<style>
+/* 共用主題：官網與會務系統共用的配色（深藍＋金）、深淺色、基本元件樣式 */
+
+/* 淺色（預設）配色 */
+:root {
+  --navy: #2a2854;
+  --gold: #c6951c;
+  --gold-soft: #f3e7c6;
+  --bg: #f5f4ef;
+  --surface: #ffffff;
+  --surface-2: #eeedf4;
+  --text: #1d1c2b;
+  --muted: #5d5c70;
+  --line: #d9d7e3;
+  --brand: #2a2854;
+  --brand-text: #ffffff;
+  --link: #2f2c8f;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
+  --ok: #1f7a4d;
+  --ok-soft: #e3f4ea;
+  --warn: #9a6400;
+  --warn-soft: #fdf1d8;
+  --focus: #c6951c;
+  --shadow: 0 1px 2px rgba(20, 18, 50, .08), 0 4px 14px rgba(20, 18, 50, .06);
+  --radius: 10px;
+  --font: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", sans-serif;
+  --font-kai: "DFKai-SB", "標楷體", "BiauKai", "TW-Kai", serif;
+  color-scheme: light;
+}
+
+/* 深色配色：系統偏好深色、且使用者沒有手動選淺色時 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --gold: #d9aa3a;
+    --gold-soft: #3b3220;
+    --bg: #131226;
+    --surface: #1d1c36;
+    --surface-2: #26254a;
+    --text: #ecebf5;
+    --muted: #aeadc6;
+    --line: #36355e;
+    --brand: #3b3880;
+    --link: #b9b6ff;
+    --danger: #ff8a7a;
+    --danger-soft: #3d1d1d;
+    --ok: #6fd6a0;
+    --ok-soft: #173326;
+    --warn: #f0c060;
+    --warn-soft: #3a2f16;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}
+
+/* 深色配色：使用者手動切成深色時 */
+:root[data-theme="dark"] {
+  --gold: #d9aa3a;
+  --gold-soft: #3b3220;
+  --bg: #131226;
+  --surface: #1d1c36;
+  --surface-2: #26254a;
+  --text: #ecebf5;
+  --muted: #aeadc6;
+  --line: #36355e;
+  --brand: #3b3880;
+  --link: #b9b6ff;
+  --danger: #ff8a7a;
+  --danger-soft: #3d1d1d;
+  --ok: #6fd6a0;
+  --ok-soft: #173326;
+  --warn: #f0c060;
+  --warn-soft: #3a2f16;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+
+/* 基本版面 */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.65;
+}
+a { color: var(--link); }
+img { max-width: 100%; }
+h1, h2, h3, h4 { line-height: 1.35; margin: 0 0 .6em; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.隱藏 { display: none !important; }
+.次要字 { color: var(--muted); }
+.小字 { font-size: .875rem; }
+.右 { text-align: right; }
+.置中 { text-align: center; }
+.不換行 { white-space: nowrap; }
+
+/* 按鈕 */
+.鈕 {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35em;
+  min-height: 38px; padding: .4em 1em;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: .95rem; cursor: pointer; text-decoration: none;
+}
+.鈕:hover { border-color: var(--gold); }
+.鈕:disabled { opacity: .5; cursor: not-allowed; }
+.鈕.主 { background: var(--brand); color: var(--brand-text); border-color: var(--brand); }
+.鈕.金 { background: var(--gold); color: #1d1c2b; border-color: var(--gold); }
+.鈕.危 { color: var(--danger); border-color: var(--danger); }
+.鈕.小 { min-height: 30px; padding: .15em .65em; font-size: .85rem; }
+.鈕.文字 { border-color: transparent; background: transparent; color: var(--link); }
+
+/* 輸入欄位 */
+input, select, textarea {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: .45em .6em; min-height: 38px;
+  max-width: 100%;
+}
+textarea { min-height: 6em; width: 100%; resize: vertical; }
+input[type="checkbox"], input[type="radio"] { min-height: 0; width: 1.1em; height: 1.1em; accent-color: var(--brand); }
+label { cursor: pointer; }
+
+/* 卡片 */
+.卡 {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem 1.2rem;
+}
+
+/* 標記（狀態小方塊） */
+.標記 {
+  display: inline-block; padding: 0 .55em; border-radius: 999px;
+  font-size: .8rem; line-height: 1.7; background: var(--surface-2); color: var(--muted);
+  white-space: nowrap;
+}
+.標記.成 { background: var(--ok-soft); color: var(--ok); }
+.標記.危 { background: var(--danger-soft); color: var(--danger); }
+.標記.警 { background: var(--warn-soft); color: var(--warn); }
+.標記.金 { background: var(--gold-soft); color: var(--warn); }
+
+/* 範例資料提示條 */
+.範例條 {
+  background: repeating-linear-gradient(-45deg, var(--warn-soft), var(--warn-soft) 10px, transparent 10px, transparent 20px);
+  color: var(--warn); border: 1px dashed var(--warn); border-radius: 8px;
+  padding: .3em .8em; font-size: .85rem; text-align: center;
+}
+
+/* 表格 */
+.表 { width: 100%; border-collapse: collapse; font-size: .93rem; }
+.表 th, .表 td { padding: .5em .6em; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.表 th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+.表 td.數, .表 th.數 { text-align: right; font-variant-numeric: tabular-nums; }
+.表捲 { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* 官網版面：站頭選單、首頁主視覺、卡片、列表、表單、組織圖、手機版、列印申請書 */
+
+.寬度 { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+.跳至內容 { position: absolute; left: -9999px; top: 0; background: var(--gold); color: #000; padding: .5em 1em; z-index: 100; }
+.跳至內容:focus { left: 8px; top: 8px; }
+
+/* 站頭 */
+.站頭 { background: var(--navy); color: #fff; border-bottom: 4px solid var(--gold); position: sticky; top: 0; z-index: 20; }
+.站頭列 { display: flex; align-items: center; gap: 1rem; min-height: 68px; flex-wrap: wrap; }
+.站名 { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none; font-weight: 700; font-size: 1.15rem; min-width: 0; }
+.站名 span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.主選單 { display: flex; gap: .1rem; margin-left: auto; flex-wrap: wrap; order: 2; }
+.主題鈕 { order: 3; padding: .2em .6em !important; font-size: .85rem !important; white-space: nowrap; }
+.主選單 a { color: #e9e8f7; text-decoration: none; padding: .45em .55em; border-radius: 6px; font-size: .95rem; }
+.主選單 a:hover { background: rgba(255,255,255,.1); color: #fff; }
+.主選單 a[aria-current="page"] { color: #fff; box-shadow: inset 0 -3px 0 var(--gold); }
+.站頭 .鈕 { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); min-height: 34px; }
+.選單鈕 { display: none; order: 3; }
+
+/* 內容 */
+.內容 { padding-top: 1.6rem; padding-bottom: 3rem; min-height: 60vh; outline: none; }
+.內容 > h1 { font-size: 1.7rem; border-left: 6px solid var(--gold); padding-left: .6rem; }
+.段 { margin-top: 2rem; }
+.段 > h2 { font-size: 1.3rem; display: flex; align-items: baseline; gap: .6rem; }
+.段 > h2 a { font-size: .9rem; font-weight: 400; margin-left: auto; }
+.格 { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.卡 h3 { margin-bottom: .3em; font-size: 1.1rem; }
+.卡 p { margin: .3em 0; }
+.日期 { color: var(--muted); font-size: .88rem; font-variant-numeric: tabular-nums; }
+.內文 { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* 首頁主視覺 */
+.主視覺 { background: linear-gradient(135deg, #2a2854 0%, #3c3a78 60%, #2a2854 100%); color: #fff; border-radius: 16px; padding: 2.4rem 1.6rem; display: flex; gap: 1.6rem; align-items: center; flex-wrap: wrap; border-bottom: 5px solid var(--gold); }
+.主視覺 img { width: 110px; height: 110px; flex: none; }
+.主視覺 h1 { font-size: 2rem; margin: 0 0 .2em; }
+.主視覺 p { color: #e2e0f5; font-size: 1.1rem; margin: 0 0 1rem; }
+.主視覺 .鈕 { margin: .2rem .4rem .2rem 0; }
+.主視覺 .鈕:not(.金) { background: transparent; color: #fff; border-color: rgba(255,255,255,.5); }
+
+/* 快速連結 */
+.快速 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+.快速 a { display: block; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.1rem; border-top: 4px solid var(--gold); box-shadow: var(--shadow); }
+.快速 a strong { display: block; font-size: 1.1rem; }
+.快速 a span { color: var(--muted); font-size: .9rem; }
+.快速 a:hover { border-color: var(--gold); }
+
+/* 消息列表 */
+.消息列 { list-style: none; margin: 0; padding: 0; }
+.消息列 li { display: flex; gap: .8rem; align-items: baseline; padding: .7rem 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.消息列 li a { font-weight: 600; flex: 1 1 260px; overflow-wrap: anywhere; }
+.分類鈕 { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.分類鈕 button[aria-pressed="true"] { background: var(--brand); color: var(--brand-text); border-color: var(--brand); }
+
+/* 組織架構圖 */
+.組織圖 { display: flex; flex-direction: column; align-items: center; gap: .9rem; }
+.組織圖 .層 { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; position: relative; }
+.組織圖 .節點 { background: var(--surface); border: 2px solid var(--navy); border-radius: 10px; padding: .45em 1em; font-weight: 600; text-align: center; }
+:root[data-theme="dark"] .組織圖 .節點 { border-color: var(--gold); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .組織圖 .節點 { border-color: var(--gold); } }
+.組織圖 .節點.頂 { background: var(--navy); color: #fff; }
+.組織圖 .線 { width: 2px; height: 16px; background: var(--gold); }
+.組織圖 .節點.小 { font-weight: 400; font-size: .92rem; border-width: 1px; }
+
+/* 問答 */
+details.問答 { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .2rem 1rem; margin-bottom: .6rem; }
+details.問答 summary { cursor: pointer; font-weight: 600; padding: .6rem 0; }
+details.問答[open] summary { border-bottom: 1px dashed var(--line); margin-bottom: .5rem; }
+
+/* 表單 */
+.表單 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .8rem 1rem; }
+.表單 .欄 { display: flex; flex-direction: column; gap: .25rem; }
+.表單 .欄.寬 { grid-column: 1 / -1; }
+.表單 .欄 > label { font-size: .9rem; color: var(--muted); }
+.表單 .必填::after { content: " *"; color: var(--danger); }
+.錯誤 { color: var(--danger); }
+.完成訊息 { background: var(--ok-soft); color: var(--ok); border-radius: 8px; padding: .8rem 1rem; }
+
+/* 照片 */
+.相片牆 { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .6rem; }
+.相片牆 img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px; }
+
+/* 站尾 */
+.站尾 { background: var(--navy); color: #d6d4ee; padding: 1.6rem 0; font-size: .9rem; border-top: 4px solid var(--gold); }
+.站尾 a { color: #fff; }
+.站尾 strong { color: #fff; }
+
+/* 手機版 */
+@media (max-width: 900px) {
+  .選單鈕 { display: inline-flex; }
+  .主選單 { display: none; width: 100%; flex-direction: column; padding-bottom: .6rem; order: 4; }
+  .主選單.開 { display: flex; }
+  .主選單 a { padding: .6em .4em; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .主題鈕 { margin-left: auto; }
+  .站頭列 { gap: .5rem; }
+  .主視覺 { padding: 1.6rem 1.1rem; }
+  .主視覺 h1 { font-size: 1.5rem; }
+  .主視覺 img { width: 72px; height: 72px; }
+}
+
+/* 列印入會申請書 */
+.列印區 { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 18mm; }
+  body { background: #fff; color: #000; }
+  .站頭, .站尾, .內容, #範例條, .跳至內容 { display: none !important; }
+  .列印區 { display: block; font-family: var(--font-kai); }
+}
+.申請書 h1 { text-align: center; font-size: 20pt; }
+.申請書 table { width: 100%; border-collapse: collapse; }
+.申請書 th, .申請書 td { border: 1px solid #000; padding: 3mm; text-align: left; font-size: 12pt; }
+.申請書 th { width: 25%; background: #f2f2f2; }
+
+</style>
+</head>
+<body data-page="聯絡我們">
+<a class="跳至內容" href="#內容">跳至主要內容</a>
+<header class="站頭">
+  <div class="寬度 站頭列">
+    <a class="站名" href="index.html"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E" alt="" width="44" height="44"><span id="站名">協會官網</span></a>
+    <button class="鈕 主題鈕" id="主題鈕" type="button" title="切換深色／淺色" >深淺色</button>
+    <button class="鈕 選單鈕" id="選單鈕" type="button" aria-expanded="false" aria-controls="主選單">選單</button>
+    <nav class="主選單" id="主選單" aria-label="主選單">
+        <a href="index.html">首頁</a>
+        <a href="about.html">關於協會</a>
+        <a href="news.html">最新消息</a>
+        <a href="activities.html">活動</a>
+        <a href="benefits.html">會員福利</a>
+        <a href="rights.html">權益專區</a>
+        <a href="join.html">入會申請</a>
+        <a href="downloads.html">下載專區</a>
+        <a href="faq.html">常見問答</a>
+        <a href="contact.html" aria-current="page">聯絡我們</a>
+    </nav>
+  </div>
+</header>
+<div id="範例條"></div>
+<main id="內容" class="寬度 內容" tabindex="-1">
+  <h1>聯絡我們</h1>
+  <noscript><p>請啟用 JavaScript 以顯示網站內容。</p></noscript>
+</main>
+<footer class="站尾">
+  <div class="寬度" id="站尾"></div>
+</footer>
+<div id="列印區" class="列印區"></div>
+<script src="資料/site-data.js"></script>
+<script>
+/* ===== 程式分節 =====
+ * （每一節對應 製作/src/ 裡的一支原始檔）
+ * 01. 共用/工具.js：共用工具（HTML 跳脫、建立畫面元素、日期與民國年、金額、CSV、下載），官網與會務系統共用
+ * 02. 共用/官網資料.js：把協會資料整理成「官網資料檔」（site-data.js）的內容；只放公開資訊，不含會員個資
+ * 03. 官網/網站.js：官網各頁的畫面（內容全部來自 資料/site-data.js；入會申請與活動報名產生申請資料檔）
+ * ===================== */
+(function () {
+"use strict";
+const 版本 = "v1.0";
+
+/* ---------- 共用/工具.js ---------- */
+// 檔案說明：共用工具（HTML 跳脫、建立畫面元素、日期與民國年、金額、CSV、下載），官網與會務系統共用
+
+// 把文字裡的 HTML 特殊字元換成安全寫法，避免資料被當成程式碼執行
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+// 檢查網址是否安全（只允許 http、https、mailto、tel、圖片 data:、blob: 與相對路徑），不安全就回傳 "#"
+function 安全網址(url) {
+  const s = String(url == null ? "" : url).trim();
+  if (/^(https?:|mailto:|tel:|blob:|data:image\/)/i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return "#";
+  return s;
+}
+
+// 建立一個畫面元素：h("div", {class:"x", onclick:函式}, "文字", 子元素…)；文字一律當純文字放入
+function h(tag, attrs) {
+  const el = document.createElement(tag);
+  if (attrs) {
+    for (const k of Object.keys(attrs)) {
+      const v = attrs[k];
+      if (v == null || v === false) continue;
+      if (k.slice(0, 2) === "on" && typeof v === "function") el.addEventListener(k.slice(2), v);
+      else if (k === "class") el.className = v;
+      else if (k === "value") el.value = v;
+      else if (k === "checked" || k === "selected" || k === "disabled" || k === "multiple") el[k] = !!v;
+      else if (k === "dataset") Object.assign(el.dataset, v);
+      else if (k === "href" || k === "src") el.setAttribute(k, 安全網址(v));
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+  }
+  加入子元素(el, Array.prototype.slice.call(arguments, 2));
+  return el;
+}
+
+// 把子元素（文字、元素、陣列）依序加到父元素；文字會轉成純文字節點
+function 加入子元素(el, kids) {
+  for (const k of kids) {
+    if (k == null || k === false) continue;
+    if (Array.isArray(k)) { 加入子元素(el, k); continue; }
+    el.appendChild(typeof k === "object" && k.nodeType ? k : document.createTextNode(String(k)));
+  }
+  return el;
+}
+
+// 清空一個元素裡的所有內容
+function 清空(el) {
+  while (el.firstChild) el.removeChild(el.firstChild);
+  return el;
+}
+
+// 用安全方式把一段（已跳脫的）HTML 字串轉成元素片段：template.innerHTML → content
+function 轉片段(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html;
+  return t.content;
+}
+
+// 兩位數補零
+function 補零(n, 位數) {
+  return String(n).padStart(位數 || 2, "0");
+}
+
+// 取得今天日期（本機時間），格式 2026-10-07
+function 今天() {
+  const d = new Date();
+  return d.getFullYear() + "-" + 補零(d.getMonth() + 1) + "-" + 補零(d.getDate());
+}
+
+// 取得現在時間（ISO 格式，含時區），用來記錄修改時間
+function 現在() {
+  return new Date().toISOString();
+}
+
+// 把 2026-10-07 這種日期轉成民國 115/10/07；空值回傳空字串
+function 民國(日期) {
+  if (!日期) return "";
+  const m = String(日期).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(日期);
+  return (Number(m[1]) - 1911) + "/" + m[2] + "/" + m[3];
+}
+
+// 把 ISO 時間轉成民國年月日＋時分，例：115/10/07 14:05
+function 民國時間(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  return (d.getFullYear() - 1911) + "/" + 補零(d.getMonth() + 1) + "/" + 補零(d.getDate()) + " " + 補零(d.getHours()) + ":" + 補零(d.getMinutes());
+}
+
+// 西元年轉民國年
+function 民國年(西元年) {
+  return Number(西元年) - 1911;
+}
+
+// 把民國日期（115/1/7、115.01.07、1150107）或西元日期轉成 2026-01-07；看不懂回傳空字串
+function 解析日期(s) {
+  s = String(s == null ? "" : s).trim();
+  if (!s) return "";
+  let m = s.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (m) return m[1] + "-" + 補零(m[2]) + "-" + 補零(m[3]);
+  m = s.match(/^(\d{2,3})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (m) return (Number(m[1]) + 1911) + "-" + 補零(m[2]) + "-" + 補零(m[3]);
+  m = s.match(/^(\d{3})(\d{2})(\d{2})$/);
+  if (m) return (Number(m[1]) + 1911) + "-" + m[2] + "-" + m[3];
+  if (/^\d{5}(\.\d+)?$/.test(s)) {
+    // Excel 日期序號（1900 日期系統）
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(s)) * 86400000);
+    return d.getUTCFullYear() + "-" + 補零(d.getUTCMonth() + 1) + "-" + 補零(d.getUTCDate());
+  }
+  return "";
+}
+
+// 金額加千分位，例：12345 → 12,345
+function 金額(n) {
+  const v = Math.round(Number(n) || 0);
+  return v.toLocaleString("en-US");
+}
+
+// 把金額轉成國字大寫（收據用），例：600 → 陸佰元整、10005 → 壹萬零伍元整
+function 國字金額(n) {
+  const 數 = ["零", "壹", "貳", "參", "肆", "伍", "陸", "柒", "捌", "玖"];
+  const 小單位 = ["", "拾", "佰", "仟"];
+  const 大單位 = ["", "萬", "億", "兆"];
+  let v = Math.round(Math.abs(Number(n) || 0));
+  if (!v) return "零元整";
+  const 各組 = [];
+  while (v > 0) { 各組.push(v % 10000); v = Math.floor(v / 10000); }
+  let 結果 = "";
+  let 前面有字 = false;
+  let 待補零 = false;
+  for (let g = 各組.length - 1; g >= 0; g--) {
+    const x = 各組[g];
+    if (x === 0) { if (前面有字) 待補零 = true; continue; }
+    if (前面有字 && x < 1000) 待補零 = true;
+    let 段 = "";
+    let 段補零 = false;
+    for (let i = 3; i >= 0; i--) {
+      const d = Math.floor(x / Math.pow(10, i)) % 10;
+      if (d === 0) { if (段) 段補零 = true; continue; }
+      if (段補零) { 段 += "零"; 段補零 = false; }
+      段 += 數[d] + 小單位[i];
+    }
+    結果 += (待補零 ? "零" : "") + 段 + 大單位[g];
+    待補零 = false;
+    前面有字 = true;
+  }
+  return 結果 + "元整";
+}
+
+// 產生一個不重複的編號（時間＋亂數）
+function 新編號() {
+  const 亂 = new Uint8Array(6);
+  crypto.getRandomValues(亂);
+  return Date.now().toString(36) + Array.from(亂, function (b) { return 補零(b.toString(16)); }).join("");
+}
+
+// 防公式注入：儲存格開頭是 = + - @ Tab 換行 時，前面加一個單引號
+function 防公式(v) {
+  const s = String(v == null ? "" : v);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
+// 把二維陣列轉成 CSV 文字（含 BOM，Excel 開中文不亂碼；並防公式注入）
+function 轉CSV(列) {
+  const 行 = 列.map(function (r) {
+    return r.map(function (v) {
+      const s = 防公式(v);
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",");
+  });
+  return "﻿" + 行.join("\r\n") + "\r\n";
+}
+
+// 解析 CSV 文字成二維陣列（支援雙引號、欄內換行）
+function 解析CSV(text) {
+  text = String(text).replace(/^﻿/, "");
+  const 列 = [];
+  let 目前列 = [];
+  let 欄 = "";
+  let 引號中 = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (引號中) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { 欄 += '"'; i++; } else 引號中 = false;
+      } else 欄 += c;
+    } else if (c === '"') 引號中 = true;
+    else if (c === ",") { 目前列.push(欄); 欄 = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      目前列.push(欄); 欄 = "";
+      列.push(目前列); 目前列 = [];
+    } else 欄 += c;
+  }
+  if (欄 !== "" || 目前列.length) { 目前列.push(欄); 列.push(目前列); }
+  return 列.filter(function (r) { return r.some(function (v) { return String(v).trim() !== ""; }); });
+}
+
+// 下載檔案：用 Blob URL，1.5 秒後撤銷
+function 下載檔案(檔名, 內容, 類型) {
+  const blob = 內容 instanceof Blob ? 內容 : new Blob([內容], { type: 類型 || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = 檔名;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+}
+
+// 比較兩個值做排序（數字比大小、文字依中文筆畫／字典順序）
+function 比較(a, b) {
+  if (a == null || a === "") return b == null || b === "" ? 0 : 1;
+  if (b == null || b === "") return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b), "zh-Hant-TW", { numeric: true });
+}
+
+// 深拷貝一個資料物件（只含 JSON 能表示的內容）
+function 深拷貝(o) {
+  return o == null ? o : JSON.parse(JSON.stringify(o));
+}
+
+
+/* ---------- 共用/官網資料.js ---------- */
+// 檔案說明：把協會資料整理成「官網資料檔」（site-data.js）的內容；只放公開資訊，不含會員個資
+
+// 從附件路徑取出官網上的檔案位置（附件/官網下載/abc_章程.pdf → 資料/檔案/abc_章程.pdf）
+function 官網檔案位置(附件路徑) {
+  const 檔名 = String(附件路徑 || "").split("/").pop();
+  return 檔名 ? "資料/檔案/" + 檔名 : "";
+}
+
+// 依協會資料產生官網要用的資料物件（只挑「公開」的項目，依日期排序）
+function 產生官網資料(資料, 發布時間) {
+  const 設 = 資料.設定 || {};
+  const 公開 = function (清單) { return (清單 || []).filter(function (x) { return x.公開 !== false; }); };
+  const 依日期新到舊 = function (a, b) { return String(b.日期 || "").localeCompare(String(a.日期 || "")); };
+  const 報名 = 資料.報名 || [];
+
+  const 活動 = 公開(資料.活動).slice().sort(依日期新到舊).map(function (a) {
+    const 正取數 = 報名.filter(function (r) { return r.活動id === a.id && r.狀態 === "正取"; }).length;
+    const 成果公開 = a.成果公開 === true;
+    return {
+      id: a.id, 名稱: a.名稱, 類別: a.類別 || "", 日期: a.日期 || "", 開始時間: a.開始時間 || "", 結束時間: a.結束時間 || "",
+      地點: a.地點 || "", 名額: Number(a.名額) || 0, 候補名額: Number(a.候補名額) || 0, 費用: Number(a.費用) || 0,
+      截止日: a.截止日 || "", 說明: a.說明 || "", 已報名數: 正取數,
+      成果說明: 成果公開 ? (a.成果說明 || "") : "",
+      照片: 成果公開 ? (a.照片 || []).map(官網檔案位置) : []
+    };
+  });
+
+  return {
+    格式: "協會官網資料",
+    格式版本: 1,
+    發布時間: 發布時間 || "",
+    範例資料: !!設.範例資料,
+    協會: {
+      名稱: 設.協會名稱 || "", 標語: 設.標語 || "", 宗旨: 設.宗旨 || "", 沿革: 設.沿革 || "", 章程: 設.章程 || "",
+      地址: 設.地址 || "", 電話: 設.電話 || "", 傳真: 設.傳真 || "", Email: 設.Email || "", 服務時間: 設.服務時間 || "",
+      組別: 設.組別 || [], 服務機關: 設.服務機關 || [],
+      入會費: (設.會費標準 || {}).入會費 || 0, 常年會費: (設.會費標準 || {}).常年會費 || 0
+    },
+    理監事: (資料.理監事 || []).slice().sort(function (a, b) { return (Number(a.排序) || 0) - (Number(b.排序) || 0); })
+      .map(function (p) { return { 職稱: p.職稱, 姓名: p.姓名, 服務機關: p.服務機關 || "" }; }),
+    消息: 公開(資料.消息).slice().sort(function (a, b) {
+      if (!!b.置頂 !== !!a.置頂) return b.置頂 ? 1 : -1;
+      return 依日期新到舊(a, b);
+    }).map(function (n) { return { id: n.id, 標題: n.標題, 分類: n.分類 || "", 日期: n.日期 || "", 內文: n.內文 || "", 置頂: !!n.置頂 }; }),
+    活動: 活動,
+    福利: 公開(資料.福利).map(function (b) { return { 名稱: b.名稱, 對象: b.對象 || "", 內容: b.內容 || "", 申請方式: b.申請方式 || "" }; }),
+    特約商店: 公開(資料.特約商店).map(function (s) { return { 名稱: s.名稱, 類別: s.類別 || "", 優惠內容: s.優惠內容 || "", 地址: s.地址 || "", 電話: s.電話 || "" }; }),
+    權益成果: 公開(資料.權益成果).slice().sort(依日期新到舊)
+      .map(function (r) { return { 標題: r.標題, 類型: r.類型 || "", 日期: r.日期 || "", 摘要: r.摘要 || "", 結果: r.結果 || "" }; }),
+    法規連結: (設.法規連結 || []).map(function (l) { return { 名稱: l.名稱, 網址: l.網址 }; }),
+    下載: 公開(資料.下載).map(function (d) {
+      return { 名稱: d.名稱, 分類: d.分類 || "", 說明: d.說明 || "", 檔案: 官網檔案位置(d.附件), 檔名: d.檔名 || "" };
+    }),
+    常見問答: 公開(資料.常見問答).slice().sort(function (a, b) { return (Number(a.排序) || 0) - (Number(b.排序) || 0); })
+      .map(function (q) { return { 分類: q.分類 || "", 問題: q.問題, 答案: q.答案 }; })
+  };
+}
+
+// 把官網資料物件轉成 site-data.js 的文字內容（JSON 內的 < 與換行分隔字元會跳脫，避免被誤判成標籤）
+function 官網資料檔內容(官網資料) {
+  const json = JSON.stringify(官網資料, null, 1)
+    .replace(/</g, "\\u003c").replace(/>/g, "\\u003e")
+    .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+  return "/* 官網資料檔：由會務管理系統「發布到官網」產生，請勿手動修改 */\nwindow.SITE_DATA = " + json + ";\n";
+}
+
+
+/* ---------- 官網/網站.js ---------- */
+// 檔案說明：官網各頁的畫面（內容全部來自 資料/site-data.js；入會申請與活動報名產生申請資料檔）
+
+const 站 = window.SITE_DATA;
+const 內容區 = document.getElementById("內容");
+const 本頁 = document.body.getAttribute("data-page");
+const 網址參數 = new URLSearchParams(location.search);
+
+// 頁面標題（h1）
+function 標題(文字) {
+  return h("h1", null, 文字);
+}
+
+// 一個區段（小標題＋內容），可附「看更多」連結
+function 區段(標, 內容, 更多連結, 更多文字) {
+  return h("section", { class: "段" }, h("h2", null, 標, 更多連結 ? h("a", { href: 更多連結 }, 更多文字 || "看更多 →") : null), 內容);
+}
+
+// 多行文字（保留換行）
+function 多行(文字, 類別) {
+  return h("div", { class: "內文" + (類別 ? " " + 類別 : "") }, 文字 || "");
+}
+
+// 活動的日期時間文字
+function 活動時間(a) {
+  return 民國(a.日期) + (a.開始時間 ? " " + a.開始時間 + (a.結束時間 ? "–" + a.結束時間 : "") : "");
+}
+
+// 活動是否還可以報名（未過截止日、未過活動日、未額滿或還有候補）
+function 可報名(a) {
+  const 今 = 今天();
+  if (a.日期 < 今) return false;
+  if (a.截止日 && a.截止日 < 今) return false;
+  return true;
+}
+
+// 共用外框：站名、頁面標題、範例資料提示、站尾聯絡資訊
+function 設定外框() {
+  const 協 = 站.協會;
+  document.getElementById("站名").textContent = 協.名稱 || "協會官網";
+  const 頁名 = document.title;
+  document.title = 頁名 === "首頁" ? 協.名稱 : 頁名 + "｜" + 協.名稱;
+  if (站.範例資料) document.getElementById("範例條").appendChild(h("div", { class: "寬度" }, h("p", { class: "範例條", style: "margin:.6rem 0 0" }, "本網站目前顯示的是範例資料（人名、電話、Email、金額全部虛構）")));
+  清空(document.getElementById("站尾")).appendChild(h("div", null,
+    h("p", null, h("strong", null, 協.名稱)),
+    h("p", null, [協.地址 ? "地址：" + 協.地址 : "", 協.電話 ? "電話：" + 協.電話 : "", 協.Email ? "Email：" + 協.Email : ""].filter(Boolean).join("　")),
+    h("p", { class: "小字" }, "資料更新：" + (站.發布時間 ? 民國時間(站.發布時間) : "—") + "　網站版本 " + 版本 + "　本網站不使用追蹤碼與 Cookie")));
+}
+
+// 選單開關（手機版）與深淺色切換
+function 設定按鈕() {
+  const 鈕 = document.getElementById("選單鈕");
+  const 選單 = document.getElementById("主選單");
+  鈕.addEventListener("click", function () {
+    const 開 = 選單.classList.toggle("開");
+    鈕.setAttribute("aria-expanded", 開 ? "true" : "false");
+  });
+  document.getElementById("主題鈕").addEventListener("click", function () {
+    const 根 = document.documentElement;
+    const 深 = 根.getAttribute("data-theme") ? 根.getAttribute("data-theme") === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    根.setAttribute("data-theme", 深 ? "light" : "dark");
+  });
+}
+
+// 消息列表（ul）
+function 消息清單(消息們) {
+  if (!消息們.length) return h("p", { class: "次要字" }, "目前沒有消息");
+  return h("ul", { class: "消息列" }, 消息們.map(function (n) {
+    return h("li", null, h("span", { class: "日期" }, 民國(n.日期)), n.置頂 ? h("span", { class: "標記 危" }, "置頂") : null,
+      n.分類 ? h("span", { class: "標記" }, n.分類) : null, h("a", { href: "news.html?id=" + encodeURIComponent(n.id) }, n.標題));
+  }));
+}
+
+// 活動卡片
+function 活動卡(a) {
+  return h("div", { class: "卡" },
+    h("div", { class: "日期" }, 活動時間(a)),
+    h("h3", null, h("a", { href: "activities.html?id=" + encodeURIComponent(a.id) }, a.名稱)),
+    h("p", { class: "次要字" }, [a.地點, a.類別].filter(Boolean).join(" · ")),
+    可報名(a) ? h("span", { class: "標記 成" }, "報名中") : a.日期 < 今天() ? h("span", { class: "標記" }, "已結束") : h("span", { class: "標記 警" }, "已截止"));
+}
+
+// ===== 各頁 =====
+
+// 首頁：主視覺、最新消息 5 則、近期活動、快速連結
+function 首頁() {
+  const 協 = 站.協會;
+  const 近期 = 站.活動.filter(function (a) { return a.日期 >= 今天(); }).sort(function (a, b) { return 比較(a.日期, b.日期); }).slice(0, 3);
+  清空(內容區).appendChild(h("div", { class: "主視覺" },
+    h("img", { src: document.querySelector('link[rel="icon"]').getAttribute("href"), alt: "協會會徽" }),
+    h("div", null, h("h1", null, 協.名稱), h("p", null, 協.標語 || ""),
+      h("a", { class: "鈕 金", href: "join.html" }, "申請入會"), h("a", { class: "鈕", href: "activities.html" }, "活動報名"), h("a", { class: "鈕", href: "benefits.html" }, "會員福利"))));
+  內容區.appendChild(區段("最新消息", 消息清單(站.消息.slice(0, 5)), "news.html"));
+  內容區.appendChild(區段("近期活動", 近期.length ? h("div", { class: "格" }, 近期.map(活動卡)) : h("p", { class: "次要字" }, "目前沒有排定的活動"), "activities.html"));
+  內容區.appendChild(區段("快速連結", h("div", { class: "快速" },
+    h("a", { href: "join.html" }, h("strong", null, "入會申請"), h("span", null, "線上填寫、列印申請書")),
+    h("a", { href: "benefits.html" }, h("strong", null, "會員福利"), h("span", null, "福利項目與特約商店")),
+    h("a", { href: "rights.html" }, h("strong", null, "權益專區"), h("span", null, "建議與協商成果")),
+    h("a", { href: "downloads.html" }, h("strong", null, "下載專區"), h("span", null, "表單、章程、會議紀錄")))));
+}
+
+// 關於協會：宗旨、沿革、組織架構圖、理監事名單、章程
+function 關於協會() {
+  const 協 = 站.協會;
+  清空(內容區).appendChild(標題("關於協會"));
+  if (協.宗旨) 內容區.appendChild(區段("宗旨", 多行(協.宗旨)));
+  if (協.沿革) 內容區.appendChild(區段("沿革", 多行(協.沿革)));
+  const 線 = function () { return h("div", { class: "線", "aria-hidden": "true" }); };
+  內容區.appendChild(區段("組織架構", h("div", { class: "卡" }, h("div", { class: "組織圖", role: "img", "aria-label": "組織架構圖" },
+    h("div", { class: "層" }, h("div", { class: "節點 頂" }, "會員（代表）大會")), 線(),
+    h("div", { class: "層" }, h("div", { class: "節點" }, "理事會"), h("div", { class: "節點" }, "監事會")), 線(),
+    h("div", { class: "層" }, h("div", { class: "節點" }, "理事長")), 線(),
+    h("div", { class: "層" }, h("div", { class: "節點" }, "秘書長")), 線(),
+    h("div", { class: "層" }, (協.組別 || []).map(function (g) { return h("div", { class: "節點 小" }, g); }))))));
+  if (站.理監事.length) {
+    內容區.appendChild(區段("理監事名單", h("div", { class: "表捲" }, h("table", { class: "表" },
+      h("thead", null, h("tr", null, h("th", null, "職稱"), h("th", null, "姓名"), h("th", null, "服務機關"))),
+      h("tbody", null, 站.理監事.map(function (p) { return h("tr", null, h("td", null, p.職稱), h("td", null, p.姓名), h("td", null, p.服務機關)); }))))));
+  }
+  if (協.章程) 內容區.appendChild(區段("章程", h("details", { class: "問答" }, h("summary", null, "展開章程全文"), 多行(協.章程))));
+}
+
+// 最新消息：列表＋分類篩選，或單則內文
+function 最新消息() {
+  const id = 網址參數.get("id");
+  清空(內容區);
+  if (id) {
+    const n = 站.消息.find(function (x) { return x.id === id; });
+    if (!n) { 內容區.appendChild(標題("找不到這則消息")); 內容區.appendChild(h("a", { href: "news.html" }, "← 回消息列表")); return; }
+    document.title = n.標題 + "｜" + 站.協會.名稱;
+    內容區.appendChild(h("p", null, h("a", { href: "news.html" }, "← 回消息列表")));
+    內容區.appendChild(標題(n.標題));
+    內容區.appendChild(h("p", { class: "日期" }, 民國(n.日期) + (n.分類 ? "　｜　" + n.分類 : "")));
+    內容區.appendChild(h("article", { class: "卡" }, 多行(n.內文)));
+    return;
+  }
+  內容區.appendChild(標題("最新消息"));
+  const 分類們 = ["全部"].concat(Array.from(new Set(站.消息.map(function (n) { return n.分類; }).filter(Boolean))));
+  const 列表區 = h("div");
+  const 鈕列 = h("div", { class: "分類鈕", role: "group", "aria-label": "消息分類" });
+  const 顯示 = function (分類) {
+    Array.from(鈕列.children).forEach(function (b) { b.setAttribute("aria-pressed", b.textContent === 分類 ? "true" : "false"); });
+    清空(列表區).appendChild(消息清單(站.消息.filter(function (n) { return 分類 === "全部" || n.分類 === 分類; })));
+  };
+  分類們.forEach(function (c) { 鈕列.appendChild(h("button", { class: "鈕 小", type: "button", onclick: function () { 顯示(c); } }, c)); });
+  內容區.appendChild(鈕列);
+  內容區.appendChild(列表區);
+  顯示("全部");
+}
+
+// 活動：近期與過去活動列表，或單一活動（含報名表與成果）
+function 活動頁() {
+  const id = 網址參數.get("id");
+  清空(內容區);
+  if (id) {
+    const a = 站.活動.find(function (x) { return x.id === id; });
+    if (!a) { 內容區.appendChild(標題("找不到這個活動")); 內容區.appendChild(h("a", { href: "activities.html" }, "← 回活動列表")); return; }
+    document.title = a.名稱 + "｜" + 站.協會.名稱;
+    內容區.appendChild(h("p", null, h("a", { href: "activities.html" }, "← 回活動列表")));
+    內容區.appendChild(標題(a.名稱));
+    內容區.appendChild(h("div", { class: "卡" },
+      h("p", null, h("strong", null, "時間："), 活動時間(a)),
+      h("p", null, h("strong", null, "地點："), a.地點 || "另行通知"),
+      h("p", null, h("strong", null, "名額："), a.名額 ? a.名額 + " 人（目前已報名 " + a.已報名數 + " 人" + (a.已報名數 >= a.名額 ? "，額滿後列候補" : "") + "）" : "不限"),
+      h("p", null, h("strong", null, "費用："), a.費用 ? 金額(a.費用) + " 元" : "免費"),
+      a.截止日 ? h("p", null, h("strong", null, "報名截止："), 民國(a.截止日)) : null,
+      a.說明 ? 多行(a.說明) : null));
+    if (可報名(a)) 內容區.appendChild(區段("我要報名", 報名表(a)));
+    else if (a.日期 >= 今天()) 內容區.appendChild(h("p", { class: "標記 警" }, "報名已截止"));
+    if (a.成果說明 || a.照片.length) {
+      內容區.appendChild(區段("活動成果", h("div", null, a.成果說明 ? 多行(a.成果說明) : null,
+        a.照片.length ? h("div", { class: "相片牆", style: "margin-top:1rem" }, a.照片.map(function (p) { return h("img", { src: p, alt: a.名稱 + " 活動照片", loading: "lazy" }); })) : null)));
+    }
+    return;
+  }
+  內容區.appendChild(標題("活動"));
+  const 今 = 今天();
+  const 近期 = 站.活動.filter(function (a) { return a.日期 >= 今; }).sort(function (a, b) { return 比較(a.日期, b.日期); });
+  const 過去 = 站.活動.filter(function (a) { return a.日期 < 今; });
+  內容區.appendChild(區段("近期活動", 近期.length ? h("div", { class: "格" }, 近期.map(活動卡)) : h("p", { class: "次要字" }, "目前沒有排定的活動")));
+  內容區.appendChild(區段("過去活動與成果", 過去.length ? h("div", { class: "格" }, 過去.map(活動卡)) : h("p", { class: "次要字" }, "尚無")));
+}
+
+// 個資告知與同意（入會、報名共用）
+function 個資告知(目的) {
+  const id = "同意_" + 新編號();
+  return h("div", { class: "欄 寬" },
+    h("p", { class: "小字 次要字" }, "個人資料告知：本會僅為辦理「" + 目的 + "」蒐集、處理及利用您填寫的資料，不作其他用途；您可向本會查詢、更正或請求刪除。"),
+    h("label", { for: id }, h("input", { type: "checkbox", id: id, "data-key": "同意" }), " 我已閱讀並同意上述個人資料告知"));
+}
+
+// 依欄位清單建立表單；回傳 {表單, 讀值()}
+function 建立表單(欄們, 目的) {
+  const 協 = 站.協會;
+  const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } });
+  欄們.forEach(function (f) {
+    const id = "欄_" + f.key;
+    let 輸入;
+    if (f.key === "服務機關") {
+      輸入 = h("select", { id: id, "data-key": f.key }, h("option", { value: "" }, "請選擇"), 協.服務機關.map(function (o) { return h("option", { value: o }, o); }), h("option", { value: "其他" }, "其他"));
+    } else if (f.多行) {
+      輸入 = h("textarea", { id: id, "data-key": f.key, rows: 3 });
+    } else {
+      輸入 = h("input", { id: id, "data-key": f.key, type: f.型 || "text", autocomplete: f.自動 || "off" });
+    }
+    表單.appendChild(h("div", { class: "欄" + (f.多行 ? " 寬" : "") }, h("label", { for: id, class: f.必填 ? "必填" : "" }, f.標題), 輸入));
+  });
+  表單.appendChild(個資告知(目的));
+  return {
+    表單: 表單,
+    讀值: function () {
+      const 值 = {};
+      表單.querySelectorAll("[data-key]").forEach(function (el) { 值[el.getAttribute("data-key")] = el.type === "checkbox" ? el.checked : el.value.trim(); });
+      const 缺 = 欄們.filter(function (f) { return f.必填 && !值[f.key]; }).map(function (f) { return f.標題; });
+      if (缺.length) return { 錯誤: "請填寫：" + 缺.join("、") };
+      if (值.Email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(值.Email)) return { 錯誤: "Email 格式不正確" };
+      if (!值.同意) return { 錯誤: "請勾選同意個人資料告知" };
+      delete 值.同意;
+      return { 值: 值 };
+    }
+  };
+}
+
+const 基本欄位 = [
+  { key: "姓名", 標題: "姓名", 必填: true, 自動: "name" },
+  { key: "員工編號", 標題: "員工編號" },
+  { key: "服務機關", 標題: "服務機關", 必填: true },
+  { key: "單位", 標題: "單位" },
+  { key: "職稱", 標題: "職稱" },
+  { key: "公務電話", 標題: "公務電話", 型: "tel" },
+  { key: "Email", 標題: "Email", 必填: true, 型: "email", 自動: "email" },
+  { key: "備註", 標題: "備註", 多行: true }
+];
+
+// 產生申請資料檔（JSON）並下載；檔案交給協會，由會務系統匯入
+function 下載申請檔(類型, 值, 附加, 檔名) {
+  const 內容 = Object.assign({ 格式: "協會申請資料", 格式版本: 1, 類型: 類型, 申請時間: new Date().toISOString(), 資料: 值 }, 附加 || {});
+  下載檔案(檔名.replace(/[\\/:*?"<>|]/g, "_") + ".json", JSON.stringify(內容, null, 1), "application/json");
+}
+
+// 活動報名表
+function 報名表(a) {
+  const 表 = 建立表單(基本欄位, a.名稱 + " 活動報名");
+  const 訊息 = h("div", { role: "status" });
+  return h("div", { class: "卡" },
+    h("p", null, "填寫後按「產生報名檔」，會下載一個報名資料檔，請以 Email 寄給協會" + (站.協會.Email ? "（" + 站.協會.Email + "）" : "") + "，協會登錄後即完成報名。"),
+    表.表單,
+    h("p", null, h("button", { class: "鈕 主", type: "button", id: "產生報名檔鈕", onclick: function () {
+      const r = 表.讀值();
+      清空(訊息);
+      if (r.錯誤) return 訊息.appendChild(h("p", { class: "錯誤" }, r.錯誤));
+      下載申請檔("活動報名", r.值, { 活動id: a.id, 活動名稱: a.名稱 }, "活動報名_" + a.名稱 + "_" + r.值.姓名);
+      訊息.appendChild(h("p", { class: "完成訊息" }, "已產生報名資料檔，請寄給協會承辦人。名額依協會收件順序為準，額滿列候補。"));
+    } }, "產生報名檔")),
+    訊息);
+}
+
+// 會員福利：福利項目與特約商店
+function 會員福利() {
+  清空(內容區).appendChild(標題("會員福利"));
+  內容區.appendChild(區段("福利項目", 站.福利.length ? h("div", { class: "格" }, 站.福利.map(function (b) {
+    return h("div", { class: "卡" }, h("h3", null, b.名稱), b.對象 ? h("p", { class: "次要字" }, "對象：" + b.對象) : null, 多行(b.內容),
+      b.申請方式 ? h("p", null, h("strong", null, "申請方式："), b.申請方式) : null);
+  })) : h("p", { class: "次要字" }, "尚無資料")));
+  const 類別們 = ["全部"].concat(Array.from(new Set(站.特約商店.map(function (s) { return s.類別; }).filter(Boolean))));
+  const 列表 = h("div", { class: "格" });
+  const 鈕列 = h("div", { class: "分類鈕", role: "group", "aria-label": "商店類別" });
+  const 顯示 = function (類) {
+    Array.from(鈕列.children).forEach(function (b) { b.setAttribute("aria-pressed", b.textContent === 類 ? "true" : "false"); });
+    清空(列表);
+    站.特約商店.filter(function (s) { return 類 === "全部" || s.類別 === 類; }).forEach(function (s) {
+      列表.appendChild(h("div", { class: "卡" }, h("h3", null, s.名稱), s.類別 ? h("span", { class: "標記 金" }, s.類別) : null, 多行(s.優惠內容),
+        h("p", { class: "小字 次要字" }, [s.地址, s.電話].filter(Boolean).join("　"))));
+    });
+  };
+  類別們.forEach(function (c) { 鈕列.appendChild(h("button", { class: "鈕 小", type: "button", onclick: function () { 顯示(c); } }, c)); });
+  內容區.appendChild(區段("特約商店", 站.特約商店.length ? h("div", null, 鈕列, 列表) : h("p", { class: "次要字" }, "尚無資料")));
+  if (站.特約商店.length) 顯示("全部");
+}
+
+// 權益專區：建議與協商說明、成果、相關法規連結
+function 權益專區() {
+  清空(內容區).appendChild(標題("權益專區"));
+  內容區.appendChild(h("div", { class: "格" },
+    h("div", { class: "卡" }, h("h3", null, "建議事項（公務人員協會法第 6 條）"),
+      h("p", null, "協會可就考試，公務人員之銓敘、保障、撫卹、退休，任免、考績、級俸、陞遷、褒獎等法制事項，公務人員權益相關事項，公務人員法規之制（訂）定、修正與廢止，以及工作簡化等事項，向有關機關提出建議。")),
+    h("div", { class: "卡" }, h("h3", null, "協商事項（公務人員協會法第 7 條）"),
+      h("p", null, "協會可就辦公環境之改善、行政管理、服勤之方式及起訖時間提出協商。"),
+      h("p", { class: "小字 次要字" }, "不得協商：法律已有明文規定者；依法得提起申訴、復審、訴願、行政訴訟之事項；公務人員個人權益事項；與國防、安全、警政、獄政、消防及災害防救等有關之事項。"))));
+  內容區.appendChild(h("p", { class: "小字 次要字" }, "以上為條文重點整理，正式條文以全國法規資料庫公布者為準。"));
+  內容區.appendChild(區段("建議與協商成果", 站.權益成果.length ? h("div", { class: "格" }, 站.權益成果.map(function (r) {
+    return h("div", { class: "卡" }, h("div", { class: "日期" }, 民國(r.日期) + (r.類型 ? "　" : "")), r.類型 ? h("span", { class: "標記 金" }, r.類型) : null,
+      h("h3", null, r.標題), 多行(r.摘要), r.結果 ? h("p", null, h("strong", null, "辦理結果："), r.結果) : null);
+  })) : h("p", { class: "次要字" }, "尚無資料")));
+  if (站.法規連結.length) {
+    內容區.appendChild(區段("相關法規", h("ul", null, 站.法規連結.map(function (l) {
+      return h("li", null, h("a", { href: l.網址, rel: "noopener noreferrer", target: "_blank" }, l.名稱));
+    }))));
+  }
+}
+
+// 入會申請：說明、線上填寫 → 列印申請書＋下載申請資料檔
+function 入會申請() {
+  const 協 = 站.協會;
+  清空(內容區).appendChild(標題("入會申請"));
+  內容區.appendChild(h("div", { class: "卡" },
+    h("p", null, "財政部及所屬機關的現職公務人員，認同本會宗旨者，歡迎加入。"),
+    h("p", null, "入會費 " + 金額(協.入會費) + " 元；常年會費每年 " + 金額(協.常年會費) + " 元（依本會章程，經會員大會議決）。"),
+    h("ol", null,
+      h("li", null, "填寫下方表單。"),
+      h("li", null, "按「列印申請書」，簽名後交給協會；或按「下載申請資料檔」，以 Email 寄給協會" + (協.Email ? "（" + 協.Email + "）" : "") + "。"),
+      h("li", null, "協會審核通過後通知您繳交會費。"))));
+  const 表 = 建立表單(基本欄位, "入會申請");
+  const 訊息 = h("div", { role: "status" });
+  const 取值 = function () {
+    const r = 表.讀值();
+    清空(訊息);
+    if (r.錯誤) { 訊息.appendChild(h("p", { class: "錯誤" }, r.錯誤)); return null; }
+    return r.值;
+  };
+  內容區.appendChild(區段("申請表", h("div", { class: "卡" }, 表.表單,
+    h("p", null,
+      h("button", { class: "鈕 主", type: "button", id: "列印申請書鈕", onclick: function () {
+        const 值 = 取值();
+        if (!值) return;
+        列印申請書(值);
+      } }, "列印申請書"), " ",
+      h("button", { class: "鈕", type: "button", id: "下載申請檔鈕", onclick: function () {
+        const 值 = 取值();
+        if (!值) return;
+        下載申請檔("入會申請", 值, null, "入會申請_" + 值.姓名);
+        訊息.appendChild(h("p", { class: "完成訊息" }, "已產生入會申請資料檔，請寄給協會。"));
+      } }, "下載申請資料檔")),
+    訊息)));
+}
+
+// 把入會申請書放到列印區並列印（A4，標楷體）
+function 列印申請書(值) {
+  const 協 = 站.協會;
+  const 區 = 清空(document.getElementById("列印區"));
+  const 列 = function (名, v) { return h("tr", null, h("th", null, 名), h("td", null, v || "")); };
+  區.appendChild(h("div", { class: "申請書" },
+    h("h1", null, 協.名稱 + "　入會申請書"),
+    h("table", null, h("tbody", null,
+      列("姓名", 值.姓名), 列("員工編號", 值.員工編號), 列("服務機關", 值.服務機關), 列("單位", 值.單位), 列("職稱", 值.職稱),
+      列("公務電話", 值.公務電話), 列("Email", 值.Email), 列("備註", 值.備註),
+      列("申請日期", 民國(今天())), 列("申請人簽章", ""))),
+    h("p", null, "本人認同本會宗旨，願遵守本會章程，申請入會。"),
+    h("h3", null, "以下由協會填寫"),
+    h("table", null, h("tbody", null, 列("收件日期", ""), 列("審核結果", "□ 核准　□ 不核准"), 列("會員編號", ""), 列("承辦人／秘書長／理事長", "")))));
+  if (!navigator.webdriver) window.print();
+}
+
+// 下載專區：依分類列出檔案
+function 下載專區() {
+  清空(內容區).appendChild(標題("下載專區"));
+  if (!站.下載.length) { 內容區.appendChild(h("p", { class: "次要字" }, "尚無資料")); return; }
+  const 分類們 = Array.from(new Set(站.下載.map(function (d) { return d.分類 || "其他"; })));
+  分類們.forEach(function (c) {
+    內容區.appendChild(區段(c, h("ul", { class: "消息列" }, 站.下載.filter(function (d) { return (d.分類 || "其他") === c; }).map(function (d) {
+      return h("li", null, d.檔案 ? h("a", { href: d.檔案, download: d.檔名 || null }, d.名稱) : h("span", null, d.名稱),
+        h("span", { class: "次要字 小字" }, [d.說明, d.檔名].filter(Boolean).join("　")));
+    }))));
+  });
+}
+
+// 常見問答：可展開
+function 常見問答() {
+  清空(內容區).appendChild(標題("常見問答"));
+  if (!站.常見問答.length) { 內容區.appendChild(h("p", { class: "次要字" }, "尚無資料")); return; }
+  內容區.appendChild(h("div", null, 站.常見問答.map(function (q) {
+    return h("details", { class: "問答" }, h("summary", null, q.問題), 多行(q.答案));
+  })));
+}
+
+// 聯絡我們
+function 聯絡我們() {
+  const 協 = 站.協會;
+  清空(內容區).appendChild(標題("聯絡我們"));
+  const 列 = function (名, v, 連結) { return v ? h("p", null, h("strong", null, 名 + "："), 連結 ? h("a", { href: 連結 }, v) : v) : null; };
+  內容區.appendChild(h("div", { class: "卡" },
+    h("h2", null, 協.名稱),
+    列("地址", 協.地址), 列("電話", 協.電話, 協.電話 ? "tel:" + 協.電話.replace(/[^\d+]/g, "") : null), 列("傳真", 協.傳真),
+    列("Email", 協.Email, 協.Email ? "mailto:" + 協.Email : null), 列("服務時間", 協.服務時間)));
+}
+
+// 依頁面名稱畫出內容
+function 顯示頁面() {
+  if (!站 || 站.格式 !== "協會官網資料") {
+    清空(內容區).appendChild(h("div", { class: "卡" }, h("h1", null, "找不到網站資料"),
+      h("p", null, "請由會務管理系統「官網發布」產生 資料/site-data.js，並放在本網站的 資料 資料夾。")));
+    return;
+  }
+  設定外框();
+  const 表 = { 首頁: 首頁, 關於協會: 關於協會, 最新消息: 最新消息, 活動: 活動頁, 會員福利: 會員福利, 權益專區: 權益專區, 入會申請: 入會申請, 下載專區: 下載專區, 常見問答: 常見問答, 聯絡我們: 聯絡我們 };
+  (表[本頁] || 首頁)();
+}
+
+設定按鈕();
+顯示頁面();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,3919 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; media-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="app-version" content="v1.0">
+<meta name="referrer" content="no-referrer">
+<title>會務管理系統 v1.0</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E">
+<style>
+/* 共用主題：官網與會務系統共用的配色（深藍＋金）、深淺色、基本元件樣式 */
+
+/* 淺色（預設）配色 */
+:root {
+  --navy: #2a2854;
+  --gold: #c6951c;
+  --gold-soft: #f3e7c6;
+  --bg: #f5f4ef;
+  --surface: #ffffff;
+  --surface-2: #eeedf4;
+  --text: #1d1c2b;
+  --muted: #5d5c70;
+  --line: #d9d7e3;
+  --brand: #2a2854;
+  --brand-text: #ffffff;
+  --link: #2f2c8f;
+  --danger: #b42318;
+  --danger-soft: #fde8e6;
+  --ok: #1f7a4d;
+  --ok-soft: #e3f4ea;
+  --warn: #9a6400;
+  --warn-soft: #fdf1d8;
+  --focus: #c6951c;
+  --shadow: 0 1px 2px rgba(20, 18, 50, .08), 0 4px 14px rgba(20, 18, 50, .06);
+  --radius: 10px;
+  --font: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", sans-serif;
+  --font-kai: "DFKai-SB", "標楷體", "BiauKai", "TW-Kai", serif;
+  color-scheme: light;
+}
+
+/* 深色配色：系統偏好深色、且使用者沒有手動選淺色時 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --gold: #d9aa3a;
+    --gold-soft: #3b3220;
+    --bg: #131226;
+    --surface: #1d1c36;
+    --surface-2: #26254a;
+    --text: #ecebf5;
+    --muted: #aeadc6;
+    --line: #36355e;
+    --brand: #3b3880;
+    --link: #b9b6ff;
+    --danger: #ff8a7a;
+    --danger-soft: #3d1d1d;
+    --ok: #6fd6a0;
+    --ok-soft: #173326;
+    --warn: #f0c060;
+    --warn-soft: #3a2f16;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}
+
+/* 深色配色：使用者手動切成深色時 */
+:root[data-theme="dark"] {
+  --gold: #d9aa3a;
+  --gold-soft: #3b3220;
+  --bg: #131226;
+  --surface: #1d1c36;
+  --surface-2: #26254a;
+  --text: #ecebf5;
+  --muted: #aeadc6;
+  --line: #36355e;
+  --brand: #3b3880;
+  --link: #b9b6ff;
+  --danger: #ff8a7a;
+  --danger-soft: #3d1d1d;
+  --ok: #6fd6a0;
+  --ok-soft: #173326;
+  --warn: #f0c060;
+  --warn-soft: #3a2f16;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+  color-scheme: dark;
+}
+
+/* 基本版面 */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.65;
+}
+a { color: var(--link); }
+img { max-width: 100%; }
+h1, h2, h3, h4 { line-height: 1.35; margin: 0 0 .6em; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.隱藏 { display: none !important; }
+.次要字 { color: var(--muted); }
+.小字 { font-size: .875rem; }
+.右 { text-align: right; }
+.置中 { text-align: center; }
+.不換行 { white-space: nowrap; }
+
+/* 按鈕 */
+.鈕 {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35em;
+  min-height: 38px; padding: .4em 1em;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+  font: inherit; font-size: .95rem; cursor: pointer; text-decoration: none;
+}
+.鈕:hover { border-color: var(--gold); }
+.鈕:disabled { opacity: .5; cursor: not-allowed; }
+.鈕.主 { background: var(--brand); color: var(--brand-text); border-color: var(--brand); }
+.鈕.金 { background: var(--gold); color: #1d1c2b; border-color: var(--gold); }
+.鈕.危 { color: var(--danger); border-color: var(--danger); }
+.鈕.小 { min-height: 30px; padding: .15em .65em; font-size: .85rem; }
+.鈕.文字 { border-color: transparent; background: transparent; color: var(--link); }
+
+/* 輸入欄位 */
+input, select, textarea {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: .45em .6em; min-height: 38px;
+  max-width: 100%;
+}
+textarea { min-height: 6em; width: 100%; resize: vertical; }
+input[type="checkbox"], input[type="radio"] { min-height: 0; width: 1.1em; height: 1.1em; accent-color: var(--brand); }
+label { cursor: pointer; }
+
+/* 卡片 */
+.卡 {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem 1.2rem;
+}
+
+/* 標記（狀態小方塊） */
+.標記 {
+  display: inline-block; padding: 0 .55em; border-radius: 999px;
+  font-size: .8rem; line-height: 1.7; background: var(--surface-2); color: var(--muted);
+  white-space: nowrap;
+}
+.標記.成 { background: var(--ok-soft); color: var(--ok); }
+.標記.危 { background: var(--danger-soft); color: var(--danger); }
+.標記.警 { background: var(--warn-soft); color: var(--warn); }
+.標記.金 { background: var(--gold-soft); color: var(--warn); }
+
+/* 範例資料提示條 */
+.範例條 {
+  background: repeating-linear-gradient(-45deg, var(--warn-soft), var(--warn-soft) 10px, transparent 10px, transparent 20px);
+  color: var(--warn); border: 1px dashed var(--warn); border-radius: 8px;
+  padding: .3em .8em; font-size: .85rem; text-align: center;
+}
+
+/* 表格 */
+.表 { width: 100%; border-collapse: collapse; font-size: .93rem; }
+.表 th, .表 td { padding: .5em .6em; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.表 th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+.表 td.數, .表 th.數 { text-align: right; font-variant-numeric: tabular-nums; }
+.表捲 { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* 會務系統版面：表頭、側欄、內容區、對話框、資料表、列印 */
+
+/* 整體框架 */
+#應用 { min-height: 100vh; display: flex; flex-direction: column; }
+.表頭 {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: .7rem;
+  padding: .45rem 1rem; background: var(--navy); color: #fff;
+  border-bottom: 3px solid var(--gold);
+}
+.表頭 .會徽 { flex: none; }
+.表頭名 { min-width: 0; }
+.表頭名 .協會名 { font-weight: 700; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.表頭名 .次要字 { color: #cfcde6; }
+.表頭右 { margin-left: auto; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; }
+.表頭 .鈕 { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+.表頭 .鈕:hover { border-color: var(--gold); }
+.表頭 #使用者區 { color: #e8e6f6; }
+.選單鈕 { display: none; color: #fff !important; font-size: 1.3rem; }
+.主體 { flex: 1; display: flex; min-height: 0; }
+.側欄 {
+  flex: none; width: 210px; padding: .8rem .5rem; background: var(--surface);
+  border-right: 1px solid var(--line); overflow-y: auto;
+}
+.側欄 button {
+  display: flex; align-items: center; gap: .6em; width: 100%;
+  padding: .55em .8em; margin-bottom: 2px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.側欄 button:hover { background: var(--surface-2); }
+.側欄 button[aria-current="page"] { background: var(--navy); color: #fff; box-shadow: inset 4px 0 0 var(--gold); }
+.側欄 .圖示 { width: 1.4em; text-align: center; }
+.側欄 .分隔 { height: 1px; background: var(--line); margin: .6rem .4rem; }
+.內容 { flex: 1; min-width: 0; padding: 1.2rem 1.4rem 3rem; outline: none; }
+
+/* 頁面標題列 */
+.頁首 { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.頁首 h1 { font-size: 1.45rem; margin: 0; }
+.頁首 .工具 { margin-left: auto; display: flex; gap: .5rem; flex-wrap: wrap; }
+
+/* 分頁籤 */
+.頁籤 { display: flex; gap: .3rem; border-bottom: 2px solid var(--line); margin-bottom: 1rem; flex-wrap: wrap; }
+.頁籤 button {
+  border: 0; background: none; font: inherit; padding: .5em 1em; cursor: pointer; color: var(--muted);
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+}
+.頁籤 button[aria-selected="true"] { color: var(--text); font-weight: 700; border-bottom-color: var(--gold); }
+
+/* 首頁統計格 */
+.格 { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+.格2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.數字卡 .數字 { font-size: 2rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.數字卡 .標 { color: var(--muted); font-size: .9rem; }
+.數字卡 { border-top: 4px solid var(--gold); }
+.卡 h2 { font-size: 1.05rem; }
+.清單 { list-style: none; margin: 0; padding: 0; }
+.清單 li { padding: .45em 0; border-bottom: 1px dashed var(--line); display: flex; gap: .6em; align-items: baseline; }
+.清單 li:last-child { border-bottom: 0; }
+.條圖 { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding-top: .5rem; }
+.條圖 .柱 { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; font-size: .75rem; color: var(--muted); }
+.條圖 .柱 i { display: block; width: 100%; max-width: 28px; background: var(--navy); border-radius: 4px 4px 0 0; min-height: 2px; }
+:root[data-theme="dark"] .條圖 .柱 i { background: var(--gold); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .條圖 .柱 i { background: var(--gold); } }
+
+/* 資料表元件 */
+.表工具列 { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .6rem; }
+.表工具列 input[type="search"] { min-width: 220px; flex: 1 1 220px; max-width: 360px; }
+.表工具列 .右側 { margin-left: auto; display: flex; gap: .4rem; flex-wrap: wrap; }
+.表 th.可排序 { cursor: pointer; user-select: none; }
+.表 th.可排序::after { content: " ↕"; color: var(--muted); font-weight: 400; }
+.表 th[aria-sort="ascending"]::after { content: " ▲"; color: var(--gold); }
+.表 th[aria-sort="descending"]::after { content: " ▼"; color: var(--gold); }
+.表 tbody tr.可點 { cursor: pointer; }
+.表 tbody tr:hover { background: var(--surface-2); }
+.表 tbody tr.已選 { background: var(--gold-soft); }
+.表 .勾 { width: 2.2em; }
+.分頁列 { display: flex; gap: .4rem; align-items: center; justify-content: flex-end; margin-top: .6rem; flex-wrap: wrap; }
+.批次列 { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; padding: .4rem .6rem; background: var(--gold-soft); border-radius: 8px; margin-bottom: .6rem; }
+.空 { padding: 1.5rem; text-align: center; color: var(--muted); }
+
+/* 表單 */
+.表單 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .8rem 1rem; }
+.表單 .欄 { display: flex; flex-direction: column; gap: .25rem; }
+.表單 .欄.寬 { grid-column: 1 / -1; }
+.表單 .欄 > span { font-size: .88rem; color: var(--muted); }
+.表單 .欄 .必填::after { content: " *"; color: var(--danger); }
+.表單 .欄 small { color: var(--muted); }
+.標籤組 { display: flex; flex-wrap: wrap; gap: .3rem .8rem; }
+.標籤組 label { display: inline-flex; gap: .3em; align-items: center; }
+.錯誤 { color: var(--danger); }
+
+/* 對話框 */
+dialog.對話框 {
+  border: 0; border-radius: 14px; padding: 0; width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px); background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+dialog.對話框.寬 { width: min(1080px, calc(100vw - 32px)); }
+dialog.對話框::backdrop { background: rgba(14, 12, 40, .55); }
+.對話框 .框頭 { display: flex; align-items: center; gap: .5rem; padding: .8rem 1.2rem; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.對話框 .框頭 h2 { margin: 0; font-size: 1.1rem; }
+.對話框 .框頭 .關 { margin-left: auto; }
+.對話框 .框身 { padding: 1rem 1.2rem; overflow-y: auto; max-height: calc(100vh - 180px); }
+.對話框 .框尾 { display: flex; gap: .5rem; justify-content: flex-end; padding: .8rem 1.2rem; border-top: 1px solid var(--line); }
+
+/* 提示訊息 */
+.提示區 { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: flex; flex-direction: column; gap: .5rem; }
+.提示 { background: var(--navy); color: #fff; padding: .6em 1em; border-radius: 8px; box-shadow: var(--shadow); border-left: 4px solid var(--gold); max-width: 420px; }
+.提示.錯 { border-left-color: #ff6b5b; }
+
+/* 歡迎與登入畫面 */
+.歡迎 { max-width: 640px; margin: 2rem auto; }
+.歡迎 .會徽大 { display: block; margin: 0 auto 1rem; width: 96px; height: 96px; }
+.歡迎 h1 { text-align: center; }
+.歡迎 .卡 { margin-top: 1rem; }
+.提醒 { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: .6em .9em; font-size: .9rem; }
+
+/* 衝突對照 */
+.衝突 { border: 1px solid var(--line); border-radius: 10px; padding: .8rem; margin-bottom: .8rem; }
+.衝突 table td:nth-child(2), .衝突 table td:nth-child(3) { width: 38%; }
+.衝突 .不同 { background: var(--warn-soft); }
+
+/* 簽到 */
+.簽到輸入 { font-size: 1.3rem; padding: .5em .8em; width: 100%; max-width: 420px; }
+.相片牆 { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .6rem; }
+.相片牆 figure { margin: 0; }
+.相片牆 img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+
+/* 會員挑選清單 */
+.挑選清單 { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.挑選清單 button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: .45em .7em; font: inherit; color: var(--text); cursor: pointer; }
+.挑選清單 button:hover { background: var(--surface-2); }
+
+/* 手機與窄螢幕 */
+@media (max-width: 860px) {
+  .選單鈕 { display: inline-flex; }
+  .側欄 { position: fixed; top: 58px; bottom: 0; left: 0; z-index: 30; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow); }
+  .側欄.開 { transform: none; }
+  .內容 { padding: 1rem; }
+  .表頭右 #使用者區 { display: none; }
+}
+
+/* 列印：只印列印區，A4 直式 */
+.列印區 { display: none; }
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+  body { background: #fff; color: #000; }
+  #應用, .提示區 { display: none !important; }
+  .列印區 { display: block; }
+  .列印區.標楷 { font-family: var(--font-kai); }
+  .列印頁 { page-break-after: always; break-after: page; }
+  .列印頁:last-child { page-break-after: auto; break-after: auto; }
+}
+.列印區 .表 th { background: #eee; color: #000; }
+.列印區 .表 th, .列印區 .表 td { border: 1px solid #555; }
+.列印頁 h1 { text-align: center; font-size: 20pt; margin-bottom: .3em; }
+.列印頁 .副標 { text-align: center; margin-bottom: 1em; }
+.收據 { border: 2px solid #000; padding: 10mm; margin-bottom: 8mm; }
+.收據 table { width: 100%; border-collapse: collapse; }
+.收據 td { border: 1px solid #000; padding: 3mm; font-size: 13pt; }
+.收據 .聯別 { text-align: right; font-size: 10pt; }
+.簽名列 { display: flex; justify-content: space-around; margin-top: 12mm; }
+
+</style>
+</head>
+<body>
+<div id="應用">
+  <header class="表頭">
+    <button class="鈕 文字 選單鈕" id="選單鈕" type="button" aria-label="開關選單">☰</button>
+    <img class="會徽" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%20role%3D%22img%22%20aria-label%3D%22%E5%8D%94%E6%9C%83%E6%9C%83%E5%BE%BD%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2231%22%20fill%3D%22%232a2854%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2227%22%20fill%3D%22none%22%20stroke%3D%22%23c6951c%22%20stroke-width%3D%222.5%22%2F%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2219.5%22%20r%3D%225.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2219.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Ccircle%20cx%3D%2244.5%22%20cy%3D%2225%22%20r%3D%224.2%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M21.5%2044.5c0-7.4%204.7-12.6%2010.5-12.6s10.5%205.2%2010.5%2012.6z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M11.5%2044.5c0-6%203.6-10.2%208-10.2%202%200%203.8.8%205.2%202.2-1.9%202.2-3.1%205-3.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Cpath%20d%3D%22M52.5%2044.5c0-6-3.6-10.2-8-10.2-2%200-3.8.8-5.2%202.2%201.9%202.2%203.1%205%203.5%208z%22%20fill%3D%22%23c6951c%22%2F%3E%20%3Crect%20x%3D%2213%22%20y%3D%2246.5%22%20width%3D%2238%22%20height%3D%223%22%20rx%3D%221.5%22%20fill%3D%22%23c6951c%22%2F%3E%20%3C%2Fsvg%3E" alt="" width="36" height="36">
+    <div class="表頭名">
+      <div class="協會名" id="協會名">會務管理系統</div>
+      <div class="小字 次要字">會務管理系統 <span id="版號">v1.0</span></div>
+    </div>
+    <div class="表頭右">
+      <span id="存檔狀態" class="標記"></span>
+      <button class="鈕 小" id="存檔鈕" type="button" title="存檔（Ctrl+S）">存檔</button>
+      <button class="鈕 小" id="主題鈕" type="button" title="切換深色／淺色">深淺色</button>
+      <button class="鈕 小" id="說明鈕" type="button">說明</button>
+      <span id="使用者區" class="小字"></span>
+    </div>
+  </header>
+  <div class="主體">
+    <nav id="側欄" class="側欄" aria-label="功能選單"></nav>
+    <main id="內容" class="內容" tabindex="-1">
+      <noscript>本系統需要啟用 JavaScript。</noscript>
+    </main>
+  </div>
+</div>
+<div id="提示區" class="提示區" role="status" aria-live="polite"></div>
+<div id="列印區" class="列印區"></div>
+<script>
+/* ===== 程式分節 =====
+ * （每一節對應 製作/src/ 裡的一支原始檔）
+ * 01. 共用/工具.js：共用工具（HTML 跳脫、建立畫面元素、日期與民國年、金額、CSV、下載），官網與會務系統共用
+ * 02. 共用/官網資料.js：把協會資料整理成「官網資料檔」（site-data.js）的內容；只放公開資訊，不含會員個資
+ * 03. 會務/01_核心.js：核心（系統狀態、資料集合、角色權限、新增修改刪除紀錄、操作紀錄、提示、對話框、列印）
+ * 04. 會務/02_試算表.js：讀寫試算表（自己解 zip：用瀏覽器內建 DecompressionStream；讀 xlsx／ods／csv，寫 xlsx）
+ * 05. 會務/03_儲存.js：資料儲存（選協會資料夾、讀寫協會資料.json、自動備份、多人同時存檔的合併與衝突處理、附件、單檔模式）
+ * 06. 會務/04_登入.js：開始畫面、第一次建立協會資料、登入（密碼以 PBKDF2 雜湊保存）、登出、改密碼
+ * 07. 會務/05_資料表.js：通用資料表元件（排序、篩選、搜尋、分頁、勾選批次動作、匯出 CSV／Excel）
+ * 08. 會務/10_首頁.js：首頁（待辦簽核、待催繳會費、近期活動與會議、本月收支、會員數變化）
+ * 09. 會務/11_會員名冊.js：會員名冊（基本資料、標籤、多條件查詢、入會／退會／轉調異動歷程、分眾名單、匯入匯出、入會申請審核）
+ * 10. 會務/12_會費與帳務.js：會費與帳務（常年會費逐人收繳、催繳名單與通知單、收據列印、收支記帳與傳票、收支決算表）
+ * 11. 會務/13_活動報名.js：活動報名（建立活動、名額與候補、報名名單、匯入官網報名檔、簽到、出席率、通知名單、成果紀錄與照片）
+ * 12. 會務/14_官網發布.js：官網發布（編輯最新消息、會員福利、特約商店、權益成果、下載檔、常見問答、理監事、協會簡介；一鍵輸出官網資料檔）
+ * 13. 會務/19_設定.js：設定（服務機關、會員類別與標籤、會費標準、會計科目、使用者與角色、備份份數）與操作紀錄
+ * 14. 會務/99_啟動.js：啟動（側欄選單、換頁、表頭按鈕、深淺色切換、Ctrl+S 存檔、關頁提醒、關於視窗、測試掛勾）
+ * ===================== */
+(function () {
+"use strict";
+const 版本 = "v1.0";
+const 建置日期 = "2026-10-08";
+const 測試模式 = false;
+
+/* ---------- 共用/工具.js ---------- */
+// 檔案說明：共用工具（HTML 跳脫、建立畫面元素、日期與民國年、金額、CSV、下載），官網與會務系統共用
+
+// 把文字裡的 HTML 特殊字元換成安全寫法，避免資料被當成程式碼執行
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+// 檢查網址是否安全（只允許 http、https、mailto、tel、圖片 data:、blob: 與相對路徑），不安全就回傳 "#"
+function 安全網址(url) {
+  const s = String(url == null ? "" : url).trim();
+  if (/^(https?:|mailto:|tel:|blob:|data:image\/)/i.test(s)) return s;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return "#";
+  return s;
+}
+
+// 建立一個畫面元素：h("div", {class:"x", onclick:函式}, "文字", 子元素…)；文字一律當純文字放入
+function h(tag, attrs) {
+  const el = document.createElement(tag);
+  if (attrs) {
+    for (const k of Object.keys(attrs)) {
+      const v = attrs[k];
+      if (v == null || v === false) continue;
+      if (k.slice(0, 2) === "on" && typeof v === "function") el.addEventListener(k.slice(2), v);
+      else if (k === "class") el.className = v;
+      else if (k === "value") el.value = v;
+      else if (k === "checked" || k === "selected" || k === "disabled" || k === "multiple") el[k] = !!v;
+      else if (k === "dataset") Object.assign(el.dataset, v);
+      else if (k === "href" || k === "src") el.setAttribute(k, 安全網址(v));
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+  }
+  加入子元素(el, Array.prototype.slice.call(arguments, 2));
+  return el;
+}
+
+// 把子元素（文字、元素、陣列）依序加到父元素；文字會轉成純文字節點
+function 加入子元素(el, kids) {
+  for (const k of kids) {
+    if (k == null || k === false) continue;
+    if (Array.isArray(k)) { 加入子元素(el, k); continue; }
+    el.appendChild(typeof k === "object" && k.nodeType ? k : document.createTextNode(String(k)));
+  }
+  return el;
+}
+
+// 清空一個元素裡的所有內容
+function 清空(el) {
+  while (el.firstChild) el.removeChild(el.firstChild);
+  return el;
+}
+
+// 用安全方式把一段（已跳脫的）HTML 字串轉成元素片段：template.innerHTML → content
+function 轉片段(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html;
+  return t.content;
+}
+
+// 兩位數補零
+function 補零(n, 位數) {
+  return String(n).padStart(位數 || 2, "0");
+}
+
+// 取得今天日期（本機時間），格式 2026-10-07
+function 今天() {
+  const d = new Date();
+  return d.getFullYear() + "-" + 補零(d.getMonth() + 1) + "-" + 補零(d.getDate());
+}
+
+// 取得現在時間（ISO 格式，含時區），用來記錄修改時間
+function 現在() {
+  return new Date().toISOString();
+}
+
+// 把 2026-10-07 這種日期轉成民國 115/10/07；空值回傳空字串
+function 民國(日期) {
+  if (!日期) return "";
+  const m = String(日期).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(日期);
+  return (Number(m[1]) - 1911) + "/" + m[2] + "/" + m[3];
+}
+
+// 把 ISO 時間轉成民國年月日＋時分，例：115/10/07 14:05
+function 民國時間(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso);
+  return (d.getFullYear() - 1911) + "/" + 補零(d.getMonth() + 1) + "/" + 補零(d.getDate()) + " " + 補零(d.getHours()) + ":" + 補零(d.getMinutes());
+}
+
+// 西元年轉民國年
+function 民國年(西元年) {
+  return Number(西元年) - 1911;
+}
+
+// 把民國日期（115/1/7、115.01.07、1150107）或西元日期轉成 2026-01-07；看不懂回傳空字串
+function 解析日期(s) {
+  s = String(s == null ? "" : s).trim();
+  if (!s) return "";
+  let m = s.match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (m) return m[1] + "-" + 補零(m[2]) + "-" + 補零(m[3]);
+  m = s.match(/^(\d{2,3})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if (m) return (Number(m[1]) + 1911) + "-" + 補零(m[2]) + "-" + 補零(m[3]);
+  m = s.match(/^(\d{3})(\d{2})(\d{2})$/);
+  if (m) return (Number(m[1]) + 1911) + "-" + m[2] + "-" + m[3];
+  if (/^\d{5}(\.\d+)?$/.test(s)) {
+    // Excel 日期序號（1900 日期系統）
+    const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(s)) * 86400000);
+    return d.getUTCFullYear() + "-" + 補零(d.getUTCMonth() + 1) + "-" + 補零(d.getUTCDate());
+  }
+  return "";
+}
+
+// 金額加千分位，例：12345 → 12,345
+function 金額(n) {
+  const v = Math.round(Number(n) || 0);
+  return v.toLocaleString("en-US");
+}
+
+// 把金額轉成國字大寫（收據用），例：600 → 陸佰元整、10005 → 壹萬零伍元整
+function 國字金額(n) {
+  const 數 = ["零", "壹", "貳", "參", "肆", "伍", "陸", "柒", "捌", "玖"];
+  const 小單位 = ["", "拾", "佰", "仟"];
+  const 大單位 = ["", "萬", "億", "兆"];
+  let v = Math.round(Math.abs(Number(n) || 0));
+  if (!v) return "零元整";
+  const 各組 = [];
+  while (v > 0) { 各組.push(v % 10000); v = Math.floor(v / 10000); }
+  let 結果 = "";
+  let 前面有字 = false;
+  let 待補零 = false;
+  for (let g = 各組.length - 1; g >= 0; g--) {
+    const x = 各組[g];
+    if (x === 0) { if (前面有字) 待補零 = true; continue; }
+    if (前面有字 && x < 1000) 待補零 = true;
+    let 段 = "";
+    let 段補零 = false;
+    for (let i = 3; i >= 0; i--) {
+      const d = Math.floor(x / Math.pow(10, i)) % 10;
+      if (d === 0) { if (段) 段補零 = true; continue; }
+      if (段補零) { 段 += "零"; 段補零 = false; }
+      段 += 數[d] + 小單位[i];
+    }
+    結果 += (待補零 ? "零" : "") + 段 + 大單位[g];
+    待補零 = false;
+    前面有字 = true;
+  }
+  return 結果 + "元整";
+}
+
+// 產生一個不重複的編號（時間＋亂數）
+function 新編號() {
+  const 亂 = new Uint8Array(6);
+  crypto.getRandomValues(亂);
+  return Date.now().toString(36) + Array.from(亂, function (b) { return 補零(b.toString(16)); }).join("");
+}
+
+// 防公式注入：儲存格開頭是 = + - @ Tab 換行 時，前面加一個單引號
+function 防公式(v) {
+  const s = String(v == null ? "" : v);
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
+// 把二維陣列轉成 CSV 文字（含 BOM，Excel 開中文不亂碼；並防公式注入）
+function 轉CSV(列) {
+  const 行 = 列.map(function (r) {
+    return r.map(function (v) {
+      const s = 防公式(v);
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",");
+  });
+  return "﻿" + 行.join("\r\n") + "\r\n";
+}
+
+// 解析 CSV 文字成二維陣列（支援雙引號、欄內換行）
+function 解析CSV(text) {
+  text = String(text).replace(/^﻿/, "");
+  const 列 = [];
+  let 目前列 = [];
+  let 欄 = "";
+  let 引號中 = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (引號中) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { 欄 += '"'; i++; } else 引號中 = false;
+      } else 欄 += c;
+    } else if (c === '"') 引號中 = true;
+    else if (c === ",") { 目前列.push(欄); 欄 = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      目前列.push(欄); 欄 = "";
+      列.push(目前列); 目前列 = [];
+    } else 欄 += c;
+  }
+  if (欄 !== "" || 目前列.length) { 目前列.push(欄); 列.push(目前列); }
+  return 列.filter(function (r) { return r.some(function (v) { return String(v).trim() !== ""; }); });
+}
+
+// 下載檔案：用 Blob URL，1.5 秒後撤銷
+function 下載檔案(檔名, 內容, 類型) {
+  const blob = 內容 instanceof Blob ? 內容 : new Blob([內容], { type: 類型 || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = 檔名;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+}
+
+// 比較兩個值做排序（數字比大小、文字依中文筆畫／字典順序）
+function 比較(a, b) {
+  if (a == null || a === "") return b == null || b === "" ? 0 : 1;
+  if (b == null || b === "") return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b), "zh-Hant-TW", { numeric: true });
+}
+
+// 深拷貝一個資料物件（只含 JSON 能表示的內容）
+function 深拷貝(o) {
+  return o == null ? o : JSON.parse(JSON.stringify(o));
+}
+
+
+/* ---------- 共用/官網資料.js ---------- */
+// 檔案說明：把協會資料整理成「官網資料檔」（site-data.js）的內容；只放公開資訊，不含會員個資
+
+// 從附件路徑取出官網上的檔案位置（附件/官網下載/abc_章程.pdf → 資料/檔案/abc_章程.pdf）
+function 官網檔案位置(附件路徑) {
+  const 檔名 = String(附件路徑 || "").split("/").pop();
+  return 檔名 ? "資料/檔案/" + 檔名 : "";
+}
+
+// 依協會資料產生官網要用的資料物件（只挑「公開」的項目，依日期排序）
+function 產生官網資料(資料, 發布時間) {
+  const 設 = 資料.設定 || {};
+  const 公開 = function (清單) { return (清單 || []).filter(function (x) { return x.公開 !== false; }); };
+  const 依日期新到舊 = function (a, b) { return String(b.日期 || "").localeCompare(String(a.日期 || "")); };
+  const 報名 = 資料.報名 || [];
+
+  const 活動 = 公開(資料.活動).slice().sort(依日期新到舊).map(function (a) {
+    const 正取數 = 報名.filter(function (r) { return r.活動id === a.id && r.狀態 === "正取"; }).length;
+    const 成果公開 = a.成果公開 === true;
+    return {
+      id: a.id, 名稱: a.名稱, 類別: a.類別 || "", 日期: a.日期 || "", 開始時間: a.開始時間 || "", 結束時間: a.結束時間 || "",
+      地點: a.地點 || "", 名額: Number(a.名額) || 0, 候補名額: Number(a.候補名額) || 0, 費用: Number(a.費用) || 0,
+      截止日: a.截止日 || "", 說明: a.說明 || "", 已報名數: 正取數,
+      成果說明: 成果公開 ? (a.成果說明 || "") : "",
+      照片: 成果公開 ? (a.照片 || []).map(官網檔案位置) : []
+    };
+  });
+
+  return {
+    格式: "協會官網資料",
+    格式版本: 1,
+    發布時間: 發布時間 || "",
+    範例資料: !!設.範例資料,
+    協會: {
+      名稱: 設.協會名稱 || "", 標語: 設.標語 || "", 宗旨: 設.宗旨 || "", 沿革: 設.沿革 || "", 章程: 設.章程 || "",
+      地址: 設.地址 || "", 電話: 設.電話 || "", 傳真: 設.傳真 || "", Email: 設.Email || "", 服務時間: 設.服務時間 || "",
+      組別: 設.組別 || [], 服務機關: 設.服務機關 || [],
+      入會費: (設.會費標準 || {}).入會費 || 0, 常年會費: (設.會費標準 || {}).常年會費 || 0
+    },
+    理監事: (資料.理監事 || []).slice().sort(function (a, b) { return (Number(a.排序) || 0) - (Number(b.排序) || 0); })
+      .map(function (p) { return { 職稱: p.職稱, 姓名: p.姓名, 服務機關: p.服務機關 || "" }; }),
+    消息: 公開(資料.消息).slice().sort(function (a, b) {
+      if (!!b.置頂 !== !!a.置頂) return b.置頂 ? 1 : -1;
+      return 依日期新到舊(a, b);
+    }).map(function (n) { return { id: n.id, 標題: n.標題, 分類: n.分類 || "", 日期: n.日期 || "", 內文: n.內文 || "", 置頂: !!n.置頂 }; }),
+    活動: 活動,
+    福利: 公開(資料.福利).map(function (b) { return { 名稱: b.名稱, 對象: b.對象 || "", 內容: b.內容 || "", 申請方式: b.申請方式 || "" }; }),
+    特約商店: 公開(資料.特約商店).map(function (s) { return { 名稱: s.名稱, 類別: s.類別 || "", 優惠內容: s.優惠內容 || "", 地址: s.地址 || "", 電話: s.電話 || "" }; }),
+    權益成果: 公開(資料.權益成果).slice().sort(依日期新到舊)
+      .map(function (r) { return { 標題: r.標題, 類型: r.類型 || "", 日期: r.日期 || "", 摘要: r.摘要 || "", 結果: r.結果 || "" }; }),
+    法規連結: (設.法規連結 || []).map(function (l) { return { 名稱: l.名稱, 網址: l.網址 }; }),
+    下載: 公開(資料.下載).map(function (d) {
+      return { 名稱: d.名稱, 分類: d.分類 || "", 說明: d.說明 || "", 檔案: 官網檔案位置(d.附件), 檔名: d.檔名 || "" };
+    }),
+    常見問答: 公開(資料.常見問答).slice().sort(function (a, b) { return (Number(a.排序) || 0) - (Number(b.排序) || 0); })
+      .map(function (q) { return { 分類: q.分類 || "", 問題: q.問題, 答案: q.答案 }; })
+  };
+}
+
+// 把官網資料物件轉成 site-data.js 的文字內容（JSON 內的 < 與換行分隔字元會跳脫，避免被誤判成標籤）
+function 官網資料檔內容(官網資料) {
+  const json = JSON.stringify(官網資料, null, 1)
+    .replace(/</g, "\\u003c").replace(/>/g, "\\u003e")
+    .replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+  return "/* 官網資料檔：由會務管理系統「發布到官網」產生，請勿手動修改 */\nwindow.SITE_DATA = " + json + ";\n";
+}
+
+
+/* ---------- 會務/01_核心.js ---------- */
+// 檔案說明：核心（系統狀態、資料集合、角色權限、新增修改刪除紀錄、操作紀錄、提示、對話框、列印）
+
+// ===== 系統狀態 =====
+const 狀態 = {
+  資料: null,        // 目前編輯中的協會資料（整份）
+  基準: null,        // 上次讀入或存檔時磁碟上的內容（合併時用來判斷誰改了什麼）
+  資料夾: null,      // 使用者選的協會資料夾（資料夾模式）
+  檔案時間: 0,       // 上次讀入或存檔時，協會資料.json 的修改時間
+  模式: "",          // "資料夾" 或 "單檔"（瀏覽器不支援資料夾功能時）
+  檔名: "協會資料.json",
+  使用者: null,      // 目前登入的使用者紀錄
+  未存: false,       // 有沒有尚未存檔的變更
+  目前頁: "",
+  頁參數: null
+};
+
+// 資料檔裡的各個資料集合（每個都是陣列，每筆有 id、建立時間、修改時間、修改人）
+const 集合清單 = ["使用者", "會員", "會員異動", "會費", "催繳", "傳票", "預算", "活動", "報名",
+  "消息", "福利", "特約商店", "權益成果", "下載", "常見問答", "理監事", "操作紀錄"];
+
+// 角色（只決定介面能做什麼，不是真正的資安控管）
+const 角色清單 = ["理事長", "常務理事", "理事", "監事", "秘書長", "會計", "承辦人", "一般會員"];
+
+// 各項動作允許哪些角色
+const 權限表 = {
+  "個資.檢視": ["理事長", "常務理事", "理事", "監事", "秘書長", "會計", "承辦人"],
+  "會員.編輯": ["理事長", "秘書長", "承辦人"],
+  "會費.收繳": ["理事長", "秘書長", "會計", "承辦人"],
+  "帳務.檢視": ["理事長", "常務理事", "理事", "監事", "秘書長", "會計", "承辦人"],
+  "帳務.編輯": ["理事長", "秘書長", "會計"],
+  "活動.編輯": ["理事長", "秘書長", "承辦人"],
+  "官網.編輯": ["理事長", "秘書長", "承辦人"],
+  "設定.編輯": ["理事長", "秘書長"],
+  "紀錄.檢視": ["理事長", "常務理事", "監事", "秘書長"]
+};
+
+// 判斷目前登入的人能不能做某個動作
+function 可(權限) {
+  const 角色 = 狀態.使用者 && 狀態.使用者.角色;
+  return !!(角色 && 權限表[權限] && 權限表[權限].indexOf(角色) >= 0);
+}
+
+// ===== 資料存取 =====
+
+// 取得某個集合（陣列）；不存在就建立空陣列
+function 集合(名稱) {
+  if (!狀態.資料[名稱]) 狀態.資料[名稱] = [];
+  return 狀態.資料[名稱];
+}
+
+// 依 id 找一筆紀錄
+function 找(名稱, id) {
+  return 集合(名稱).find(function (r) { return r.id === id; }) || null;
+}
+
+// 目前操作者的名字（寫入修改人、操作紀錄）
+function 操作者() {
+  return 狀態.使用者 ? 狀態.使用者.姓名 : "系統";
+}
+
+// 新增一筆紀錄到集合，自動補上 id、建立時間、修改時間、修改人，並寫操作紀錄
+function 新增紀錄(名稱, 物件, 摘要) {
+  const 時間 = 現在();
+  const r = Object.assign({ id: 新編號() }, 物件, { 建立時間: 時間, 修改時間: 時間, 修改人: 操作者() });
+  集合(名稱).push(r);
+  if (名稱 !== "操作紀錄") 記錄操作("新增", 名稱, 摘要 || 紀錄名稱(名稱, r));
+  標記未存();
+  return r;
+}
+
+// 修改一筆紀錄的部分欄位，自動更新修改時間與修改人，並把改了哪些欄位寫進操作紀錄
+function 更新紀錄(名稱, id, 變更, 摘要) {
+  const r = 找(名稱, id);
+  if (!r) throw new Error("找不到要修改的資料");
+  const 改了 = Object.keys(變更).filter(function (k) { return JSON.stringify(r[k]) !== JSON.stringify(變更[k]); });
+  if (!改了.length) return r;
+  Object.assign(r, 變更, { 修改時間: 現在(), 修改人: 操作者() });
+  記錄操作("修改", 名稱, (摘要 || 紀錄名稱(名稱, r)) + "（" + 改了.join("、") + "）");
+  標記未存();
+  return r;
+}
+
+// 刪除一筆紀錄並寫操作紀錄
+function 刪除紀錄(名稱, id, 摘要) {
+  const 清單 = 集合(名稱);
+  const i = 清單.findIndex(function (r) { return r.id === id; });
+  if (i < 0) return;
+  const r = 清單[i];
+  清單.splice(i, 1);
+  記錄操作("刪除", 名稱, 摘要 || 紀錄名稱(名稱, r));
+  標記未存();
+}
+
+// 修改設定（設定是單一物件）
+function 更新設定(變更) {
+  Object.assign(狀態.資料.設定, 變更, { 修改時間: 現在(), 修改人: 操作者() });
+  記錄操作("修改", "設定", Object.keys(變更).join("、"));
+  標記未存();
+}
+
+// 給操作紀錄用的簡短名稱（例：會員「王小明」）
+function 紀錄名稱(名稱, r) {
+  const 名 = r.姓名 || r.名稱 || r.標題 || r.問題 || r.傳票號 || r.收據號 || "";
+  return 名 ? 名稱 + "「" + 名 + "」" : 名稱;
+}
+
+// 寫一筆操作紀錄（誰在何時做了什麼），最多保留 5000 筆
+function 記錄操作(動作, 對象, 說明) {
+  const 時間 = 現在();
+  const 清單 = 集合("操作紀錄");
+  清單.push({ id: 新編號(), 時間: 時間, 人: 操作者(), 動作: 動作, 對象: 對象, 說明: 說明 || "", 建立時間: 時間, 修改時間: 時間, 修改人: 操作者() });
+  if (清單.length > 5000) 清單.splice(0, 清單.length - 5000);
+}
+
+// 標記「有未存的變更」，並更新表頭狀態
+function 標記未存() {
+  狀態.未存 = true;
+  更新存檔狀態();
+}
+
+// 更新表頭的存檔狀態文字
+function 更新存檔狀態() {
+  const el = document.getElementById("存檔狀態");
+  if (!el) return;
+  if (!狀態.資料) { el.textContent = ""; el.className = "標記"; return; }
+  el.textContent = 狀態.未存 ? "有未存變更" : "已存檔";
+  el.className = "標記 " + (狀態.未存 ? "警" : "成");
+}
+
+// ===== 提示與對話框 =====
+
+// 在右下角顯示提示訊息，幾秒後自動消失
+function 提示(訊息, 是錯誤) {
+  const 區 = document.getElementById("提示區");
+  const el = h("div", { class: "提示" + (是錯誤 ? " 錯" : "") }, 訊息);
+  區.appendChild(el);
+  setTimeout(function () { el.remove(); }, 是錯誤 ? 7000 : 3500);
+}
+
+// 開一個對話框；內容可以是元素或元素陣列，按鈕用 [{文字, 主, 動作}]；回傳 Promise（關閉時帶回結果）
+function 對話框(標題, 內容, 按鈕, 選項) {
+  選項 = 選項 || {};
+  return new Promise(function (完成) {
+    let 結果 = null;
+    const 框 = h("dialog", { class: "對話框" + (選項.寬 ? " 寬" : ""), "aria-label": 標題 });
+    const 關閉 = function (值) { 結果 = 值; 框.close(); };
+    const 尾 = h("div", { class: "框尾" });
+    (按鈕 || [{ 文字: "關閉" }]).forEach(function (b) {
+      尾.appendChild(h("button", {
+        type: "button", class: "鈕" + (b.主 ? " 主" : "") + (b.危 ? " 危" : ""),
+        onclick: async function () {
+          if (!b.動作) return 關閉(b.值 == null ? null : b.值);
+          const v = await b.動作(關閉);
+          if (v !== false && v !== undefined) 關閉(v);
+        }
+      }, b.文字));
+    });
+    框.appendChild(h("div", { class: "框頭" }, h("h2", null, 標題),
+      h("button", { type: "button", class: "鈕 小 關", "aria-label": "關閉", onclick: function () { 關閉(null); } }, "✕")));
+    框.appendChild(h("div", { class: "框身" }, 內容));
+    框.appendChild(尾);
+    框.addEventListener("close", function () { 框.remove(); 完成(結果); });
+    document.body.appendChild(框);
+    框.showModal();
+    if (選項.開啟後) 選項.開啟後(框);
+  });
+}
+
+// 確認對話框：回傳 true（確定）或 false
+async function 確認(訊息, 確定文字) {
+  const v = await 對話框("請確認", h("p", null, 訊息), [
+    { 文字: "取消", 值: false }, { 文字: 確定文字 || "確定", 主: true, 值: true }]);
+  return v === true;
+}
+
+// 建立表單欄位元素；欄位定義 {key, 標題, 類型, 選項, 必填, 說明, 寬}
+function 表單欄位(f, 值) {
+  const id = "欄_" + 新編號();
+  let 輸入;
+  const v = 值 == null ? "" : 值;
+  switch (f.類型) {
+    case "多行":
+      輸入 = h("textarea", { id: id, rows: f.行數 || 5 });
+      輸入.value = v;
+      break;
+    case "選單":
+      輸入 = h("select", { id: id },
+        f.必填 ? null : h("option", { value: "" }, "（未選）"),
+        (typeof f.選項 === "function" ? f.選項() : f.選項 || []).map(function (o) {
+          const 值o = typeof o === "object" ? o.值 : o;
+          const 字 = typeof o === "object" ? o.字 : o;
+          return h("option", { value: 值o, selected: String(值o) === String(v) }, 字);
+        }));
+      if (v !== "" && 輸入.value !== String(v)) 輸入.appendChild(h("option", { value: v, selected: true }, v));
+      break;
+    case "多選": {
+      const 已選 = Array.isArray(v) ? v : [];
+      輸入 = h("div", { class: "標籤組", id: id, role: "group" },
+        (typeof f.選項 === "function" ? f.選項() : f.選項 || []).map(function (o) {
+          return h("label", null, h("input", { type: "checkbox", value: o, checked: 已選.indexOf(o) >= 0 }), o);
+        }));
+      break;
+    }
+    case "勾選":
+      輸入 = h("input", { id: id, type: "checkbox", checked: !!v });
+      break;
+    case "數字": case "金額":
+      輸入 = h("input", { id: id, type: "number", step: "1", min: f.最小 == null ? null : f.最小, value: v });
+      break;
+    case "日期":
+      輸入 = h("input", { id: id, type: "date", value: v });
+      break;
+    case "時間":
+      輸入 = h("input", { id: id, type: "time", value: v });
+      break;
+    case "密碼":
+      輸入 = h("input", { id: id, type: "password", autocomplete: "new-password", value: v });
+      break;
+    case "Email":
+      輸入 = h("input", { id: id, type: "email", value: v });
+      break;
+    case "檔案":
+      輸入 = h("input", { id: id, type: "file", accept: f.接受 || null });
+      break;
+    default:
+      輸入 = h("input", { id: id, type: "text", value: v });
+  }
+  輸入.dataset.key = f.key;
+  if (f.唯讀) 輸入.disabled = true;
+  const 寬 = f.寬 || f.類型 === "多行" || f.類型 === "多選";
+  return h("div", { class: "欄" + (寬 ? " 寬" : "") },
+    h("span", { class: f.必填 ? "必填" : "" }, h("label", { for: id }, f.標題)),
+    f.類型 === "勾選" ? h("label", null, 輸入, " " + (f.勾選文字 || "是")) : 輸入,
+    f.說明 ? h("small", null, f.說明) : null);
+}
+
+// 讀出表單裡各欄位的值（依欄位類型轉成文字、數字、陣列或布林）
+function 讀表單(表單, 欄位們) {
+  const 值 = {};
+  欄位們.forEach(function (f) {
+    const el = 表單.querySelector('[data-key="' + f.key + '"]');
+    if (!el) return;
+    if (f.類型 === "多選") 值[f.key] = Array.from(el.querySelectorAll("input:checked")).map(function (c) { return c.value; });
+    else if (f.類型 === "勾選") 值[f.key] = el.checked;
+    else if (f.類型 === "檔案") 值[f.key] = el.files && el.files[0] ? el.files[0] : null;
+    else if (f.類型 === "數字" || f.類型 === "金額") 值[f.key] = el.value === "" ? "" : Number(el.value);
+    else 值[f.key] = el.value.trim();
+  });
+  return 值;
+}
+
+// 表單對話框：顯示欄位讓人填寫，按儲存時驗證必填並呼叫 儲存(值)；儲存回傳文字表示錯誤訊息
+function 表單對話框(標題, 欄位們, 初值, 儲存, 選項) {
+  初值 = 初值 || {};
+  const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } },
+    欄位們.map(function (f) { return 表單欄位(f, 初值[f.key] == null ? f.預設 : 初值[f.key]); }));
+  const 錯誤區 = h("p", { class: "錯誤", role: "alert" });
+  return 對話框(標題, [表單, 錯誤區], ((選項 && 選項.額外按鈕) || []).concat([
+    { 文字: "取消", 值: null },
+    {
+      文字: (選項 && 選項.儲存文字) || "儲存", 主: true, 動作: async function () {
+        const 值 = 讀表單(表單, 欄位們);
+        const 缺 = 欄位們.filter(function (f) {
+          return f.必填 && (值[f.key] === "" || 值[f.key] == null || (Array.isArray(值[f.key]) && !值[f.key].length));
+        });
+        if (缺.length) { 錯誤區.textContent = "請填寫：" + 缺.map(function (f) { return f.標題; }).join("、"); return false; }
+        const 結果 = await 儲存(值);
+        if (typeof 結果 === "string") { 錯誤區.textContent = 結果; return false; }
+        return 值;
+      }
+    }
+  ]), 選項);
+}
+
+// ===== 選檔 =====
+
+// 跳出選檔視窗，回傳使用者選的檔案陣列；暫時把選檔元素放進頁面，選完就移除（使用者按取消時不會回傳）
+function 選擇檔案(接受, 多選) {
+  // 清掉上次按取消而留下的選檔元素
+  document.querySelectorAll("input.暫用選檔").forEach(function (el) { el.remove(); });
+  return new Promise(function (完成) {
+    const 選 = h("input", { type: "file", accept: 接受 || null, multiple: !!多選, class: "隱藏 暫用選檔" });
+    選.addEventListener("change", function () {
+      const 檔們 = Array.from(選.files || []);
+      選.remove();
+      if (檔們.length) 完成(檔們);
+    });
+    document.body.appendChild(選);
+    選.click();
+  });
+}
+
+// ===== 列印 =====
+
+// 把內容放到列印區後呼叫瀏覽器列印（A4 直式；可選標楷體）
+function 列印(內容, 標楷) {
+  const 區 = document.getElementById("列印區");
+  清空(區);
+  區.className = "列印區" + (標楷 ? " 標楷" : "");
+  加入子元素(區, [內容]);
+  if (測試模式) { 狀態.最後列印 = 區.textContent; return; }
+  setTimeout(function () { window.print(); }, 50);
+}
+
+// 列印前詢問是否使用標楷體，然後列印
+async function 列印詢問(內容) {
+  const v = await 對話框("列印", h("p", null, "要用哪一種字型列印？（A4 直式）"), [
+    { 文字: "取消", 值: null }, { 文字: "一般字型", 值: "一般" }, { 文字: "標楷體", 主: true, 值: "標楷" }]);
+  if (v) 列印(內容, v === "標楷");
+}
+
+// ===== 頁面註冊與頁籤 =====
+const 頁面表 = {};
+const 頁面順序 = [];
+
+// 註冊一個功能頁：{標題, 圖示, 可見(), 繪製(容器, 參數), 說明}
+function 註冊頁面(名稱, 定義) {
+  頁面表[名稱] = 定義;
+  頁面順序.push(名稱);
+}
+
+// 建立頁首（標題＋右側工具按鈕）
+function 頁首(標題, 工具們) {
+  return h("div", { class: "頁首" }, h("h1", null, 標題), h("div", { class: "工具" }, 工具們 || []));
+}
+
+// 建立頁籤列；切換時呼叫 繪製(名稱, 容器)；回傳 {元素, 切換(名稱)}
+function 建立頁籤(名稱們, 預設, 繪製) {
+  const 列 = h("div", { class: "頁籤", role: "tablist" });
+  const 區 = h("div", { role: "tabpanel" });
+  const 切換 = function (名) {
+    Array.from(列.children).forEach(function (b) { b.setAttribute("aria-selected", b.dataset.name === 名 ? "true" : "false"); });
+    清空(區);
+    繪製(名, 區);
+  };
+  名稱們.forEach(function (名) {
+    列.appendChild(h("button", { type: "button", role: "tab", dataset: { name: 名 }, onclick: function () { 切換(名); } }, 名));
+  });
+  切換(預設 || 名稱們[0]);
+  return { 元素: h("div", null, 列, 區), 切換: 切換 };
+}
+
+// 本年度（西元）
+function 本年() {
+  return new Date().getFullYear();
+}
+
+
+/* ---------- 會務/02_試算表.js ---------- */
+// 檔案說明：讀寫試算表（自己解 zip：用瀏覽器內建 DecompressionStream；讀 xlsx／ods／csv，寫 xlsx）
+
+// 用瀏覽器內建的解壓縮功能，把 deflate-raw 壓縮的資料解開
+async function 解壓縮(位元組) {
+  const 串流 = new Blob([位元組]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(串流).arrayBuffer());
+}
+
+// 讀 zip 檔的目錄，回傳 {檔名: 取出函式}；取出函式回傳該檔的位元組
+function 讀zip目錄(buf) {
+  const 資料 = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  // 從檔尾往前找「中央目錄結尾」標記 0x06054b50
+  let 結尾 = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
+    if (資料.getUint32(i, true) === 0x06054b50) { 結尾 = i; break; }
+  }
+  if (結尾 < 0) throw new Error("不是有效的 zip 檔（xlsx／ods 都是 zip 格式）");
+  const 筆數 = 資料.getUint16(結尾 + 10, true);
+  let 位置 = 資料.getUint32(結尾 + 16, true);
+  const 目錄 = {};
+  const 解碼 = new TextDecoder("utf-8");
+  for (let n = 0; n < 筆數; n++) {
+    if (資料.getUint32(位置, true) !== 0x02014b50) throw new Error("zip 目錄格式錯誤");
+    const 方法 = 資料.getUint16(位置 + 10, true);
+    const 壓縮大小 = 資料.getUint32(位置 + 20, true);
+    const 名長 = 資料.getUint16(位置 + 28, true);
+    const 額外長 = 資料.getUint16(位置 + 30, true);
+    const 註解長 = 資料.getUint16(位置 + 32, true);
+    const 本地位置 = 資料.getUint32(位置 + 42, true);
+    const 名 = 解碼.decode(buf.subarray(位置 + 46, 位置 + 46 + 名長));
+    目錄[名] = async function () {
+      const 本地名長 = 資料.getUint16(本地位置 + 26, true);
+      const 本地額外長 = 資料.getUint16(本地位置 + 28, true);
+      const 起 = 本地位置 + 30 + 本地名長 + 本地額外長;
+      const 內容 = buf.subarray(起, 起 + 壓縮大小);
+      if (方法 === 0) return 內容;
+      if (方法 === 8) return 解壓縮(內容);
+      throw new Error("不支援的壓縮方式：" + 方法);
+    };
+    位置 += 46 + 名長 + 額外長 + 註解長;
+  }
+  return 目錄;
+}
+
+// 從 zip 目錄取出一個檔案並轉成文字
+async function zip取文字(目錄, 名) {
+  if (!目錄[名]) return null;
+  return new TextDecoder("utf-8").decode(await 目錄[名]());
+}
+
+// 把 XML 文字解析成文件物件
+function 解析XML(文字) {
+  return new DOMParser().parseFromString(文字, "application/xml");
+}
+
+// 取得 XML 元素裡指定「本地名稱」的子孫元素（不管命名空間前綴）
+function 找元素(節點, 本地名) {
+  return Array.from(節點.getElementsByTagNameNS("*", 本地名));
+}
+
+// 把 Excel 欄位代號（A、B…AA）轉成從 0 起算的欄號
+function 欄號(代號) {
+  let n = 0;
+  for (const c of 代號) n = n * 26 + (c.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+// 讀 xlsx 的第一個工作表，回傳二維陣列（文字）
+async function 讀xlsx(buf) {
+  const 目錄 = 讀zip目錄(buf);
+  const 共用字串 = [];
+  const ss = await zip取文字(目錄, "xl/sharedStrings.xml");
+  if (ss) {
+    找元素(解析XML(ss), "si").forEach(function (si) {
+      共用字串.push(找元素(si, "t").map(function (t) { return t.textContent; }).join(""));
+    });
+  }
+  // 找第一個工作表的檔名（依 workbook.xml 與關聯檔）
+  let 工作表檔 = "xl/worksheets/sheet1.xml";
+  const wb = await zip取文字(目錄, "xl/workbook.xml");
+  const rels = await zip取文字(目錄, "xl/_rels/workbook.xml.rels");
+  if (wb && rels) {
+    const 第一 = 找元素(解析XML(wb), "sheet")[0];
+    const rid = 第一 && (第一.getAttribute("r:id") || 第一.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id"));
+    const 關聯 = 找元素(解析XML(rels), "Relationship").find(function (r) { return r.getAttribute("Id") === rid; });
+    if (關聯) {
+      const t = 關聯.getAttribute("Target").replace(/^\//, "");
+      工作表檔 = t.indexOf("xl/") === 0 ? t : "xl/" + t;
+    }
+  }
+  const 表 = await zip取文字(目錄, 工作表檔);
+  if (!表) throw new Error("xlsx 裡找不到工作表");
+  const 結果 = [];
+  找元素(解析XML(表), "row").forEach(function (列) {
+    const r = [];
+    找元素(列, "c").forEach(function (格) {
+      const 參照 = (格.getAttribute("r") || "").replace(/\d+/g, "");
+      const 位 = 參照 ? 欄號(參照) : r.length;
+      const 型 = 格.getAttribute("t");
+      let 值 = "";
+      if (型 === "s") 值 = 共用字串[Number((找元素(格, "v")[0] || {}).textContent)] || "";
+      else if (型 === "inlineStr") 值 = 找元素(格, "t").map(function (t) { return t.textContent; }).join("");
+      else { const v = 找元素(格, "v")[0]; 值 = v ? v.textContent : ""; }
+      while (r.length < 位) r.push("");
+      r[位] = 值;
+    });
+    結果.push(r);
+  });
+  return 結果.filter(function (r) { return r.some(function (v) { return String(v).trim() !== ""; }); });
+}
+
+// 讀 ods（OpenDocument 試算表）的第一個工作表，回傳二維陣列
+async function 讀ods(buf) {
+  const 目錄 = 讀zip目錄(buf);
+  const 內容 = await zip取文字(目錄, "content.xml");
+  if (!內容) throw new Error("ods 裡找不到 content.xml");
+  const 表 = 找元素(解析XML(內容), "table")[0];
+  if (!表) return [];
+  const 結果 = [];
+  const TABLE = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+  找元素(表, "table-row").forEach(function (列) {
+    const 列重複 = Math.min(Number(列.getAttributeNS(TABLE, "number-rows-repeated")) || 1, 1000);
+    const r = [];
+    Array.from(列.children).forEach(function (格) {
+      if (格.localName !== "table-cell" && 格.localName !== "covered-table-cell") return;
+      const 重複 = Math.min(Number(格.getAttributeNS(TABLE, "number-columns-repeated")) || 1, 200);
+      const 值 = 找元素(格, "p").map(function (p) { return p.textContent; }).join("\n");
+      for (let i = 0; i < 重複; i++) r.push(值);
+    });
+    while (r.length && r[r.length - 1] === "") r.pop();
+    if (r.length) for (let i = 0; i < 列重複; i++) 結果.push(r.slice());
+  });
+  return 結果;
+}
+
+// 依副檔名讀取試算表檔（xlsx、ods、csv），回傳二維陣列
+async function 讀試算表(檔案) {
+  const 名 = 檔案.name.toLowerCase();
+  const buf = new Uint8Array(await 檔案.arrayBuffer());
+  if (名.endsWith(".xlsx")) return 讀xlsx(buf);
+  if (名.endsWith(".ods")) return 讀ods(buf);
+  if (名.endsWith(".csv") || 名.endsWith(".txt")) {
+    // 先試 UTF-8，有亂碼就改用 Big5（舊版 Excel 存的 CSV）
+    let 文字 = new TextDecoder("utf-8").decode(buf);
+    if (文字.indexOf("�") >= 0) 文字 = new TextDecoder("big5").decode(buf);
+    return 解析CSV(文字);
+  }
+  if (名.endsWith(".xls")) throw new Error("舊版 .xls 格式不支援，請在 Excel 另存成 .xlsx 或 .csv");
+  throw new Error("只支援 .xlsx、.ods、.csv 檔");
+}
+
+// ===== 寫 xlsx =====
+
+// 計算 CRC32 檢查碼（zip 格式需要）
+const CRC表 = (function () {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+// 計算一段位元組的 CRC32
+function crc32(位元組) {
+  let c = 0xffffffff;
+  for (let i = 0; i < 位元組.length; i++) c = CRC表[(c ^ 位元組[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// 把多個檔案包成 zip（不壓縮，格式最單純），回傳 Uint8Array
+function 打包zip(檔案們) {
+  const 編碼 = new TextEncoder();
+  const 本地段 = [];
+  const 目錄段 = [];
+  let 位移 = 0;
+  檔案們.forEach(function (f) {
+    const 名 = 編碼.encode(f.名);
+    const 內容 = typeof f.內容 === "string" ? 編碼.encode(f.內容) : f.內容;
+    const crc = crc32(內容);
+    const 頭 = new DataView(new ArrayBuffer(30));
+    頭.setUint32(0, 0x04034b50, true); 頭.setUint16(4, 20, true); 頭.setUint16(6, 0x0800, true);
+    頭.setUint16(8, 0, true); 頭.setUint32(14, crc, true);
+    頭.setUint32(18, 內容.length, true); 頭.setUint32(22, 內容.length, true); 頭.setUint16(26, 名.length, true);
+    本地段.push(new Uint8Array(頭.buffer), 名, 內容);
+    const 目 = new DataView(new ArrayBuffer(46));
+    目.setUint32(0, 0x02014b50, true); 目.setUint16(4, 20, true); 目.setUint16(6, 20, true); 目.setUint16(8, 0x0800, true);
+    目.setUint32(16, crc, true); 目.setUint32(20, 內容.length, true); 目.setUint32(24, 內容.length, true);
+    目.setUint16(28, 名.length, true); 目.setUint32(42, 位移, true);
+    目錄段.push(new Uint8Array(目.buffer), 名);
+    位移 += 30 + 名.length + 內容.length;
+  });
+  const 目錄大小 = 目錄段.reduce(function (s, b) { return s + b.length; }, 0);
+  const 尾 = new DataView(new ArrayBuffer(22));
+  尾.setUint32(0, 0x06054b50, true); 尾.setUint16(8, 檔案們.length, true); 尾.setUint16(10, 檔案們.length, true);
+  尾.setUint32(12, 目錄大小, true); 尾.setUint32(16, 位移, true);
+  const 全部 = 本地段.concat(目錄段, [new Uint8Array(尾.buffer)]);
+  const 結果 = new Uint8Array(全部.reduce(function (s, b) { return s + b.length; }, 0));
+  let p = 0;
+  全部.forEach(function (b) { 結果.set(b, p); p += b.length; });
+  return 結果;
+}
+
+// XML 文字跳脫（並移除 XML 不允許的控制字元）
+function xml跳脫(s) {
+  return esc(String(s == null ? "" : s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ""));
+}
+
+// 把二維陣列做成 xlsx 檔（第一列粗體當標題；數字存成數字，文字存成文字並防公式注入）
+function 產生xlsx(列, 工作表名) {
+  const 欄字 = function (i) { let s = ""; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const 列XML = 列.map(function (r, ri) {
+    return '<row r="' + (ri + 1) + '">' + r.map(function (v, ci) {
+      const 參照 = 欄字(ci) + (ri + 1);
+      const 樣式 = ri === 0 ? ' s="1"' : "";
+      if (typeof v === "number" && isFinite(v)) return '<c r="' + 參照 + '"' + 樣式 + "><v>" + v + "</v></c>";
+      return '<c r="' + 參照 + '" t="inlineStr"' + 樣式 + "><is><t xml:space=\"preserve\">" + xml跳脫(防公式(v)) + "</t></is></c>";
+    }).join("") + "</row>";
+  }).join("");
+  const 名 = xml跳脫(String(工作表名 || "工作表1").replace(/[\\/?*[\]:]/g, "").slice(0, 31) || "工作表1");
+  const 檔案們 = [
+    { 名: "[Content_Types].xml", 內容: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+    { 名: "_rels/.rels", 內容: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+    { 名: "xl/workbook.xml", 內容: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + 名 + '" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+    { 名: "xl/_rels/workbook.xml.rels", 內容: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+    { 名: "xl/styles.xml", 內容: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="11"/><name val="Microsoft JhengHei"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf fontId="0"/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>' },
+    { 名: "xl/worksheets/sheet1.xml", 內容: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + 列XML + "</sheetData></worksheet>" }
+  ];
+  return 打包zip(檔案們);
+}
+
+// 匯出二維陣列：格式 "csv" 或 "xlsx"
+function 匯出表格(檔名, 列, 格式) {
+  if (格式 === "xlsx") {
+    下載檔案(檔名 + ".xlsx", new Blob([產生xlsx(列, 檔名)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  } else {
+    下載檔案(檔名 + ".csv", 轉CSV(列), "text/csv;charset=utf-8");
+  }
+}
+
+
+/* ---------- 會務/03_儲存.js ---------- */
+// 檔案說明：資料儲存（選協會資料夾、讀寫協會資料.json、自動備份、多人同時存檔的合併與衝突處理、附件、單檔模式）
+
+const 資料檔名 = "協會資料.json";
+
+// 瀏覽器支不支援「選資料夾」功能（Edge／Chrome 支援）
+function 支援資料夾() {
+  return typeof window.showDirectoryPicker === "function";
+}
+
+// 建立一份新的空白協會資料（第一次使用時）
+function 空白資料(協會名稱) {
+  const 時間 = 現在();
+  const 資料 = {
+    格式: "協會資料",
+    格式版本: 1,
+    設定: 預設設定(協會名稱, 時間)
+  };
+  集合清單.forEach(function (名) { 資料[名] = []; });
+  return 資料;
+}
+
+// 預設設定：協會基本資料、服務機關、會員類別、會費標準、會計科目等
+function 預設設定(協會名稱, 時間) {
+  return {
+    id: "設定",
+    協會名稱: 協會名稱 || "財政部公務人員協會",
+    標語: "凝聚同仁力量，促進權益與福利",
+    宗旨: "", 沿革: "", 章程: "",
+    地址: "", 電話: "", 傳真: "", Email: "", 服務時間: "週一至週五 09:00–17:00",
+    組別: ["總務組", "財務組", "活動組", "福利組", "權益組"],
+    // 依《財政部組織法》第 5 條所列次級機關整理；組織如有調整，請在「設定」增刪
+    服務機關: ["財政部（部本部）", "財政部國庫署", "財政部賦稅署", "財政部關務署", "財政部國有財產署", "財政部財政資訊中心",
+      "財政部臺北國稅局", "財政部高雄國稅局", "財政部北區國稅局", "財政部中區國稅局", "財政部南區國稅局", "財政部財政人員訓練所"],
+    會員類別: ["一般會員", "榮譽會員"],
+    會員標籤: ["新進", "理監事", "志工", "幹部"],
+    活動類別: ["研習講座", "聯誼活動", "親子活動", "健康促進", "志工服務", "其他"],
+    消息分類: ["協會公告", "活動訊息", "福利訊息", "權益訊息"],
+    會費標準: { 入會費: 0, 常年會費: 0 },
+    // 預設科目依《公務人員協會法》第 27 條經費來源整理，可自訂；正式報表請對照主管機關規定之科目
+    會計科目: [
+      { 代碼: "4101", 名稱: "入會費收入", 類別: "收入" },
+      { 代碼: "4102", 名稱: "常年會費收入", 類別: "收入" },
+      { 代碼: "4103", 名稱: "捐款收入", 類別: "收入" },
+      { 代碼: "4104", 名稱: "委託收益", 類別: "收入" },
+      { 代碼: "4105", 名稱: "基金及孳息收入", 類別: "收入" },
+      { 代碼: "4106", 名稱: "政府補助收入", 類別: "收入" },
+      { 代碼: "4107", 名稱: "活動收入", 類別: "收入" },
+      { 代碼: "4199", 名稱: "其他收入", 類別: "收入" },
+      { 代碼: "5101", 名稱: "會議費", 類別: "支出" },
+      { 代碼: "5102", 名稱: "活動費", 類別: "支出" },
+      { 代碼: "5103", 名稱: "會員福利及慰問費", 類別: "支出" },
+      { 代碼: "5104", 名稱: "文具印刷費", 類別: "支出" },
+      { 代碼: "5105", 名稱: "郵電費", 類別: "支出" },
+      { 代碼: "5106", 名稱: "交通費", 類別: "支出" },
+      { 代碼: "5107", 名稱: "業務推展費", 類別: "支出" },
+      { 代碼: "5108", 名稱: "雜支", 類別: "支出" },
+      { 代碼: "5109", 名稱: "提撥基金", 類別: "支出" }
+    ],
+    // 官網「權益專區」的相關法規連結（在「官網發布 → 協會簡介」填寫；本系統本身不連任何網址）
+    法規連結: [],
+    備份份數: 30,
+    範例資料: false,
+    建立時間: 時間, 修改時間: 時間, 修改人: "系統"
+  };
+}
+
+// 補齊舊資料檔缺少的集合與設定欄位（升級相容）
+function 補齊資料(資料) {
+  if (!資料 || 資料.格式 !== "協會資料") throw new Error("這不是協會資料檔");
+  集合清單.forEach(function (名) { if (!Array.isArray(資料[名])) 資料[名] = []; });
+  const 預設 = 預設設定("", 現在());
+  資料.設定 = Object.assign({}, 預設, 資料.設定 || {});
+  return 資料;
+}
+
+// ===== 資料夾模式 =====
+
+// 讓使用者選協會資料夾，讀入協會資料.json（沒有就回傳 null，表示要建立新的）
+async function 選擇資料夾() {
+  const 夾 = await window.showDirectoryPicker({ id: "協會資料夾", mode: "readwrite" });
+  if (夾.requestPermission) {
+    const 權 = await 夾.requestPermission({ mode: "readwrite" });
+    if (權 !== "granted") throw new Error("沒有取得資料夾的讀寫權限");
+  }
+  狀態.資料夾 = 夾;
+  狀態.模式 = "資料夾";
+  return 讀資料夾內資料();
+}
+
+// 讀資料夾裡的協會資料.json；檔案不存在回傳 null
+async function 讀資料夾內資料() {
+  let 檔;
+  try {
+    檔 = await 狀態.資料夾.getFileHandle(資料檔名);
+  } catch (e) {
+    return null;
+  }
+  const f = await 檔.getFile();
+  if (!f.size) return null;
+  const 資料 = 補齊資料(JSON.parse(await f.text()));
+  狀態.檔案時間 = f.lastModified;
+  return 資料;
+}
+
+// 取得（必要時建立）子資料夾，例如 取子資料夾(["附件","活動"])
+async function 取子資料夾(路徑們, 建立) {
+  let 夾 = 狀態.資料夾;
+  for (const 名 of 路徑們) 夾 = await 夾.getDirectoryHandle(名, { create: 建立 !== false });
+  return 夾;
+}
+
+// 寫一個檔案到指定資料夾
+async function 寫檔(夾, 檔名, 內容) {
+  const 檔 = await 夾.getFileHandle(檔名, { create: true });
+  const 寫 = await 檔.createWritable();
+  await 寫.write(內容);
+  await 寫.close();
+  return 檔;
+}
+
+// 存檔前備份：把磁碟上目前的協會資料.json 複製到 備份/，只保留最近 N 份
+async function 備份(目前文字) {
+  const 夾 = await 取子資料夾(["備份"]);
+  const d = new Date();
+  const 時戳 = d.getFullYear() + 補零(d.getMonth() + 1) + 補零(d.getDate()) + "-" + 補零(d.getHours()) + 補零(d.getMinutes()) + 補零(d.getSeconds()) + "-" + 補零(d.getMilliseconds(), 3);
+  await 寫檔(夾, "協會資料_" + 時戳 + ".json", 目前文字);
+  const 名單 = [];
+  for await (const [名, 項] of 夾.entries()) {
+    if (項.kind === "file" && /^協會資料_\d{8}-\d{6}(-\d{3})?\.json$/.test(名)) 名單.push(名);
+  }
+  名單.sort().reverse();
+  const 保留 = Math.max(1, Number(狀態.資料.設定.備份份數) || 30);
+  for (const 名 of 名單.slice(保留)) await 夾.removeEntry(名);
+}
+
+// 存檔：若別人在這段期間存過，先讀入並合併；備份後寫入
+async function 存檔() {
+  if (!狀態.資料) return false;
+  if (狀態.模式 === "單檔") return 下載資料檔();
+  const 檔 = await 狀態.資料夾.getFileHandle(資料檔名, { create: true });
+  const 磁碟檔 = await 檔.getFile();
+  let 磁碟文字 = 磁碟檔.size ? await 磁碟檔.text() : "";
+  if (磁碟檔.size && 磁碟檔.lastModified !== 狀態.檔案時間) {
+    // 別人存過：以每筆紀錄的修改時間合併
+    const 對方 = 補齊資料(JSON.parse(磁碟文字));
+    const 結果 = 合併資料(狀態.基準, 狀態.資料, 對方);
+    if (結果.衝突.length) {
+      const 選擇 = await 衝突對話框(結果.衝突);
+      if (!選擇) { 提示("已取消存檔，資料尚未寫入", true); return false; }
+      套用衝突選擇(結果.資料, 結果.衝突, 選擇);
+    }
+    狀態.資料 = 結果.資料;
+    if (狀態.使用者) 狀態.使用者 = 找("使用者", 狀態.使用者.id) || 狀態.使用者;
+    提示("有其他人剛存過檔，已自動合併" + (結果.衝突.length ? "（含 " + 結果.衝突.length + " 筆衝突處理）" : ""));
+  }
+  if (磁碟文字) await 備份(磁碟文字);
+  const 文字 = JSON.stringify(狀態.資料, null, 1);
+  await 寫檔(狀態.資料夾, 資料檔名, 文字);
+  const 新檔 = await (await 狀態.資料夾.getFileHandle(資料檔名)).getFile();
+  狀態.檔案時間 = 新檔.lastModified;
+  狀態.基準 = JSON.parse(文字);
+  狀態.未存 = false;
+  更新存檔狀態();
+  if (typeof 重新繪製 === "function") 重新繪製();
+  提示(磁碟文字 ? "已存檔（舊檔已自動備份）" : "已存檔");
+  return true;
+}
+
+// ===== 合併 =====
+
+// 三方合併：基準（上次讀入）、我的（目前編輯）、對方（磁碟上別人存的），以每筆紀錄的修改時間判斷
+function 合併資料(基準, 我的, 對方) {
+  基準 = 基準 || { 設定: {} };
+  const 結果 = 深拷貝(對方);
+  const 衝突 = [];
+  // 判斷一筆紀錄跟基準比有沒有變（新增、刪除或修改時間不同）
+  const 變了 = function (b, x) {
+    if (!b && !x) return false;
+    if (!b || !x) return true;
+    return b.修改時間 !== x.修改時間;
+  };
+  集合清單.forEach(function (名) {
+    const B = 依編號(基準[名]), M = 依編號(我的[名]), T = 依編號(對方[名]);
+    const 全部 = new Set(Object.keys(B).concat(Object.keys(M), Object.keys(T)));
+    const 輸出 = [];
+    // 保持對方的順序，再接上我新增的
+    const 順序 = (對方[名] || []).map(function (r) { return r.id; });
+    (我的[名] || []).forEach(function (r) { if (順序.indexOf(r.id) < 0) 順序.push(r.id); });
+    全部.forEach(function (id) { if (順序.indexOf(id) < 0) 順序.push(id); });
+    順序.forEach(function (id) {
+      const b = B[id], m = M[id], t = T[id];
+      const 我改 = 變了(b, m), 他改 = 變了(b, t);
+      let 採用;
+      if (!我改) 採用 = t;
+      else if (!他改) 採用 = m;
+      else if (m && t && JSON.stringify(m) === JSON.stringify(t)) 採用 = t;
+      else if (名 === "操作紀錄") 採用 = m || t;
+      else {
+        衝突.push({ 集合: 名, id: id, 我的: m || null, 對方: t || null });
+        採用 = 較新(m, t);
+      }
+      if (採用) 輸出.push(深拷貝(採用));
+    });
+    if (名 === "操作紀錄") 輸出.sort(function (a, b) { return String(a.時間).localeCompare(String(b.時間)); });
+    結果[名] = 輸出;
+  });
+  // 設定是單一物件，用同樣規則
+  const b = 基準.設定, m = 我的.設定, t = 對方.設定;
+  const 我改 = 變了(b, m), 他改 = 變了(b, t);
+  if (我改 && !他改) 結果.設定 = 深拷貝(m);
+  else if (我改 && 他改 && JSON.stringify(m) !== JSON.stringify(t)) {
+    衝突.push({ 集合: "設定", id: "設定", 我的: m, 對方: t });
+    結果.設定 = 深拷貝(較新(m, t));
+  }
+  return { 資料: 結果, 衝突: 衝突 };
+}
+
+// 把陣列轉成 {id: 紀錄}
+function 依編號(清單) {
+  const o = {};
+  (清單 || []).forEach(function (r) { if (r && r.id) o[r.id] = r; });
+  return o;
+}
+
+// 兩筆紀錄取修改時間較新的（被刪除的算最舊）
+function 較新(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return String(a.修改時間) >= String(b.修改時間) ? a : b;
+}
+
+// 衝突對照對話框：每筆衝突列出兩邊不同的欄位，讓使用者選保留哪一邊；回傳 {索引: "我的"|"對方"} 或 null
+async function 衝突對話框(衝突們) {
+  const 區 = h("div", null,
+    h("p", null, "您和其他人同時修改了下列資料（只列出兩邊不同的欄位）。請逐筆選擇要保留哪一個版本（預設已選修改時間較新的）。"));
+  衝突們.forEach(function (c, i) {
+    const 欄位 = new Set(Object.keys(c.我的 || {}).concat(Object.keys(c.對方 || {})));
+    const 列 = [];
+    // 只列出兩邊不同的欄位（修改時間以民國年顯示）
+    欄位.forEach(function (k) {
+      if (k === "id" || k === "建立時間" || k === "鹽" || k === "雜湊") return;
+      const 轉 = function (r) { return r ? (k === "修改時間" ? 民國時間(r[k]) : 顯示值(r[k])) : "（已刪除）"; };
+      const a = 轉(c.我的), b = 轉(c.對方);
+      if (a !== b) 列.push(h("tr", { class: "不同" }, h("th", null, k), h("td", null, a), h("td", null, b)));
+    });
+    const 預設對方 = 較新(c.我的, c.對方) === c.對方;
+    區.appendChild(h("div", { class: "衝突", dataset: { index: i } },
+      h("h3", null, 紀錄名稱(c.集合, c.我的 || c.對方 || {})),
+      h("div", { class: "表捲" }, h("table", { class: "表" },
+        h("thead", null, h("tr", null, h("th", null, "欄位"), h("th", null, "我的版本"), h("th", null, "其他人的版本"))),
+        h("tbody", null, 列))),
+      h("div", { class: "標籤組" },
+        h("label", null, h("input", { type: "radio", name: "衝突" + i, value: "我的", checked: !預設對方 }), "保留我的版本"),
+        h("label", null, h("input", { type: "radio", name: "衝突" + i, value: "對方", checked: 預設對方 }), "採用其他人的版本"))));
+  });
+  return 對話框("資料衝突", 區, [
+    { 文字: "取消存檔", 值: null },
+    {
+      文字: "依選擇合併並存檔", 主: true, 動作: function () {
+        const 選 = {};
+        衝突們.forEach(function (c, i) { 選[i] = 區.querySelector('input[name="衝突' + i + '"]:checked').value; });
+        return 選;
+      }
+    }
+  ], { 寬: true });
+}
+
+// 把欄位值轉成好讀的文字（陣列用頓號連接）
+function 顯示值(v) {
+  if (v == null) return "";
+  if (Array.isArray(v)) return v.map(function (x) { return typeof x === "object" ? JSON.stringify(x) : x; }).join("、");
+  if (typeof v === "object") return JSON.stringify(v);
+  if (typeof v === "boolean") return v ? "是" : "否";
+  return String(v);
+}
+
+// 依使用者的選擇修正合併結果
+function 套用衝突選擇(資料, 衝突們, 選擇) {
+  衝突們.forEach(function (c, i) {
+    const 要的 = 選擇[i] === "我的" ? c.我的 : c.對方;
+    if (c.集合 === "設定") { if (要的) 資料.設定 = 深拷貝(要的); return; }
+    const 清單 = 資料[c.集合];
+    const 位 = 清單.findIndex(function (r) { return r.id === c.id; });
+    if (要的) { if (位 >= 0) 清單[位] = 深拷貝(要的); else 清單.push(深拷貝(要的)); }
+    else if (位 >= 0) 清單.splice(位, 1);
+  });
+}
+
+// ===== 附件 =====
+
+// 把檔案存到 附件/子路徑/，檔名前加短編號避免重複；回傳相對路徑（附件/…/檔名）
+async function 存附件(子路徑們, 檔案) {
+  if (狀態.模式 !== "資料夾") throw new Error("單檔模式無法存附件，請改用支援資料夾功能的 Edge 瀏覽器");
+  const 夾 = await 取子資料夾(["附件"].concat(子路徑們));
+  const 安全名 = 檔案.name.replace(/[\\/:*?"<>|]/g, "_");
+  const 名 = 新編號().slice(-6) + "_" + 安全名;
+  await 寫檔(夾, 名, 檔案);
+  return ["附件"].concat(子路徑們, [名]).join("/");
+}
+
+// 依相對路徑讀附件，回傳 File；找不到回傳 null
+async function 讀附件(路徑) {
+  if (狀態.模式 !== "資料夾" || !路徑) return null;
+  try {
+    const 段 = 路徑.split("/");
+    const 夾 = await 取子資料夾(段.slice(0, -1), false);
+    const f = await (await 夾.getFileHandle(段[段.length - 1])).getFile();
+    // 有些環境讀出的檔案沒有類型，依副檔名補上（圖片才顯示得出來）
+    return f.type ? f : new File([f], f.name, { type: 副檔名類型(f.name), lastModified: f.lastModified });
+  } catch (e) {
+    return null;
+  }
+}
+
+// 依副檔名猜檔案類型
+function 副檔名類型(檔名) {
+  const 副 = String(檔名).split(".").pop().toLowerCase();
+  return { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+    pdf: "application/pdf", txt: "text/plain", csv: "text/csv", json: "application/json" }[副] || "application/octet-stream";
+}
+
+// 刪除附件檔（找不到就略過）
+async function 刪附件(路徑) {
+  if (狀態.模式 !== "資料夾" || !路徑) return;
+  try {
+    const 段 = 路徑.split("/");
+    const 夾 = await 取子資料夾(段.slice(0, -1), false);
+    await 夾.removeEntry(段[段.length - 1]);
+  } catch (e) { /* 檔案已不存在 */ }
+}
+
+// ===== 單檔模式（瀏覽器不支援資料夾功能時）=====
+
+// 讓使用者選一個協會資料.json 檔讀入
+async function 開啟資料檔() {
+  const f = (await 選擇檔案(".json,application/json"))[0];
+  if (!f) return undefined;
+  const 資料 = 補齊資料(JSON.parse(await f.text()));
+  狀態.模式 = "單檔";
+  狀態.檔名 = f.name;
+  return 資料;
+}
+
+// 單檔模式存檔：下載整份資料檔，請使用者放回原位置
+function 下載資料檔() {
+  const 文字 = JSON.stringify(狀態.資料, null, 1);
+  下載檔案(資料檔名, 文字, "application/json");
+  狀態.基準 = JSON.parse(文字);
+  狀態.未存 = false;
+  更新存檔狀態();
+  提示("已下載資料檔，請放回協會資料夾覆蓋舊檔");
+  return true;
+}
+
+
+/* ---------- 會務/04_登入.js ---------- */
+// 檔案說明：開始畫面、第一次建立協會資料、登入（密碼以 PBKDF2 雜湊保存）、登出、改密碼
+
+const 雜湊次數 = 310000;
+
+// 位元組轉十六進位文字
+function 轉十六進位(位元組) {
+  return Array.from(new Uint8Array(位元組), function (b) { return 補零(b.toString(16)); }).join("");
+}
+
+// 十六進位文字轉位元組
+function 十六進位轉位元組(hex) {
+  const 結果 = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < 結果.length; i++) 結果[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return 結果;
+}
+
+// 用 PBKDF2（SHA-256）把密碼加鹽雜湊，回傳十六進位文字
+async function 雜湊密碼(密碼, 鹽hex, 次數) {
+  const 金鑰 = await crypto.subtle.importKey("raw", new TextEncoder().encode(密碼), "PBKDF2", false, ["deriveBits"]);
+  const 位元 = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: 十六進位轉位元組(鹽hex), iterations: 次數, hash: "SHA-256" }, 金鑰, 256);
+  return 轉十六進位(位元);
+}
+
+// 為一個密碼產生新的鹽與雜湊值（存進使用者紀錄）
+async function 產生密碼紀錄(密碼) {
+  const 鹽 = new Uint8Array(16);
+  crypto.getRandomValues(鹽);
+  const 鹽hex = 轉十六進位(鹽);
+  return { 鹽: 鹽hex, 次數: 雜湊次數, 雜湊: await 雜湊密碼(密碼, 鹽hex, 雜湊次數) };
+}
+
+// 檢查密碼是否正確
+async function 驗證密碼(使用者, 密碼) {
+  if (!使用者 || !使用者.鹽 || !使用者.雜湊) return false;
+  const 算出 = await 雜湊密碼(密碼, 使用者.鹽, 使用者.次數 || 雜湊次數);
+  // 逐字比對全部字元，避免因比對時間不同洩漏資訊
+  let 差 = 算出.length ^ 使用者.雜湊.length;
+  for (let i = 0; i < 算出.length; i++) 差 |= 算出.charCodeAt(i) ^ (使用者.雜湊.charCodeAt(i) || 0);
+  return 差 === 0;
+}
+
+// 密碼強度檢查：至少 8 個字元；回傳錯誤訊息或空字串
+function 檢查密碼(密碼, 再次) {
+  if (String(密碼).length < 8) return "密碼至少要 8 個字元";
+  if (再次 != null && 密碼 !== 再次) return "兩次輸入的密碼不一樣";
+  return "";
+}
+
+// 顯示開始畫面：選協會資料夾（或不支援時開啟資料檔）
+function 顯示開始畫面() {
+  狀態.資料 = null;
+  狀態.使用者 = null;
+  更新外框();
+  const 內容 = 清空(document.getElementById("內容"));
+  const 區 = h("div", { class: "歡迎" },
+    h("img", { class: "會徽大", src: 會徽網址(), alt: "協會會徽" }),
+    h("h1", null, "會務管理系統"),
+    h("p", { class: "置中 次要字" }, "版本 " + 版本 + "　｜　完全離線，資料只存在您選的資料夾"));
+  const 卡 = h("div", { class: "卡" });
+  if (支援資料夾()) {
+    卡.appendChild(h("h2", null, "開始使用"));
+    卡.appendChild(h("p", null, "請選擇「協會資料夾」（例如共用磁碟上的 協會會務 資料夾）。系統會在裡面讀寫 協會資料.json、附件 與 備份 資料夾。"));
+    卡.appendChild(h("button", { class: "鈕 主", type: "button", id: "選資料夾鈕", onclick: 按選資料夾 }, "選擇協會資料夾"));
+  } else {
+    卡.appendChild(h("h2", null, "開始使用（單檔模式）"));
+    卡.appendChild(h("p", null, "這個瀏覽器不支援選資料夾功能，改用單檔模式：開啟協會資料.json，存檔時會下載新的資料檔，請自行放回原位置覆蓋。建議改用 Microsoft Edge。"));
+    卡.appendChild(h("div", { class: "表工具列" },
+      h("button", { class: "鈕 主", type: "button", onclick: 按開啟資料檔 }, "開啟資料檔"),
+      h("button", { class: "鈕", type: "button", onclick: function () { 建立新協會(null); } }, "建立新的資料檔")));
+  }
+  卡.appendChild(h("p", { class: "提醒" }, "資料夾的存取權限請由資訊單位設定（只開放給協會幹部）。本系統的登入與角色只控制畫面上能做什麼，不能取代資料夾權限。"));
+  區.appendChild(卡);
+  內容.appendChild(區);
+}
+
+// 取得會徽圖片網址（沿用網頁小圖示）
+function 會徽網址() {
+  const el = document.querySelector('link[rel="icon"]');
+  return el ? el.getAttribute("href") : "";
+}
+
+// 按下「選擇協會資料夾」
+async function 按選資料夾() {
+  try {
+    const 資料 = await 選擇資料夾();
+    if (資料) 載入資料(資料);
+    else 建立新協會(狀態.資料夾);
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    提示("無法開啟資料夾：" + e.message, true);
+  }
+}
+
+// 按下「開啟資料檔」（單檔模式）
+async function 按開啟資料檔() {
+  try {
+    const 資料 = await 開啟資料檔();
+    if (資料) 載入資料(資料);
+  } catch (e) {
+    提示("無法讀取資料檔：" + e.message, true);
+  }
+}
+
+// 讀入資料後：記下基準，顯示登入畫面
+function 載入資料(資料) {
+  狀態.資料 = 資料;
+  狀態.基準 = 深拷貝(資料);
+  狀態.未存 = false;
+  顯示登入畫面();
+}
+
+// 第一次使用：建立新的協會資料（協會名稱＋第一位管理者）
+function 建立新協會(夾) {
+  const 內容 = 清空(document.getElementById("內容"));
+  const 欄位們 = [
+    { key: "協會名稱", 標題: "協會名稱", 必填: true, 預設: "財政部公務人員協會", 寬: true },
+    { key: "姓名", 標題: "您的姓名", 必填: true },
+    { key: "角色", 標題: "您的角色", 類型: "選單", 選項: ["理事長", "秘書長"], 必填: true, 預設: "秘書長" },
+    { key: "密碼", 標題: "密碼（至少 8 個字元）", 類型: "密碼", 必填: true },
+    { key: "再次", 標題: "再輸入一次密碼", 類型: "密碼", 必填: true }
+  ];
+  const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, f.預設); }));
+  const 錯誤區 = h("p", { class: "錯誤", role: "alert" });
+  const 送出 = async function () {
+    const 值 = 讀表單(表單, 欄位們);
+    if (!值.協會名稱 || !值.姓名) { 錯誤區.textContent = "請填寫協會名稱與姓名"; return; }
+    const 錯 = 檢查密碼(值.密碼, 值.再次);
+    if (錯) { 錯誤區.textContent = 錯; return; }
+    const 資料 = 空白資料(值.協會名稱);
+    狀態.資料 = 資料;
+    狀態.基準 = null;
+    const 密 = await 產生密碼紀錄(值.密碼);
+    const 使用者 = 新增紀錄("使用者", Object.assign({ 姓名: 值.姓名, 角色: 值.角色, 停用: false }, 密));
+    狀態.使用者 = 使用者;
+    記錄操作("建立", "協會資料", "建立新的協會資料檔");
+    if (夾) {
+      狀態.基準 = { 設定: {} };
+      await 存檔();
+    } else {
+      狀態.模式 = "單檔";
+      標記未存();
+    }
+    登入完成(使用者);
+  };
+  內容.appendChild(h("div", { class: "歡迎" },
+    h("img", { class: "會徽大", src: 會徽網址(), alt: "協會會徽" }),
+    h("h1", null, "建立協會資料"),
+    h("div", { class: "卡" },
+      h("p", null, 夾 ? "這個資料夾還沒有協會資料，請先建立第一位管理者。" : "建立新的協會資料檔（存檔時會下載）。"),
+      表單, 錯誤區,
+      h("button", { class: "鈕 主", type: "button", id: "建立鈕", onclick: 送出 }, "建立並登入"))));
+}
+
+// 顯示登入畫面：選自己的名字＋輸入密碼
+function 顯示登入畫面() {
+  更新外框();
+  const 內容 = 清空(document.getElementById("內容"));
+  const 使用者們 = 集合("使用者").filter(function (u) { return !u.停用; })
+    .sort(function (a, b) { return 比較(a.姓名, b.姓名); });
+  const 選 = h("select", { id: "登入姓名" }, 使用者們.map(function (u) { return h("option", { value: u.id }, u.姓名 + "（" + u.角色 + "）"); }));
+  const 密 = h("input", { type: "password", id: "登入密碼", autocomplete: "current-password" });
+  const 錯誤區 = h("p", { class: "錯誤", role: "alert" });
+  const 送出 = async function () {
+    const u = 找("使用者", 選.value);
+    錯誤區.textContent = "驗證中…";
+    if (await 驗證密碼(u, 密.value)) {
+      錯誤區.textContent = "";
+      記錄操作("登入", "系統", u.姓名 + " 登入");
+      登入完成(u);
+    } else {
+      錯誤區.textContent = "密碼不正確";
+      密.select();
+    }
+  };
+  密.addEventListener("keydown", function (e) { if (e.key === "Enter") 送出(); });
+  內容.appendChild(h("div", { class: "歡迎" },
+    h("img", { class: "會徽大", src: 會徽網址(), alt: "協會會徽" }),
+    h("h1", null, 狀態.資料.設定.協會名稱),
+    狀態.資料.設定.範例資料 ? h("p", { class: "範例條" }, "這是範例資料（人名、電話、Email、金額全部虛構）") : null,
+    h("div", { class: "卡" },
+      h("div", { class: "表單" },
+        h("div", { class: "欄" }, h("span", null, h("label", { for: "登入姓名" }, "姓名")), 選),
+        h("div", { class: "欄" }, h("span", null, h("label", { for: "登入密碼" }, "密碼")), 密)),
+      錯誤區,
+      h("div", { class: "表工具列" },
+        h("button", { class: "鈕 主", type: "button", id: "登入鈕", onclick: 送出 }, "登入"),
+        h("button", { class: "鈕 文字", type: "button", onclick: 顯示開始畫面 }, "換一個資料夾")))));
+  密.focus();
+}
+
+// 登入成功：記錄使用者、套用其主題偏好、進入首頁
+function 登入完成(使用者) {
+  狀態.使用者 = 使用者;
+  if (使用者.主題) document.documentElement.setAttribute("data-theme", 使用者.主題);
+  更新外框();
+  前往("首頁");
+}
+
+// 登出：有未存變更時先詢問
+async function 登出() {
+  if (狀態.未存 && !(await 確認("有未存的變更，確定要登出嗎？（未存的變更會遺失）", "登出"))) return;
+  狀態.未存 = false;
+  顯示開始畫面();
+}
+
+// 改自己的密碼
+function 改我的密碼() {
+  const 欄位們 = [
+    { key: "舊", 標題: "目前密碼", 類型: "密碼", 必填: true },
+    { key: "新", 標題: "新密碼（至少 8 個字元）", 類型: "密碼", 必填: true },
+    { key: "再次", 標題: "再輸入一次新密碼", 類型: "密碼", 必填: true }
+  ];
+  表單對話框("修改我的密碼", 欄位們, {}, async function (值) {
+    if (!(await 驗證密碼(狀態.使用者, 值.舊))) return "目前密碼不正確";
+    const 錯 = 檢查密碼(值.新, 值.再次);
+    if (錯) return 錯;
+    更新紀錄("使用者", 狀態.使用者.id, await 產生密碼紀錄(值.新), "修改密碼");
+    提示("密碼已修改，記得存檔");
+  });
+}
+
+
+/* ---------- 會務/05_資料表.js ---------- */
+// 檔案說明：通用資料表元件（排序、篩選、搜尋、分頁、勾選批次動作、匯出 CSV／Excel）
+
+// 建立資料表。設定：
+//   欄位：[{key, 標題, 值(r), 顯示(r)→文字或元素, 數字:bool, 不排序:bool, 不匯出:bool}]
+//   資料()：回傳要顯示的紀錄陣列
+//   篩選：[{標題, 選項()→陣列, 取值(r)→值或值陣列}]
+//   批次：[{文字, 動作(已選紀錄們)}]（有設定才顯示勾選欄）
+//   點列(r)、工具(額外按鈕陣列)、匯出檔名、每頁（預設 20）、預設排序 {key, 反向}
+function 資料表(設定) {
+  const 狀 = { 搜尋: "", 篩選: {}, 排序: 設定.預設排序 ? 設定.預設排序.key : null, 反向: 設定.預設排序 ? !!設定.預設排序.反向 : false, 頁: 0, 已選: new Set() };
+  const 每頁 = 設定.每頁 || 20;
+  const 外框 = h("div", { class: "資料表" });
+  const 搜尋框 = h("input", { type: "search", placeholder: "搜尋…", "aria-label": "搜尋", oninput: function () { 狀.搜尋 = 搜尋框.value.trim(); 狀.頁 = 0; 繪製(); } });
+  const 篩選們 = (設定.篩選 || []).map(function (f, i) {
+    const 選 = h("select", { "aria-label": f.標題, onchange: function () { 狀.篩選[i] = 選.value; 狀.頁 = 0; 繪製(); } },
+      h("option", { value: "" }, "全部" + f.標題));
+    選.addEventListener("focus", function () { 填篩選選項(選, f, i); });
+    填篩選選項(選, f, i);
+    return 選;
+  });
+  const 匯出名 = 設定.匯出檔名 || "匯出";
+  const 工具列 = h("div", { class: "表工具列" }, 搜尋框, 篩選們,
+    h("div", { class: "右側" }, 設定.工具 || [],
+      設定.不匯出 ? null : h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(false, "csv"); } }, "匯出 CSV"),
+      設定.不匯出 ? null : h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(false, "xlsx"); } }, "匯出 Excel")));
+  const 批次列 = h("div", { class: "批次列 隱藏" });
+  const 表區 = h("div", { class: "表捲" });
+  const 分頁列 = h("div", { class: "分頁列" });
+  外框.appendChild(工具列);
+  外框.appendChild(批次列);
+  外框.appendChild(表區);
+  外框.appendChild(分頁列);
+
+  // 填入篩選下拉選單的選項（保留目前選擇）
+  function 填篩選選項(選, f, i) {
+    const 目前 = 狀.篩選[i] || "";
+    while (選.options.length > 1) 選.remove(1);
+    (typeof f.選項 === "function" ? f.選項() : f.選項).forEach(function (o) { 選.appendChild(h("option", { value: o, selected: o === 目前 }, o)); });
+  }
+
+  // 取欄位的原始值（排序、匯出、搜尋用）
+  function 原值(欄, r) {
+    return 欄.值 ? 欄.值(r) : r[欄.key];
+  }
+
+  // 依搜尋與篩選條件過濾，再排序
+  function 目前資料() {
+    let 列 = 設定.資料().slice();
+    if (狀.搜尋) {
+      const 字 = 狀.搜尋.toLowerCase();
+      列 = 列.filter(function (r) {
+        return 設定.欄位.some(function (欄) { return String(顯示值(原值(欄, r))).toLowerCase().indexOf(字) >= 0; });
+      });
+    }
+    (設定.篩選 || []).forEach(function (f, i) {
+      const v = 狀.篩選[i];
+      if (!v) return;
+      列 = 列.filter(function (r) { const x = f.取值(r); return Array.isArray(x) ? x.indexOf(v) >= 0 : String(x) === v; });
+    });
+    if (狀.排序) {
+      const 欄 = 設定.欄位.find(function (c) { return c.key === 狀.排序; });
+      if (欄) 列.sort(function (a, b) { const c = 比較(原值(欄, a), 原值(欄, b)); return 狀.反向 ? -c : c; });
+    }
+    return 列;
+  }
+
+  // 重新畫出表格
+  function 繪製() {
+    const 列 = 目前資料();
+    const 頁數 = Math.max(1, Math.ceil(列.length / 每頁));
+    if (狀.頁 >= 頁數) 狀.頁 = 頁數 - 1;
+    const 本頁 = 列.slice(狀.頁 * 每頁, 狀.頁 * 每頁 + 每頁);
+    // 已選的只保留目前篩選結果裡看得到的（避免勾了看不到的資料還被批次處理）
+    const 存在 = new Set(列.map(function (r) { return r.id; }));
+    狀.已選.forEach(function (id) { if (!存在.has(id)) 狀.已選.delete(id); });
+    const 有勾選 = !!(設定.批次 && 設定.批次.length);
+    const 全選 = h("input", { type: "checkbox", "aria-label": "全選本頁", checked: 本頁.length > 0 && 本頁.every(function (r) { return 狀.已選.has(r.id); }),
+      onchange: function () { 本頁.forEach(function (r) { if (全選.checked) 狀.已選.add(r.id); else 狀.已選.delete(r.id); }); 繪製(); } });
+    const 表頭 = h("tr", null, 有勾選 ? h("th", { class: "勾" }, 全選) : null,
+      設定.欄位.map(function (欄) {
+        const 可排 = !欄.不排序;
+        return h("th", {
+          class: (可排 ? "可排序" : "") + (欄.數字 ? " 數" : ""),
+          "aria-sort": 狀.排序 === 欄.key ? (狀.反向 ? "descending" : "ascending") : null,
+          onclick: 可排 ? function () { if (狀.排序 === 欄.key) 狀.反向 = !狀.反向; else { 狀.排序 = 欄.key; 狀.反向 = false; } 繪製(); } : null
+        }, 欄.標題);
+      }));
+    const 身 = h("tbody", null, 本頁.map(function (r) {
+      const 勾 = 有勾選 ? h("td", { class: "勾", onclick: function (e) { e.stopPropagation(); } },
+        h("input", { type: "checkbox", "aria-label": "勾選", checked: 狀.已選.has(r.id), onchange: function (e) { if (e.target.checked) 狀.已選.add(r.id); else 狀.已選.delete(r.id); 繪製(); } })) : null;
+      return h("tr", { class: (設定.點列 ? "可點" : "") + (狀.已選.has(r.id) ? " 已選" : ""), dataset: { id: r.id }, onclick: 設定.點列 ? function () { 設定.點列(r); } : null },
+        勾, 設定.欄位.map(function (欄) {
+          const v = 欄.顯示 ? 欄.顯示(r) : 顯示值(原值(欄, r));
+          return h("td", { class: 欄.數字 ? "數" : "" }, v);
+        }));
+    }));
+    清空(表區).appendChild(h("table", { class: "表" }, h("thead", null, 表頭), 身));
+    if (!列.length) 表區.appendChild(h("div", { class: "空" }, 設定.空白文字 || "沒有資料"));
+    // 批次動作列
+    清空(批次列);
+    批次列.classList.toggle("隱藏", !(有勾選 && 狀.已選.size));
+    if (有勾選 && 狀.已選.size) {
+      批次列.appendChild(h("strong", null, "已勾選 " + 狀.已選.size + " 筆"));
+      設定.批次.forEach(function (b) {
+        批次列.appendChild(h("button", { class: "鈕 小", type: "button", onclick: function () { b.動作(已選紀錄()); } }, b.文字));
+      });
+      批次列.appendChild(h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(true, "csv"); } }, "匯出勾選"));
+      批次列.appendChild(h("button", { class: "鈕 小 文字", type: "button", onclick: function () { 狀.已選.clear(); 繪製(); } }, "取消勾選"));
+    }
+    // 分頁
+    清空(分頁列);
+    分頁列.appendChild(h("span", { class: "次要字 小字" }, "共 " + 列.length + " 筆"));
+    if (頁數 > 1) {
+      分頁列.appendChild(h("button", { class: "鈕 小", type: "button", disabled: 狀.頁 === 0, onclick: function () { 狀.頁--; 繪製(); } }, "上一頁"));
+      分頁列.appendChild(h("span", null, "第 " + (狀.頁 + 1) + " / " + 頁數 + " 頁"));
+      分頁列.appendChild(h("button", { class: "鈕 小", type: "button", disabled: 狀.頁 >= 頁數 - 1, onclick: function () { 狀.頁++; 繪製(); } }, "下一頁"));
+    }
+  }
+
+  // 取得目前勾選的紀錄（依目前排序）
+  function 已選紀錄() {
+    return 目前資料().filter(function (r) { return 狀.已選.has(r.id); });
+  }
+
+  // 匯出目前篩選結果（或只匯出勾選的）
+  function 匯出(只勾選, 格式) {
+    const 列 = 只勾選 ? 已選紀錄() : 目前資料();
+    const 欄們 = 設定.欄位.filter(function (c) { return !c.不匯出; });
+    const 表 = [欄們.map(function (c) { return c.標題; })].concat(列.map(function (r) {
+      return 欄們.map(function (c) { const v = 原值(c, r); return typeof v === "number" ? v : 顯示值(v); });
+    }));
+    匯出表格(匯出名 + "_" + 今天(), 表, 格式);
+  }
+
+  繪製();
+  return { 元素: 外框, 重繪: 繪製, 已選: 已選紀錄, 目前: 目前資料, 清除勾選: function () { 狀.已選.clear(); 繪製(); } };
+}
+
+
+/* ---------- 會務/10_首頁.js ---------- */
+// 檔案說明：首頁（待辦簽核、待催繳會費、近期活動與會議、本月收支、會員數變化）
+
+註冊頁面("首頁", {
+  圖示: "⌂",
+  說明: "首頁整理今天要注意的事：本年度還沒繳常年會費的人數、近期活動、本月收支、會員人數變化。點卡片可直接到對應功能。「待我簽核」與「會議」會在第二階段（公文與簽核、會議與決議）開放。",
+  繪製: 繪製首頁
+});
+
+// 計算某一天時的有效會員數（已入會、尚未退會）
+function 某日會員數(日期) {
+  return 集合("會員").filter(function (m) {
+    if (!m.入會日期 || m.入會日期 > 日期) return false;
+    if (m.退會日期 && m.退會日期 <= 日期) return false;
+    return m.會籍狀態 !== "申請中";
+  }).length;
+}
+
+// 取得某月份（YYYY-MM）的最後一天
+function 月底(年月) {
+  const [y, m] = 年月.split("-").map(Number);
+  return 年月 + "-" + 補零(new Date(y, m, 0).getDate());
+}
+
+// 畫出首頁
+function 繪製首頁(容器) {
+  const 設 = 狀態.資料.設定;
+  const 今 = 今天();
+  const 年 = 本年();
+  const 本月 = 今.slice(0, 7);
+  const 有效 = 集合("會員").filter(function (m) { return m.會籍狀態 === "有效"; });
+  const 申請中 = 集合("會員").filter(function (m) { return m.會籍狀態 === "申請中"; });
+  const 未繳 = 未繳名單(年);
+  const 本月傳票 = 集合("傳票").filter(function (v) { return String(v.日期).slice(0, 7) === 本月; });
+  const 本月收入 = 本月傳票.filter(function (v) { return v.收支 === "收入"; }).reduce(function (s, v) { return s + Number(v.金額 || 0); }, 0);
+  const 本月支出 = 本月傳票.filter(function (v) { return v.收支 === "支出"; }).reduce(function (s, v) { return s + Number(v.金額 || 0); }, 0);
+  const 近期 = 集合("活動").filter(function (a) { return a.日期 >= 今; }).sort(function (a, b) { return 比較(a.日期, b.日期); }).slice(0, 6);
+
+  容器.appendChild(頁首("您好，" + 狀態.使用者.姓名, [h("span", { class: "次要字" }, 民國(今) + "　" + 狀態.使用者.角色)]));
+  if (設.範例資料) 容器.appendChild(h("p", { class: "範例條" }, "目前開啟的是範例資料（人名、電話、Email、金額全部虛構），僅供練習"));
+
+  // 數字卡（點了可以跳到對應功能）
+  const 數字卡 = function (標, 數, 註, 去處, 參數) {
+    return h("button", { type: "button", class: "卡 數字卡", style: "text-align:left;cursor:pointer;font:inherit;color:inherit", onclick: function () { 前往(去處, 參數); } },
+      h("div", { class: "標" }, 標), h("div", { class: "數字" }, 數), h("div", { class: "小字 次要字" }, 註));
+  };
+  容器.appendChild(h("div", { class: "格" },
+    數字卡("有效會員", 金額(有效.length) + " 人", 申請中.length ? "另有 " + 申請中.length + " 件入會申請待審" : "名冊管理", "會員名冊"),
+    數字卡(民國年(年) + " 年度未繳常年會費", 未繳.length + " 人", "應收 " + 金額(未繳.length * (Number(設.會費標準.常年會費) || 0)) + " 元，前往催繳", "會費與帳務", { 頁籤: "催繳" }),
+    數字卡("本月收入", 金額(本月收入) + " 元", "支出 " + 金額(本月支出) + " 元，結餘 " + 金額(本月收入 - 本月支出) + " 元", "會費與帳務", { 頁籤: "收支記帳" }),
+    數字卡("近期活動", 近期.length + " 場", 近期[0] ? "最近：" + 近期[0].名稱 : "目前沒有排定的活動", "活動報名")));
+
+  // 待我簽核、近期活動與會議
+  const 活動清單 = h("ul", { class: "清單" }, 近期.length ? 近期.map(function (a) {
+    const 正取 = 集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 === "正取"; }).length;
+    return h("li", null, h("span", { class: "標記 金" }, 民國(a.日期)),
+      h("a", { href: "#", onclick: function (e) { e.preventDefault(); 前往("活動報名", { 活動id: a.id }); } }, a.名稱),
+      h("span", { class: "次要字 小字", style: "margin-left:auto" }, "報名 " + 正取 + "／" + (a.名額 || "不限")));
+  }) : h("li", { class: "次要字" }, "目前沒有排定的活動"));
+
+  // 會員數變化（近 12 個月）
+  const 月份們 = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(new Date().getFullYear(), new Date().getMonth() - i, 1);
+    月份們.push(d.getFullYear() + "-" + 補零(d.getMonth() + 1));
+  }
+  const 人數們 = 月份們.map(function (ym) { return 某日會員數(ym === 本月 ? 今 : 月底(ym)); });
+  const 最大 = Math.max.apply(null, 人數們.concat([1]));
+  const 最小 = Math.min.apply(null, 人數們);
+  const 底 = Math.max(0, 最小 - Math.ceil((最大 - 最小) * 0.5) - 1);
+  const 條圖 = h("div", { class: "條圖", role: "img", "aria-label": "近 12 個月會員人數" },
+    月份們.map(function (ym, i) {
+      const 高 = Math.round(((人數們[i] - 底) / (最大 - 底 || 1)) * 100);
+      return h("div", { class: "柱", title: ym + "：" + 人數們[i] + " 人" },
+        h("span", null, 人數們[i]), h("i", { style: "height:" + Math.max(2, 高) + "%" }), h("span", null, Number(ym.slice(5)) + "月"));
+    }));
+  const 入退 = 集合("會員異動").filter(function (x) { return String(x.日期).slice(0, 4) === String(年); });
+  const 計 = function (類) { return 入退.filter(function (x) { return x.類型 === 類; }).length; };
+
+  容器.appendChild(h("div", { class: "格2" },
+    h("div", { class: "卡" }, h("h2", null, "待我簽核"),
+      h("p", { class: "次要字" }, "公文與簽核模組將於第二階段開放；開放後，送到您這一關的公文會列在這裡。"),
+      申請中.length && 可("會員.編輯") ? h("p", null, h("a", { href: "#", onclick: function (e) { e.preventDefault(); 前往("會員名冊", { 狀態: "申請中" }); } }, "有 " + 申請中.length + " 件入會申請待審核 →")) : null),
+    h("div", { class: "卡" }, h("h2", null, "近期活動與會議"), 活動清單,
+      h("p", { class: "次要字 小字" }, "會議（會員大會、理監事會）將於第二階段開放。")),
+    h("div", { class: "卡" }, h("h2", null, "會員數變化（近 12 個月）"), 條圖,
+      h("p", { class: "小字 次要字" }, 民國年(年) + " 年度：入會 " + 計("入會") + " 人、退會 " + 計("退會") + " 人、轉調 " + 計("轉調") + " 人")),
+    h("div", { class: "卡" }, h("h2", null, "待催繳會費"),
+      未繳.length ? h("ul", { class: "清單" }, 未繳.slice(0, 6).map(function (m) {
+        return h("li", null, h("span", null, m.姓名), h("span", { class: "次要字 小字" }, m.服務機關 || ""));
+      })) : h("p", { class: "次要字" }, "本年度常年會費已全部收齊"),
+      未繳.length > 6 ? h("p", { class: "小字" }, "…等 " + 未繳.length + " 人") : null)));
+}
+
+
+/* ---------- 會務/11_會員名冊.js ---------- */
+// 檔案說明：會員名冊（基本資料、標籤、多條件查詢、入會／退會／轉調異動歷程、分眾名單、匯入匯出、入會申請審核）
+
+const 會籍狀態們 = ["申請中", "有效", "停權", "退會"];
+const 異動類型們 = ["入會", "退會", "轉調", "復會", "停權"];
+
+註冊頁面("會員名冊", {
+  圖示: "👥",
+  可見: function () { return 可("個資.檢視"); },
+  說明: "管理會員基本資料。點一列可看詳細資料與異動歷程（入會、退會、轉調），並在那裡辦理異動。上方可依機關、類別、會籍狀態、標籤、入會年度篩選；勾選多人後可複製 Outlook 收件者、匯出合併列印用 CSV、加減標籤、列印名冊。「匯入」支援 Excel（.xlsx）、ODS、CSV，會先讓您對應欄位並比對重複。官網的入會申請檔請用「匯入入會申請」，審核後再核准入會。個資只收必要欄位，不收身分證字號。",
+  繪製: 繪製會員名冊
+});
+
+// 會員資料的欄位定義（表單用）
+function 會員欄位() {
+  const 設 = 狀態.資料.設定;
+  return [
+    { key: "姓名", 標題: "姓名", 必填: true },
+    { key: "員工編號", 標題: "員工編號", 說明: "活動簽到可用" },
+    { key: "服務機關", 標題: "服務機關", 類型: "選單", 選項: function () { return 設.服務機關; }, 必填: true },
+    { key: "單位", 標題: "單位" },
+    { key: "職稱", 標題: "職稱" },
+    { key: "公務電話", 標題: "公務電話" },
+    { key: "Email", 標題: "Email", 類型: "Email" },
+    { key: "入會日期", 標題: "入會日期", 類型: "日期" },
+    { key: "會員類別", 標題: "會員類別", 類型: "選單", 選項: function () { return 設.會員類別; }, 必填: true, 預設: 設.會員類別[0] },
+    { key: "會籍狀態", 標題: "會籍狀態", 類型: "選單", 選項: 會籍狀態們, 必填: true, 預設: "有效" },
+    { key: "標籤", 標題: "標籤", 類型: "多選", 選項: function () { return 設.會員標籤; } },
+    { key: "備註", 標題: "備註", 類型: "多行", 行數: 2 }
+  ];
+}
+
+// 產生下一個會員編號（M0001、M0002…）
+function 下一個會員編號() {
+  const 最大 = 集合("會員").reduce(function (m, r) { const n = Number(String(r.會員編號 || "").replace(/\D/g, "")); return n > m ? n : m; }, 0);
+  return "M" + 補零(最大 + 1, 4);
+}
+
+// 新增一位會員並寫入「入會」異動（申請中的不寫）
+function 新增會員(值, 說明) {
+  const m = 新增紀錄("會員", Object.assign({ 會員編號: 下一個會員編號(), 標籤: [] }, 值));
+  if (m.會籍狀態 !== "申請中") {
+    新增紀錄("會員異動", { 會員id: m.id, 日期: m.入會日期 || 今天(), 類型: "入會", 說明: 說明 || "", 新機關: m.服務機關 || "" }, "會員異動「" + m.姓名 + " 入會」");
+  }
+  return m;
+}
+
+// 找可能重複的會員：員工編號相同、Email 相同、或姓名＋服務機關相同
+function 找重複會員(值, 排除id) {
+  const 小 = function (s) { return String(s || "").trim().toLowerCase(); };
+  return 集合("會員").find(function (m) {
+    if (m.id === 排除id) return false;
+    if (值.員工編號 && 小(m.員工編號) === 小(值.員工編號)) return true;
+    if (值.Email && 小(m.Email) === 小(值.Email)) return true;
+    return 值.姓名 && m.姓名 === 值.姓名 && (m.服務機關 || "") === (值.服務機關 || "");
+  }) || null;
+}
+
+// 畫出會員名冊頁
+function 繪製會員名冊(容器, 參數) {
+  const 可編 = 可("會員.編輯");
+  const 設 = 狀態.資料.設定;
+  const 表 = 資料表({
+    匯出檔名: "會員名冊",
+    資料: function () { return 集合("會員"); },
+    預設排序: { key: "會員編號" },
+    欄位: [
+      { key: "會員編號", 標題: "編號" },
+      { key: "姓名", 標題: "姓名" },
+      { key: "服務機關", 標題: "服務機關" },
+      { key: "單位", 標題: "單位" },
+      { key: "職稱", 標題: "職稱" },
+      { key: "公務電話", 標題: "公務電話" },
+      { key: "Email", 標題: "Email" },
+      { key: "入會日期", 標題: "入會日期", 顯示: function (r) { return 民國(r.入會日期); } },
+      { key: "會員類別", 標題: "類別" },
+      { key: "會籍狀態", 標題: "會籍", 顯示: function (r) { return h("span", { class: "標記 " + ({ 有效: "成", 申請中: "金", 停權: "警", 退會: "危" }[r.會籍狀態] || "") }, r.會籍狀態); } },
+      { key: "標籤", 標題: "標籤", 值: function (r) { return (r.標籤 || []).join("、"); } },
+      { key: "員工編號", 標題: "員工編號" }
+    ],
+    篩選: [
+      { 標題: "機關", 選項: function () { return 設.服務機關; }, 取值: function (r) { return r.服務機關; } },
+      { 標題: "類別", 選項: function () { return 設.會員類別; }, 取值: function (r) { return r.會員類別; } },
+      { 標題: "會籍", 選項: 會籍狀態們, 取值: function (r) { return r.會籍狀態; } },
+      { 標題: "標籤", 選項: function () { return 設.會員標籤; }, 取值: function (r) { return r.標籤 || []; } },
+      { 標題: "入會年度", 選項: function () { return 入會年度們(); }, 取值: function (r) { return r.入會日期 ? 民國年(r.入會日期.slice(0, 4)) + " 年" : ""; } }
+    ],
+    點列: function (r) { 會員詳細(r.id, function () { 表.重繪(); }); },
+    批次: [
+      { 文字: "複製 Outlook 收件者", 動作: function (列) { 顯示收件者(列); } },
+      { 文字: "匯出合併列印 CSV", 動作: function (列) { 匯出合併列印(列); } },
+      可編 ? { 文字: "加標籤", 動作: function (列) { 批次標籤(列, true, 表); } } : null,
+      可編 ? { 文字: "移除標籤", 動作: function (列) { 批次標籤(列, false, 表); } } : null,
+      { 文字: "列印名冊", 動作: function (列) { 列印名冊(列); } }
+    ].filter(Boolean)
+  });
+  容器.appendChild(頁首("會員名冊", [
+    可編 ? h("button", { class: "鈕 主", type: "button", id: "新增會員鈕", onclick: function () { 編輯會員(null, 表.重繪); } }, "＋ 新增會員") : null,
+    可編 ? h("button", { class: "鈕", type: "button", id: "匯入會員鈕", onclick: function () { 匯入會員(表.重繪); } }, "匯入名冊") : null,
+    可編 ? h("button", { class: "鈕", type: "button", id: "匯入申請鈕", onclick: function () { 匯入入會申請(表.重繪); } }, "匯入入會申請") : null,
+    h("button", { class: "鈕", type: "button", onclick: function () { 列印名冊(表.目前()); } }, "列印名冊")
+  ]));
+  容器.appendChild(h("p", { class: "次要字 小字" }, "個資只收必要欄位（不收身分證字號）。匯出或列印的名冊請妥善保管，用畢銷毀。"));
+  容器.appendChild(表.元素);
+  // 從首頁點「入會申請待審」進來時，自動篩選申請中
+  if (參數 && 參數.狀態) {
+    const 選 = 表.元素.querySelectorAll(".表工具列 select")[2];
+    if (選) { 選.value = 參數.狀態; 選.dispatchEvent(new Event("change")); }
+  }
+}
+
+// 列出名冊中出現過的入會年度（民國）
+function 入會年度們() {
+  const s = new Set();
+  集合("會員").forEach(function (m) { if (m.入會日期) s.add(民國年(m.入會日期.slice(0, 4)) + " 年"); });
+  return Array.from(s).sort().reverse();
+}
+
+// 新增或編輯會員資料
+function 編輯會員(id, 完成後) {
+  const 原 = id ? 找("會員", id) : null;
+  const 欄位們 = 會員欄位();
+  return 表單對話框(原 ? "編輯會員：" + 原.姓名 : "新增會員", 欄位們, 原 || { 入會日期: 今天() }, function (值) {
+    if (值.Email && !/^[^@\s]+@[^@\s]+$/.test(值.Email)) return "Email 格式不正確";
+    const 重複 = 找重複會員(值, id);
+    if (重複) return "可能與既有會員重複：" + 重複.會員編號 + " " + 重複.姓名 + "（" + (重複.服務機關 || "") + "）";
+    if (原) {
+      if (值.會籍狀態 === "退會" && 原.會籍狀態 !== "退會") 值.退會日期 = 今天();
+      更新紀錄("會員", id, 值);
+    } else 新增會員(值);
+    提示("已儲存會員資料");
+    if (完成後) 完成後();
+  });
+}
+
+// 會員詳細資料：基本資料、異動歷程、會費紀錄、活動參與，以及辦理異動的按鈕
+function 會員詳細(id, 完成後) {
+  const m = 找("會員", id);
+  if (!m) return;
+  const 可編 = 可("會員.編輯");
+  const 重整 = function () { if (完成後) 完成後(); };
+  const 基本 = h("div", { class: "表單" }, 會員欄位().map(function (f) {
+    return h("div", { class: "欄" + (f.類型 === "多行" ? " 寬" : "") }, h("span", null, f.標題), h("div", null, f.類型 === "日期" ? 民國(m[f.key]) : 顯示值(m[f.key]) || "—"));
+  }));
+  const 異動 = 集合("會員異動").filter(function (x) { return x.會員id === id; }).sort(function (a, b) { return 比較(a.日期, b.日期); });
+  const 會費 = 集合("會費").filter(function (x) { return x.會員id === id; }).sort(function (a, b) { return 比較(b.繳費日, a.繳費日); });
+  const 報名 = 集合("報名").filter(function (x) { return x.會員id === id; });
+  const 小表 = function (標題們, 列們) {
+    return 列們.length ? h("div", { class: "表捲" }, h("table", { class: "表" }, h("thead", null, h("tr", null, 標題們.map(function (t) { return h("th", null, t); }))),
+      h("tbody", null, 列們.map(function (r) { return h("tr", null, r.map(function (v) { return h("td", null, v); })); })))) : h("p", { class: "次要字" }, "無");
+  };
+  const 按鈕們 = [];
+  if (可編) {
+    按鈕們.push({ 文字: "編輯資料", 動作: function (關) { 關(null); 編輯會員(id, 重整); } });
+    if (m.會籍狀態 === "申請中") 按鈕們.push({ 文字: "核准入會", 主: true, 動作: function (關) { 關(null); 核准入會([m], 重整); } });
+    if (m.會籍狀態 === "有效") {
+      按鈕們.push({ 文字: "辦理轉調", 動作: function (關) { 關(null); 辦理異動(m, "轉調", 重整); } });
+      按鈕們.push({ 文字: "辦理退會", 危: true, 動作: function (關) { 關(null); 辦理異動(m, "退會", 重整); } });
+    }
+    if (m.會籍狀態 === "退會" || m.會籍狀態 === "停權") 按鈕們.push({ 文字: "辦理復會", 動作: function (關) { 關(null); 辦理異動(m, "復會", 重整); } });
+    if (m.會籍狀態 === "申請中" || (!異動.length && !會費.length && !報名.length)) {
+      按鈕們.push({ 文字: "刪除", 危: true, 動作: async function (關) {
+        if (!(await 確認("確定刪除「" + m.姓名 + "」？（建議用「退會」保留紀錄；刪除後只剩操作紀錄）", "刪除"))) return false;
+        刪除紀錄("會員", id); 關(null); 重整();
+      } });
+    }
+  }
+  按鈕們.push({ 文字: "關閉" });
+  對話框(m.會員編號 + "　" + m.姓名, [
+    基本,
+    h("h3", null, "異動歷程"),
+    小表(["日期", "類型", "說明", "原機關", "新機關", "經辦"], 異動.map(function (x) { return [民國(x.日期), x.類型, x.說明 || "", x.原機關 || "", x.新機關 || "", x.修改人 || ""]; })),
+    h("h3", null, "會費紀錄"),
+    小表(["年度", "項目", "金額", "繳費日", "收據號"], 會費.map(function (x) { return [民國年(x.年度), x.項目, 金額(x.金額), 民國(x.繳費日), x.收據號 || ""]; })),
+    h("h3", null, "活動參與"),
+    小表(["活動", "日期", "報名狀態", "簽到"], 報名.map(function (r) { const a = 找("活動", r.活動id) || {}; return [a.名稱 || "（已刪除）", 民國(a.日期), r.狀態, r.簽到時間 ? "已簽到" : "—"]; }))
+  ], 按鈕們, { 寬: true });
+}
+
+// 辦理退會、轉調、復會：填日期與說明，寫入異動歷程並更新會員資料
+function 辦理異動(m, 類型, 完成後) {
+  const 設 = 狀態.資料.設定;
+  const 欄位們 = [{ key: "日期", 標題: 類型 + "日期", 類型: "日期", 必填: true, 預設: 今天() }];
+  if (類型 === "轉調") {
+    欄位們.push({ key: "新機關", 標題: "轉調後服務機關", 類型: "選單", 選項: 設.服務機關, 必填: true });
+    欄位們.push({ key: "新單位", 標題: "轉調後單位" });
+    欄位們.push({ key: "新職稱", 標題: "轉調後職稱", 預設: m.職稱 });
+  }
+  欄位們.push({ key: "說明", 標題: "說明", 類型: "多行", 行數: 2 });
+  return 表單對話框("辦理" + 類型 + "：" + m.姓名, 欄位們, {}, function (值) {
+    const 異動 = { 會員id: m.id, 日期: 值.日期, 類型: 類型, 說明: 值.說明, 原機關: m.服務機關 || "" };
+    if (類型 === "轉調") {
+      異動.新機關 = 值.新機關;
+      更新紀錄("會員", m.id, { 服務機關: 值.新機關, 單位: 值.新單位 || "", 職稱: 值.新職稱 || m.職稱 || "" }, "會員「" + m.姓名 + "」轉調");
+    } else if (類型 === "退會") {
+      更新紀錄("會員", m.id, { 會籍狀態: "退會", 退會日期: 值.日期 }, "會員「" + m.姓名 + "」退會");
+    } else if (類型 === "復會") {
+      異動.新機關 = m.服務機關 || "";
+      更新紀錄("會員", m.id, { 會籍狀態: "有效", 退會日期: "" }, "會員「" + m.姓名 + "」復會");
+    }
+    新增紀錄("會員異動", 異動, "會員異動「" + m.姓名 + " " + 類型 + "」");
+    提示("已辦理" + 類型);
+    if (完成後) 完成後();
+  });
+}
+
+// 核准入會申請：設為有效、寫入會日期與異動，可同時登記入會費
+function 核准入會(會員們, 完成後) {
+  const 設 = 狀態.資料.設定;
+  const 欄位們 = [
+    { key: "入會日期", 標題: "入會日期", 類型: "日期", 必填: true, 預設: 今天() },
+    { key: "收入會費", 標題: "同時登記入會費", 類型: "勾選", 預設: Number(設.會費標準.入會費) > 0, 勾選文字: "收入會費 " + 金額(設.會費標準.入會費) + " 元" }
+  ];
+  return 表單對話框("核准入會（" + 會員們.length + " 人）", 欄位們, {}, function (值) {
+    會員們.forEach(function (m) {
+      更新紀錄("會員", m.id, { 會籍狀態: "有效", 入會日期: 值.入會日期 }, "核准「" + m.姓名 + "」入會");
+      新增紀錄("會員異動", { 會員id: m.id, 日期: 值.入會日期, 類型: "入會", 說明: "核准入會申請", 新機關: m.服務機關 || "" }, "會員異動「" + m.姓名 + " 入會」");
+    });
+    if (值.收入會費 && Number(設.會費標準.入會費) > 0 && 可("會費.收繳")) {
+      登記繳費({ 會員們: 會員們, 年度: Number(值.入會日期.slice(0, 4)), 項目: "入會費", 金額: Number(設.會費標準.入會費), 日期: 值.入會日期, 方式: "現金" });
+    }
+    提示("已核准入會");
+    if (完成後) 完成後();
+  });
+}
+
+// 顯示 Outlook 收件者字串（姓名 <email>; …），可一鍵複製
+function 顯示收件者(列) {
+  const 有信箱 = 列.filter(function (m) { return m.Email; });
+  const 字串 = 有信箱.map(function (m) { return m.姓名.replace(/[<>;,"]/g, "") + " <" + m.Email + ">"; }).join("; ");
+  const 框 = h("textarea", { rows: 6, readonly: true, id: "收件者字串" });
+  框.value = 字串;
+  對話框("Outlook 收件者", [
+    h("p", null, "共 " + 有信箱.length + " 人有 Email" + (列.length > 有信箱.length ? "（" + (列.length - 有信箱.length) + " 人沒有 Email，未列入）" : "") + "。複製後貼到 Outlook 的「密件副本」欄。"),
+    框
+  ], [{ 文字: "關閉" }, {
+    文字: "複製", 主: true, 動作: async function () {
+      框.select();
+      try { await navigator.clipboard.writeText(字串); 提示("已複製"); } catch (e) { 提示("請按 Ctrl+C 複製已選取的文字"); }
+      return false;
+    }
+  }]);
+}
+
+// 匯出合併列印用的 CSV（Word 合併列印可直接使用）
+function 匯出合併列印(列) {
+  const 表 = [["姓名", "服務機關", "單位", "職稱", "公務電話", "Email", "會員編號"]].concat(列.map(function (m) {
+    return [m.姓名, m.服務機關 || "", m.單位 || "", m.職稱 || "", m.公務電話 || "", m.Email || "", m.會員編號 || ""];
+  }));
+  匯出表格("合併列印名單_" + 今天(), 表, "csv");
+}
+
+// 批次加上或移除標籤
+function 批次標籤(列, 加, 表) {
+  const 設 = 狀態.資料.設定;
+  表單對話框((加 ? "加上" : "移除") + "標籤（" + 列.length + " 人）", [{ key: "標籤", 標題: "標籤", 類型: "選單", 選項: 設.會員標籤, 必填: true }], {}, function (值) {
+    列.forEach(function (m) {
+      const 現 = (m.標籤 || []).slice();
+      const i = 現.indexOf(值.標籤);
+      if (加 && i < 0) 現.push(值.標籤);
+      if (!加 && i >= 0) 現.splice(i, 1);
+      更新紀錄("會員", m.id, { 標籤: 現 });
+    });
+    提示("已更新標籤");
+    表.重繪();
+  });
+}
+
+// 列印會員名冊（A4 直式）
+function 列印名冊(列) {
+  const 設 = 狀態.資料.設定;
+  列印詢問(h("div", { class: "列印頁" },
+    h("h1", null, 設.協會名稱 + " 會員名冊"),
+    h("div", { class: "副標" }, "列印日期：" + 民國(今天()) + "　共 " + 列.length + " 人" + (設.範例資料 ? "　（範例資料）" : "")),
+    h("table", { class: "表" }, h("thead", null, h("tr", null, ["編號", "姓名", "服務機關", "單位", "職稱", "公務電話", "會籍"].map(function (t) { return h("th", null, t); }))),
+      h("tbody", null, 列.map(function (m) { return h("tr", null, [m.會員編號, m.姓名, m.服務機關, m.單位, m.職稱, m.公務電話, m.會籍狀態].map(function (v) { return h("td", null, v || ""); })); })))));
+}
+
+// ===== 匯入名冊 =====
+
+// 名冊欄位的常見別名（自動對應用）
+const 匯入別名 = {
+  姓名: ["姓名", "名字", "會員姓名", "name"],
+  員工編號: ["員工編號", "員編", "人員代號", "職員編號"],
+  服務機關: ["服務機關", "機關", "機關名稱", "服務單位機關"],
+  單位: ["單位", "科室", "服務單位", "處室"],
+  職稱: ["職稱", "職務"],
+  公務電話: ["公務電話", "電話", "分機", "辦公室電話", "聯絡電話"],
+  Email: ["email", "e-mail", "電子郵件", "信箱", "電子信箱", "公務信箱"],
+  入會日期: ["入會日期", "入會日", "加入日期"],
+  會員類別: ["會員類別", "類別"],
+  會籍狀態: ["會籍狀態", "會籍", "狀態"],
+  標籤: ["標籤", "分類標籤"],
+  備註: ["備註", "說明"]
+};
+
+// 依標題文字猜對應的會員欄位
+function 猜欄位(標題) {
+  const t = String(標題 || "").trim().toLowerCase();
+  for (const k of Object.keys(匯入別名)) if (匯入別名[k].some(function (a) { return a.toLowerCase() === t; })) return k;
+  return "";
+}
+
+// 匯入名冊：選檔 → 對應欄位 → 比對重複 → 匯入
+function 匯入會員(完成後) {
+  選擇檔案(".xlsx,.ods,.csv").then(async function (檔們) {
+    const f = 檔們[0];
+    if (!f) return;
+    try {
+      const 列 = await 讀試算表(f);
+      if (列.length < 2) { 提示("檔案裡沒有資料（第一列要是欄位標題）", true); return; }
+      匯入對應對話框(f.name, 列, 完成後);
+    } catch (e) {
+      提示("讀取失敗：" + e.message, true);
+    }
+  });
+}
+
+// 欄位對應對話框：每個檔案欄位選要對應到哪個會員欄位，並選重複時怎麼處理
+function 匯入對應對話框(檔名, 列, 完成後) {
+  const 標題列 = 列[0];
+  const 資料列 = 列.slice(1);
+  const 目標 = Object.keys(匯入別名);
+  const 選單們 = 標題列.map(function (t, i) {
+    const 猜 = 猜欄位(t);
+    return h("select", { dataset: { col: i }, "aria-label": "欄位 " + t },
+      h("option", { value: "" }, "（不匯入）"), 目標.map(function (k) { return h("option", { value: k, selected: k === 猜 }, k); }));
+  });
+  const 重複處理 = h("select", { id: "重複處理" }, h("option", { value: "略過" }, "略過（不動既有資料）"), h("option", { value: "更新" }, "以檔案內容更新既有資料"));
+  const 預覽 = h("table", { class: "表" },
+    h("thead", null, h("tr", null, 標題列.map(function (t, i) { return h("th", null, t || "（第 " + (i + 1) + " 欄）", h("br"), 選單們[i]); }))),
+    h("tbody", null, 資料列.slice(0, 5).map(function (r) { return h("tr", null, 標題列.map(function (_, i) { return h("td", null, r[i] || ""); })); })));
+  對話框("匯入名冊：" + 檔名, [
+    h("p", null, "共 " + 資料列.length + " 筆。請確認每一欄要對應到哪個欄位（已自動猜測）。下方只預覽前 5 筆。"),
+    h("div", { class: "表捲" }, 預覽),
+    h("p", null, h("label", null, "遇到重複會員（員工編號、Email 或 姓名＋機關相同）時：", 重複處理))
+  ], [{ 文字: "取消" }, {
+    文字: "開始匯入", 主: true, 動作: function () {
+      const 對應 = {};
+      選單們.forEach(function (s, i) { if (s.value) 對應[s.value] = i; });
+      if (對應.姓名 == null) { 提示("至少要對應「姓名」欄位", true); return false; }
+      const 結果 = 執行匯入(資料列, 對應, 重複處理.value);
+      對話框("匯入結果", h("ul", null,
+        h("li", null, "新增 " + 結果.新增 + " 人"), h("li", null, "更新 " + 結果.更新 + " 人"),
+        h("li", null, "略過重複 " + 結果.略過 + " 人"), h("li", null, "資料不完整（沒有姓名）" + 結果.錯誤 + " 筆"),
+        h("li", null, "記得按「存檔」")));
+      if (完成後) 完成後();
+      return true;
+    }
+  }], { 寬: true });
+}
+
+// 依欄位對應把每一列轉成會員資料並新增或更新；回傳統計
+function 執行匯入(資料列, 對應, 重複處理) {
+  const 設 = 狀態.資料.設定;
+  const 統計 = { 新增: 0, 更新: 0, 略過: 0, 錯誤: 0 };
+  資料列.forEach(function (r) {
+    const 值 = {};
+    Object.keys(對應).forEach(function (k) { 值[k] = String(r[對應[k]] == null ? "" : r[對應[k]]).trim(); });
+    if (!值.姓名) { 統計.錯誤++; return; }
+    if ("入會日期" in 值) 值.入會日期 = 解析日期(值.入會日期);
+    if ("標籤" in 值) 值.標籤 = 值.標籤.split(/[、,，;；\s]+/).filter(Boolean);
+    if (值.會籍狀態 && 會籍狀態們.indexOf(值.會籍狀態) < 0) 值.會籍狀態 = "有效";
+    if (值.服務機關 && 設.服務機關.indexOf(值.服務機關) < 0) {
+      // 機關名稱不在清單：試著補上「財政部」前綴比對
+      const 試 = 設.服務機關.find(function (o) { return o === "財政部" + 值.服務機關 || o.replace(/^財政部/, "") === 值.服務機關; });
+      if (試) 值.服務機關 = 試;
+    }
+    const 重複 = 找重複會員(值);
+    if (重複) {
+      if (重複處理 === "更新") {
+        Object.keys(值).forEach(function (k) { if (值[k] === "" || (Array.isArray(值[k]) && !值[k].length)) delete 值[k]; });
+        更新紀錄("會員", 重複.id, 值, "匯入更新「" + 重複.姓名 + "」");
+        統計.更新++;
+      } else 統計.略過++;
+      return;
+    }
+    新增會員(Object.assign({ 會員類別: 設.會員類別[0], 會籍狀態: "有效", 入會日期: 今天(), 標籤: [] }, 值), "名冊匯入");
+    統計.新增++;
+  });
+  記錄操作("匯入", "會員", "新增 " + 統計.新增 + "、更新 " + 統計.更新 + "、略過 " + 統計.略過);
+  return 統計;
+}
+
+// 匯入官網產生的入會申請資料檔（可一次選多個），建立「申請中」的會員
+function 匯入入會申請(完成後) {
+  選擇檔案(".json", true).then(async function (檔們) {
+    if (!檔們.length) return;
+    let 新增 = 0, 重複 = 0, 錯誤 = 0;
+    for (const f of 檔們) {
+      try {
+        const j = JSON.parse(await f.text());
+        if (j.格式 !== "協會申請資料" || j.類型 !== "入會申請" || !j.資料 || !j.資料.姓名) { 錯誤++; continue; }
+        const d = j.資料;
+        const 值 = { 姓名: d.姓名, 員工編號: d.員工編號 || "", 服務機關: d.服務機關 || "", 單位: d.單位 || "", 職稱: d.職稱 || "",
+          公務電話: d.公務電話 || "", Email: d.Email || "", 會員類別: 狀態.資料.設定.會員類別[0], 會籍狀態: "申請中",
+          申請日期: String(j.申請時間 || "").slice(0, 10), 備註: d.備註 || "", 來源: "官網入會申請", 標籤: ["新進"] };
+        if (找重複會員(值)) { 重複++; continue; }
+        新增會員(值);
+        新增++;
+      } catch (e) { 錯誤++; }
+    }
+    對話框("匯入入會申請", h("ul", null, h("li", null, "新增申請 " + 新增 + " 件（會籍狀態：申請中，請審核後按「核准入會」）"),
+      h("li", null, "與既有會員重複 " + 重複 + " 件（未匯入）"), h("li", null, "不是入會申請檔 " + 錯誤 + " 件")));
+    if (完成後) 完成後();
+  });
+}
+
+
+/* ---------- 會務/12_會費與帳務.js ---------- */
+// 檔案說明：會費與帳務（常年會費逐人收繳、催繳名單與通知單、收據列印、收支記帳與傳票、收支決算表）
+
+註冊頁面("會費與帳務", {
+  圖示: "＄",
+  可見: function () { return 可("帳務.檢視"); },
+  說明: "「會費收繳」逐人登記本年度常年會費（可勾選多人一次登記），登記時自動開收據號並記一張收入傳票；點一列可列印收據或作廢。「催繳」列出還沒繳的人，可列印催繳通知單、複製 Outlook 收件者、記錄已催繳。「收支記帳」登記其他收入與支出，傳票號自動編。「收支決算表」依年度彙總各科目決算數，並與預算數比較，可列印與匯出；格式依銓敘部《公務人員協會財務處理作業規定》第六點（會計報告）辦理，正式報送前請再以該規定附件格式核對。會費標準與會計科目在「設定」修改。",
+  繪製: 繪製會費帳務
+});
+
+// 畫出會費與帳務頁（四個頁籤）
+function 繪製會費帳務(容器, 參數) {
+  容器.appendChild(頁首("會費與帳務"));
+  const 頁籤 = 建立頁籤(["會費收繳", "催繳", "收支記帳", "收支決算表"], 參數.頁籤, function (名, 區) {
+    if (名 === "會費收繳") 繪製收繳(區);
+    else if (名 === "催繳") 繪製催繳(區);
+    else if (名 === "收支記帳") 繪製記帳(區);
+    else 繪製決算表(區);
+  });
+  容器.appendChild(頁籤.元素);
+}
+
+// ===== 共用計算 =====
+
+// 查某會員某年度某項目的繳費紀錄
+function 繳費紀錄(會員id, 年度, 項目) {
+  return 集合("會費").find(function (f) { return f.會員id === 會員id && Number(f.年度) === Number(年度) && f.項目 === (項目 || "常年會費"); }) || null;
+}
+
+// 某年度應繳常年會費的會員：目前有效、且在該年底前入會
+function 應繳會員(年度) {
+  return 集合("會員").filter(function (m) {
+    return m.會籍狀態 === "有效" && (!m.入會日期 || m.入會日期 <= 年度 + "-12-31");
+  });
+}
+
+// 某年度還沒繳常年會費的有效會員
+function 未繳名單(年度) {
+  return 應繳會員(年度).filter(function (m) { return !繳費紀錄(m.id, 年度, "常年會費"); });
+}
+
+// 產生下一個收據號（民國年-流水號，例：115-0001）
+function 下一個收據號(年度) {
+  const 前綴 = 民國年(年度) + "-";
+  const 最大 = 集合("會費").reduce(function (m, f) {
+    if (String(f.收據號 || "").indexOf(前綴) !== 0) return m;
+    const n = Number(String(f.收據號).slice(前綴.length));
+    return n > m ? n : m;
+  }, 0);
+  return 前綴 + 補零(最大 + 1, 4);
+}
+
+// 產生下一個傳票號（民國年＋收／支＋流水號，例：115收001）
+function 下一個傳票號(日期, 收支) {
+  const 前綴 = 民國年(String(日期).slice(0, 4)) + (收支 === "收入" ? "收" : "支");
+  const 最大 = 集合("傳票").reduce(function (m, v) {
+    if (String(v.傳票號 || "").indexOf(前綴) !== 0) return m;
+    const n = Number(String(v.傳票號).slice(前綴.length));
+    return n > m ? n : m;
+  }, 0);
+  return 前綴 + 補零(最大 + 1, 3);
+}
+
+// 依名稱找會計科目代碼（找不到回傳空字串）
+function 科目代碼(名稱) {
+  const s = 狀態.資料.設定.會計科目.find(function (k) { return k.名稱 === 名稱; });
+  return s ? s.代碼 : "";
+}
+
+// 科目代碼轉成「代碼 名稱」
+function 科目名稱(代碼) {
+  const s = 狀態.資料.設定.會計科目.find(function (k) { return k.代碼 === 代碼; });
+  return s ? s.名稱 : 代碼 || "";
+}
+
+// 登記繳費：每人一筆會費紀錄（含收據號），並合記一張收入傳票；回傳會費紀錄陣列
+function 登記繳費(選項) {
+  const 會員們 = 選項.會員們.filter(function (m) { return !繳費紀錄(m.id, 選項.年度, 選項.項目); });
+  if (!會員們.length) return [];
+  const 科目 = 科目代碼(選項.項目 === "入會費" ? "入會費收入" : "常年會費收入");
+  const 傳票 = 新增紀錄("傳票", {
+    傳票號: 下一個傳票號(選項.日期, "收入"), 日期: 選項.日期, 收支: "收入", 科目: 科目,
+    金額: 選項.金額 * 會員們.length,
+    摘要: 民國年(選項.年度) + " 年度" + 選項.項目 + "（" + (會員們.length === 1 ? 會員們[0].姓名 : 會員們.length + " 人") + "）",
+    對象: 會員們.length === 1 ? 會員們[0].姓名 : "會員", 來源: "會費"
+  });
+  return 會員們.map(function (m) {
+    return 新增紀錄("會費", {
+      會員id: m.id, 姓名: m.姓名, 年度: Number(選項.年度), 項目: 選項.項目, 金額: 選項.金額, 繳費日: 選項.日期,
+      方式: 選項.方式 || "現金", 收據號: 下一個收據號(選項.年度), 傳票id: 傳票.id, 經手人: 操作者()
+    }, "會費「" + m.姓名 + " " + 民國年(選項.年度) + " 年度" + 選項.項目 + "」");
+  });
+}
+
+// 作廢一筆繳費：刪除會費紀錄，並從對應傳票扣回金額（扣到 0 就刪除傳票）
+function 作廢繳費(會費id) {
+  const f = 找("會費", 會費id);
+  if (!f) return;
+  const v = f.傳票id ? 找("傳票", f.傳票id) : null;
+  if (v) {
+    const 剩 = Number(v.金額) - Number(f.金額);
+    if (剩 <= 0) 刪除紀錄("傳票", v.id, "傳票「" + v.傳票號 + "」（繳費作廢）");
+    else 更新紀錄("傳票", v.id, { 金額: 剩, 摘要: v.摘要 + "（" + f.姓名 + " 作廢）" });
+  }
+  刪除紀錄("會費", 會費id, "作廢收據「" + f.收據號 + "」");
+}
+
+// 產生一張收據（兩聯：收執聯、存根聯）
+function 收據節點(f) {
+  const 設 = 狀態.資料.設定;
+  const 會員 = 找("會員", f.會員id) || {};
+  const 一聯 = function (聯名) {
+    return h("div", { class: "收據" },
+      h("div", { class: "聯別" }, 聯名),
+      h("h1", null, 設.協會名稱 + "　收據"),
+      h("div", { class: "副標" }, "收據號：" + f.收據號 + (設.範例資料 ? "　（範例資料）" : "")),
+      h("table", null, h("tbody", null,
+        h("tr", null, h("td", null, "繳款人"), h("td", null, f.姓名 + (會員.會員編號 ? "（會員編號 " + 會員.會員編號 + "）" : ""))),
+        h("tr", null, h("td", null, "服務機關"), h("td", null, (會員.服務機關 || "") + " " + (會員.單位 || ""))),
+        h("tr", null, h("td", null, "繳費項目"), h("td", null, 民國年(f.年度) + " 年度" + f.項目)),
+        h("tr", null, h("td", null, "金額"), h("td", null, "新臺幣 " + 國字金額(f.金額) + "（NT$ " + 金額(f.金額) + "）")),
+        h("tr", null, h("td", null, "繳費日期"), h("td", null, 民國(f.繳費日) + "　繳費方式：" + (f.方式 || ""))))),
+      h("div", { class: "簽名列" }, h("span", null, "理事長：＿＿＿＿＿"), h("span", null, "會計：＿＿＿＿＿"), h("span", null, "經手人：" + (f.經手人 || "＿＿＿＿＿"))));
+  };
+  return h("div", { class: "列印頁" }, 一聯("第一聯　收執聯（交繳款人）"), 一聯("第二聯　存根聯（協會存查）"));
+}
+
+// 年度下拉選單（從最早有資料的年度到明年）
+function 年度選單(目前, 變更) {
+  const 年們 = new Set([本年(), 本年() + 1]);
+  集合("傳票").forEach(function (v) { if (v.日期) 年們.add(Number(v.日期.slice(0, 4))); });
+  集合("會費").forEach(function (f) { 年們.add(Number(f.年度)); });
+  const 選 = h("select", { "aria-label": "年度", onchange: function () { 變更(Number(選.value)); } },
+    Array.from(年們).sort().reverse().map(function (y) { return h("option", { value: y, selected: y === 目前 }, 民國年(y) + " 年度"); }));
+  return 選;
+}
+
+// ===== 會費收繳 =====
+
+// 畫「會費收繳」頁籤
+function 繪製收繳(區, 年度) {
+  年度 = 年度 || 本年();
+  清空(區);
+  const 設 = 狀態.資料.設定;
+  const 標準 = Number(設.會費標準.常年會費) || 0;
+  const 可收 = 可("會費.收繳");
+  // 每位應繳會員一列（加上該年度已繳但現在不是有效會員的人）
+  const 列們 = function () {
+    const 名單 = 應繳會員(年度).slice();
+    集合("會費").forEach(function (f) {
+      if (Number(f.年度) === 年度 && f.項目 === "常年會費" && !名單.some(function (m) { return m.id === f.會員id; })) {
+        const m = 找("會員", f.會員id);
+        if (m) 名單.push(m);
+      }
+    });
+    return 名單.map(function (m) {
+      const f = 繳費紀錄(m.id, 年度, "常年會費");
+      return { id: m.id, 會員: m, 會費: f, 會員編號: m.會員編號, 姓名: m.姓名, 服務機關: m.服務機關, 狀態: f ? "已繳" : "未繳",
+        繳費日: f ? f.繳費日 : "", 金額: f ? Number(f.金額) : 0, 收據號: f ? f.收據號 : "", 方式: f ? f.方式 : "" };
+    });
+  };
+  const 統計 = h("p", { class: "次要字" });
+  const 更新統計 = function () {
+    const 全 = 列們();
+    const 已 = 全.filter(function (r) { return r.會費; });
+    const 收 = 已.reduce(function (s, r) { return s + r.金額; }, 0);
+    統計.textContent = 民國年(年度) + " 年度常年會費標準 " + 金額(標準) + " 元：應繳 " + 全.length + " 人，已繳 " + 已.length + " 人（" + 金額(收) + " 元），未繳 " + (全.length - 已.length) + " 人；收繳率 " + (全.length ? Math.round(已.length / 全.length * 1000) / 10 : 0) + "%";
+  };
+  const 重整 = function () { 表.重繪(); 更新統計(); };
+  const 表 = 資料表({
+    匯出檔名: 民國年(年度) + "年度常年會費收繳",
+    資料: 列們,
+    預設排序: { key: "會員編號" },
+    欄位: [
+      { key: "會員編號", 標題: "編號" }, { key: "姓名", 標題: "姓名" }, { key: "服務機關", 標題: "服務機關" },
+      { key: "狀態", 標題: "繳費狀態", 顯示: function (r) { return h("span", { class: "標記 " + (r.會費 ? "成" : "危") }, r.狀態); } },
+      { key: "繳費日", 標題: "繳費日", 顯示: function (r) { return 民國(r.繳費日); } },
+      { key: "金額", 標題: "金額", 數字: true, 顯示: function (r) { return r.會費 ? 金額(r.金額) : ""; } },
+      { key: "收據號", 標題: "收據號" }, { key: "方式", 標題: "方式" }
+    ],
+    篩選: [
+      { 標題: "狀態", 選項: ["已繳", "未繳"], 取值: function (r) { return r.狀態; } },
+      { 標題: "機關", 選項: function () { return 設.服務機關; }, 取值: function (r) { return r.服務機關; } }
+    ],
+    點列: function (r) { 繳費明細(r, 年度, 重整); },
+    批次: [
+      可收 ? { 文字: "登記繳費", 動作: function (列) { 登記繳費對話框(列.filter(function (r) { return !r.會費; }).map(function (r) { return r.會員; }), 年度, 重整); } } : null,
+      { 文字: "列印收據", 動作: function (列) {
+        const 已 = 列.filter(function (r) { return r.會費; });
+        if (!已.length) return 提示("勾選的人都還沒繳費", true);
+        列印詢問(已.map(function (r) { return 收據節點(r.會費); }));
+      } }
+    ].filter(Boolean)
+  });
+  區.appendChild(h("div", { class: "表工具列" }, h("label", null, "年度 ", 年度選單(年度, function (y) { 繪製收繳(區, y); })),
+    h("span", { class: "次要字 小字" }, "勾選未繳的會員後按「登記繳費」；點一列可列印收據或作廢")));
+  區.appendChild(統計);
+  區.appendChild(表.元素);
+  更新統計();
+}
+
+// 登記繳費對話框：選繳費日期與方式
+function 登記繳費對話框(會員們, 年度, 完成後) {
+  if (!會員們.length) return 提示("勾選的人都已繳費", true);
+  const 設 = 狀態.資料.設定;
+  return 表單對話框("登記 " + 民國年(年度) + " 年度常年會費（" + 會員們.length + " 人）", [
+    { key: "金額", 標題: "每人金額", 類型: "金額", 必填: true, 預設: 設.會費標準.常年會費, 最小: 0 },
+    { key: "日期", 標題: "繳費日期", 類型: "日期", 必填: true, 預設: 今天() },
+    { key: "方式", 標題: "繳費方式", 類型: "選單", 選項: ["現金", "轉帳", "薪資扣繳"], 必填: true, 預設: "現金" },
+    { key: "列印", 標題: "收據", 類型: "勾選", 預設: 會員們.length === 1, 勾選文字: "登記後列印收據" }
+  ], {}, function (值) {
+    if (!(值.金額 > 0)) return "金額要大於 0";
+    const 紀錄們 = 登記繳費({ 會員們: 會員們, 年度: 年度, 項目: "常年會費", 金額: 值.金額, 日期: 值.日期, 方式: 值.方式 });
+    提示("已登記 " + 紀錄們.length + " 人繳費，記得存檔");
+    if (完成後) 完成後();
+    if (值.列印 && 紀錄們.length) 列印詢問(紀錄們.map(收據節點));
+  });
+}
+
+// 一位會員的繳費明細：列印收據、作廢或登記
+function 繳費明細(r, 年度, 完成後) {
+  const 按鈕 = [{ 文字: "關閉" }];
+  if (r.會費) {
+    if (可("帳務.編輯")) 按鈕.unshift({ 文字: "作廢", 危: true, 動作: async function (關) {
+      if (!(await 確認("確定作廢收據 " + r.收據號 + "？對應傳票金額會一併扣回。", "作廢"))) return false;
+      作廢繳費(r.會費.id); 關(null); 完成後(); 提示("已作廢");
+    } });
+    按鈕.push({ 文字: "列印收據", 主: true, 動作: function (關) { 關(null); 列印詢問(收據節點(r.會費)); } });
+  } else if (可("會費.收繳")) {
+    按鈕.push({ 文字: "登記繳費", 主: true, 動作: function (關) { 關(null); 登記繳費對話框([r.會員], 年度, 完成後); } });
+  }
+  const 催 = 集合("催繳").filter(function (c) { return c.會員id === r.id && Number(c.年度) === 年度; });
+  對話框(r.姓名 + "：" + 民國年(年度) + " 年度常年會費", [
+    h("p", null, r.會費 ? "已於 " + 民國(r.繳費日) + " 繳納 " + 金額(r.金額) + " 元（" + r.方式 + "），收據號 " + r.收據號 + "。" : "尚未繳納。"),
+    催.length ? h("p", { class: "次要字" }, "催繳紀錄：" + 催.map(function (c) { return 民國(c.日期) + "（" + c.方式 + "）"; }).join("、")) : null
+  ], 按鈕);
+}
+
+// ===== 催繳 =====
+
+// 畫「催繳」頁籤：未繳名單、催繳次數
+function 繪製催繳(區, 年度) {
+  年度 = 年度 || 本年();
+  清空(區);
+  const 設 = 狀態.資料.設定;
+  const 列們 = function () {
+    return 未繳名單(年度).map(function (m) {
+      const 催 = 集合("催繳").filter(function (c) { return c.會員id === m.id && Number(c.年度) === 年度; }).sort(function (a, b) { return 比較(b.日期, a.日期); });
+      return { id: m.id, 會員: m, 會員編號: m.會員編號, 姓名: m.姓名, 服務機關: m.服務機關, 單位: m.單位, Email: m.Email, 公務電話: m.公務電話, 催繳次數: 催.length, 最近催繳: 催[0] ? 催[0].日期 : "" };
+    });
+  };
+  const 表 = 資料表({
+    匯出檔名: 民國年(年度) + "年度常年會費催繳名單",
+    資料: 列們,
+    預設排序: { key: "會員編號" },
+    欄位: [
+      { key: "會員編號", 標題: "編號" }, { key: "姓名", 標題: "姓名" }, { key: "服務機關", 標題: "服務機關" }, { key: "單位", 標題: "單位" },
+      { key: "公務電話", 標題: "公務電話" }, { key: "Email", 標題: "Email" },
+      { key: "催繳次數", 標題: "催繳次數", 數字: true }, { key: "最近催繳", 標題: "最近催繳", 顯示: function (r) { return 民國(r.最近催繳); } }
+    ],
+    篩選: [{ 標題: "機關", 選項: function () { return 設.服務機關; }, 取值: function (r) { return r.服務機關; } }],
+    批次: [
+      { 文字: "列印催繳通知單", 動作: function (列) { 列印詢問(列.map(function (r) { return 催繳通知單(r.會員, 年度); })); } },
+      { 文字: "複製 Outlook 收件者", 動作: function (列) { 顯示收件者(列.map(function (r) { return r.會員; })); } },
+      可("會費.收繳") ? { 文字: "記錄已催繳", 動作: function (列) {
+        表單對話框("記錄已催繳（" + 列.length + " 人）", [
+          { key: "日期", 標題: "催繳日期", 類型: "日期", 必填: true, 預設: 今天() },
+          { key: "方式", 標題: "催繳方式", 類型: "選單", 選項: ["Email", "紙本通知", "電話", "當面"], 必填: true, 預設: "Email" }
+        ], {}, function (值) {
+          列.forEach(function (r) { 新增紀錄("催繳", { 會員id: r.id, 年度: 年度, 日期: 值.日期, 方式: 值.方式 }, "催繳「" + r.姓名 + "」"); });
+          提示("已記錄催繳"); 表.重繪();
+        });
+      } } : null
+    ].filter(Boolean),
+    空白文字: "本年度常年會費已全部收齊"
+  });
+  區.appendChild(h("div", { class: "表工具列" }, h("label", null, "年度 ", 年度選單(年度, function (y) { 繪製催繳(區, y); })),
+    h("span", { class: "次要字 小字" }, "勾選後可列印通知單、複製收件者或記錄已催繳")));
+  區.appendChild(表.元素);
+}
+
+// 產生一張催繳通知單
+function 催繳通知單(m, 年度) {
+  const 設 = 狀態.資料.設定;
+  return h("div", { class: "列印頁" },
+    h("h1", null, 設.協會名稱), h("div", { class: "副標" }, "常年會費繳納通知" + (設.範例資料 ? "（範例資料）" : "")),
+    h("p", null, (m.服務機關 || "") + " " + (m.單位 || "") + "　" + m.姓名 + "　會員您好："),
+    h("p", null, "感謝您對協會的支持。依本會章程，" + 民國年(年度) + " 年度常年會費為新臺幣 " + 金額(設.會費標準.常年會費) + " 元，經查您尚未繳納，敬請於方便時向協會承辦人繳納，或洽詢繳費方式。若已繳納，請忽略本通知，並請告知承辦人以便更正。"),
+    h("p", null, "聯絡電話：" + (設.電話 || "　") + "　Email：" + (設.Email || "　")),
+    h("p", { class: "右" }, 設.協會名稱 + "　敬啟　" + 民國(今天())));
+}
+
+// ===== 收支記帳 =====
+
+// 傳票的欄位定義（科目決定是收入還是支出）
+function 傳票欄位() {
+  const 科目們 = 狀態.資料.設定.會計科目.map(function (k) { return { 值: k.代碼, 字: k.代碼 + " " + k.名稱 + "（" + k.類別 + "）" }; });
+  return [
+    { key: "日期", 標題: "日期", 類型: "日期", 必填: true, 預設: 今天() },
+    { key: "科目", 標題: "會計科目", 類型: "選單", 選項: 科目們, 必填: true },
+    { key: "金額", 標題: "金額", 類型: "金額", 必填: true, 最小: 0 },
+    { key: "對象", 標題: "收款／付款對象" },
+    { key: "摘要", 標題: "摘要", 必填: true, 寬: true },
+    { key: "備註", 標題: "備註", 類型: "多行", 行數: 2 }
+  ];
+}
+
+// 畫「收支記帳」頁籤
+function 繪製記帳(區, 年度) {
+  年度 = 年度 || 本年();
+  清空(區);
+  const 可編 = 可("帳務.編輯");
+  const 列們 = function () {
+    return 集合("傳票").filter(function (v) { return String(v.日期).slice(0, 4) === String(年度); });
+  };
+  const 合計 = h("p", { class: "次要字" });
+  const 更新合計 = function () {
+    const 全 = 列們();
+    const 收 = 全.filter(function (v) { return v.收支 === "收入"; }).reduce(function (s, v) { return s + Number(v.金額); }, 0);
+    const 支 = 全.filter(function (v) { return v.收支 === "支出"; }).reduce(function (s, v) { return s + Number(v.金額); }, 0);
+    合計.textContent = 民國年(年度) + " 年度：收入 " + 金額(收) + " 元、支出 " + 金額(支) + " 元、結餘 " + 金額(收 - 支) + " 元（共 " + 全.length + " 張傳票）";
+  };
+  const 重整 = function () { 表.重繪(); 更新合計(); };
+  const 表 = 資料表({
+    匯出檔名: 民國年(年度) + "年度收支明細",
+    資料: 列們,
+    預設排序: { key: "日期", 反向: true },
+    欄位: [
+      { key: "傳票號", 標題: "傳票號" },
+      { key: "日期", 標題: "日期", 顯示: function (r) { return 民國(r.日期); } },
+      { key: "收支", 標題: "收支", 顯示: function (r) { return h("span", { class: "標記 " + (r.收支 === "收入" ? "成" : "警") }, r.收支); } },
+      { key: "科目", 標題: "科目", 值: function (r) { return r.科目 + " " + 科目名稱(r.科目); } },
+      { key: "摘要", 標題: "摘要" }, { key: "對象", 標題: "對象" },
+      { key: "金額", 標題: "金額", 數字: true, 值: function (r) { return Number(r.金額); }, 顯示: function (r) { return 金額(r.金額); } }
+    ],
+    篩選: [
+      { 標題: "收支", 選項: ["收入", "支出"], 取值: function (r) { return r.收支; } },
+      { 標題: "月份", 選項: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(function (m) { return m + "月"; }), 取值: function (r) { return String(r.日期).slice(5, 7) + "月"; } },
+      { 標題: "科目", 選項: function () { return 狀態.資料.設定.會計科目.map(function (k) { return k.名稱; }); }, 取值: function (r) { return 科目名稱(r.科目); } }
+    ],
+    點列: 可編 ? function (r) { 編輯傳票(r.id, 重整); } : null,
+    工具: 可編 ? [h("button", { class: "鈕 主 小", type: "button", id: "新增傳票鈕", onclick: function () { 編輯傳票(null, 重整); } }, "＋ 記一筆")] : []
+  });
+  區.appendChild(h("div", { class: "表工具列" }, h("label", null, "年度 ", 年度選單(年度, function (y) { 繪製記帳(區, y); }))));
+  區.appendChild(合計);
+  區.appendChild(表.元素);
+  更新合計();
+}
+
+// 新增或修改一張傳票（會費產生的傳票只能改摘要與備註）
+function 編輯傳票(id, 完成後) {
+  const 原 = id ? 找("傳票", id) : null;
+  const 來自會費 = 原 && 原.來源 === "會費";
+  const 欄位們 = 傳票欄位().map(function (f) { return 來自會費 && ["日期", "科目", "金額"].indexOf(f.key) >= 0 ? Object.assign({}, f, { 唯讀: true }) : f; });
+  const 選項 = {};
+  if (原) {
+    // 編輯既有傳票時，額外提供刪除按鈕
+    選項.額外按鈕 = [{
+      文字: "刪除傳票", 危: true, 動作: async function (關) {
+        if (來自會費) { 提示("這張傳票由會費收繳產生，請到「會費收繳」作廢該筆繳費", true); return false; }
+        if (!(await 確認("確定刪除傳票 " + 原.傳票號 + "？", "刪除"))) return false;
+        刪除紀錄("傳票", id);
+        關(null);
+        if (完成後) 完成後();
+      }
+    }];
+  }
+  return 表單對話框(原 ? "傳票 " + 原.傳票號 : "記一筆收支", 欄位們, 原 || {}, function (值) {
+    if (來自會費) { 更新紀錄("傳票", id, { 摘要: 值.摘要, 對象: 值.對象, 備註: 值.備註 }); if (完成後) 完成後(); return; }
+    if (!(值.金額 > 0)) return "金額要大於 0";
+    const 科 = 狀態.資料.設定.會計科目.find(function (k) { return k.代碼 === 值.科目; });
+    值.收支 = 科 ? 科.類別 : "支出";
+    if (原) {
+      if (原.收支 !== 值.收支 || 原.日期.slice(0, 4) !== 值.日期.slice(0, 4)) 值.傳票號 = 下一個傳票號(值.日期, 值.收支);
+      更新紀錄("傳票", id, 值);
+    } else {
+      值.傳票號 = 下一個傳票號(值.日期, 值.收支);
+      新增紀錄("傳票", 值);
+    }
+    提示("已記帳，記得存檔");
+    if (完成後) 完成後();
+  }, 選項);
+}
+
+// ===== 收支決算表 =====
+
+// 計算某年度各科目的決算數、預算數與比較
+function 決算資料(年度) {
+  const 科目們 = 狀態.資料.設定.會計科目;
+  const 傳票們 = 集合("傳票").filter(function (v) { return String(v.日期).slice(0, 4) === String(年度); });
+  const 預算們 = 集合("預算").filter(function (b) { return Number(b.年度) === Number(年度); });
+  const 列 = function (類別) {
+    return 科目們.filter(function (k) { return k.類別 === 類別; }).map(function (k) {
+      const 決算 = 傳票們.filter(function (v) { return v.科目 === k.代碼; }).reduce(function (s, v) { return s + Number(v.金額); }, 0);
+      const 預 = 預算們.find(function (b) { return b.科目 === k.代碼; });
+      const 預算 = 預 ? Number(預.金額) || 0 : 0;
+      return { 代碼: k.代碼, 名稱: k.名稱, 決算: 決算, 預算: 預算, 差: 決算 - 預算, 說明: 預 ? 預.說明 || "" : "" };
+    });
+  };
+  const 收入 = 列("收入"), 支出 = 列("支出");
+  const 加總 = function (列們, k) { return 列們.reduce(function (s, r) { return s + r[k]; }, 0); };
+  return {
+    收入: 收入, 支出: 支出,
+    收入合計: { 決算: 加總(收入, "決算"), 預算: 加總(收入, "預算") },
+    支出合計: { 決算: 加總(支出, "決算"), 預算: 加總(支出, "預算") }
+  };
+}
+
+// 產生收支決算表的表格（畫面與列印共用）
+function 決算表格(年度) {
+  const d = 決算資料(年度);
+  const 數 = function (n) { return h("td", { class: "數" }, n ? 金額(n) : "0"); };
+  const 增減 = function (差) { return [h("td", { class: "數" }, 差 > 0 ? 金額(差) : ""), h("td", { class: "數" }, 差 < 0 ? 金額(-差) : "")]; };
+  const 科目列 = function (r) { return h("tr", null, h("td", null, "　" + r.名稱), 數(r.決算), 數(r.預算), 增減(r.差), h("td", null, r.說明)); };
+  const 合計列 = function (名, t) { return h("tr", { style: "font-weight:700" }, h("td", null, 名), 數(t.決算), 數(t.預算), 增減(t.決算 - t.預算), h("td", null, "")); };
+  const 餘絀決算 = d.收入合計.決算 - d.支出合計.決算, 餘絀預算 = d.收入合計.預算 - d.支出合計.預算;
+  return h("table", { class: "表", id: "決算表" },
+    h("thead", null,
+      h("tr", null, h("th", { rowspan: 2 }, "科目"), h("th", { rowspan: 2, class: "數" }, "本年度決算數"), h("th", { rowspan: 2, class: "數" }, "本年度預算數"),
+        h("th", { colspan: 2, class: "置中" }, "決算與預算比較"), h("th", { rowspan: 2 }, "說明")),
+      h("tr", null, h("th", { class: "數" }, "增加"), h("th", { class: "數" }, "減少"))),
+    h("tbody", null,
+      h("tr", null, h("td", { colspan: 6, style: "font-weight:700" }, "收入")), d.收入.map(科目列), 合計列("收入合計", d.收入合計),
+      h("tr", null, h("td", { colspan: 6, style: "font-weight:700" }, "支出")), d.支出.map(科目列), 合計列("支出合計", d.支出合計),
+      h("tr", { style: "font-weight:700" }, h("td", null, 餘絀決算 >= 0 ? "本期賸餘" : "本期短絀"), 數(Math.abs(餘絀決算)), 數(Math.abs(餘絀預算)), 增減(餘絀決算 - 餘絀預算), h("td", null, ""))));
+}
+
+// 畫「收支決算表」頁籤
+function 繪製決算表(區, 年度) {
+  年度 = 年度 || 本年();
+  清空(區);
+  const 設 = 狀態.資料.設定;
+  const 標頭 = function () {
+    return [h("h1", null, 設.協會名稱), h("div", { class: "副標" }, "收支決算表" + (設.範例資料 ? "（範例資料）" : "")),
+      h("div", { class: "副標" }, "中華民國 " + 民國年(年度) + " 年 1 月 1 日至 " + 民國年(年度) + " 年 12 月 31 日　　單位：新臺幣元")];
+  };
+  const 依據 = "格式依銓敘部《公務人員協會財務處理作業規定》第六點（會計報告）編製；會計科目依本會設定。報送主管機關前，請以該規定附件之格式與科目核對。";
+  區.appendChild(h("div", { class: "表工具列" },
+    h("label", null, "年度 ", 年度選單(年度, function (y) { 繪製決算表(區, y); })),
+    h("div", { class: "右側" },
+      可("帳務.編輯") ? h("button", { class: "鈕 小", type: "button", id: "編預算鈕", onclick: function () { 編輯預算(年度, function () { 繪製決算表(區, 年度); }); } }, "編列預算數／說明") : null,
+      h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出決算表(年度, "csv"); } }, "匯出 CSV"),
+      h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出決算表(年度, "xlsx"); } }, "匯出 Excel"),
+      h("button", { class: "鈕 小 主", type: "button", id: "列印決算表鈕", onclick: function () {
+        列印詢問(h("div", { class: "列印頁" }, 標頭(), 決算表格(年度), h("p", { class: "小字" }, 依據),
+          h("div", { class: "簽名列" }, h("span", null, "理事長"), h("span", null, "秘書長"), h("span", null, "會計"), h("span", null, "製表"))));
+      } }, "列印"))));
+  區.appendChild(h("div", { class: "卡" }, h("div", { class: "置中" }, 標頭()), h("div", { class: "表捲" }, 決算表格(年度)), h("p", { class: "小字 次要字" }, 依據)));
+}
+
+// 匯出收支決算表
+function 匯出決算表(年度, 格式) {
+  const d = 決算資料(年度);
+  const 表 = [["科目", "本年度決算數", "本年度預算數", "比較增加", "比較減少", "說明"]];
+  const 加 = function (r, 名) { const 差 = r.決算 - r.預算; 表.push([名 || r.名稱, r.決算, r.預算, 差 > 0 ? 差 : 0, 差 < 0 ? -差 : 0, r.說明 || ""]); };
+  表.push(["收入", "", "", "", "", ""]); d.收入.forEach(function (r) { 加(r); }); 加(d.收入合計, "收入合計");
+  表.push(["支出", "", "", "", "", ""]); d.支出.forEach(function (r) { 加(r); }); 加(d.支出合計, "支出合計");
+  加({ 決算: d.收入合計.決算 - d.支出合計.決算, 預算: d.收入合計.預算 - d.支出合計.預算 }, "本期餘絀");
+  匯出表格(民國年(年度) + "年度收支決算表", 表, 格式);
+}
+
+// 編列某年度各科目預算數與說明
+function 編輯預算(年度, 完成後) {
+  const 科目們 = 狀態.資料.設定.會計科目;
+  const 預算們 = 集合("預算").filter(function (b) { return Number(b.年度) === 年度; });
+  const 欄位們 = [];
+  const 初值 = {};
+  科目們.forEach(function (k) {
+    欄位們.push({ key: "金額_" + k.代碼, 標題: k.代碼 + " " + k.名稱 + "（" + k.類別 + "）", 類型: "金額", 最小: 0 });
+    欄位們.push({ key: "說明_" + k.代碼, 標題: "說明" });
+    const b = 預算們.find(function (x) { return x.科目 === k.代碼; });
+    初值["金額_" + k.代碼] = b ? b.金額 : "";
+    初值["說明_" + k.代碼] = b ? b.說明 || "" : "";
+  });
+  return 表單對話框(民國年(年度) + " 年度預算數", 欄位們, 初值, function (值) {
+    科目們.forEach(function (k) {
+      const 金 = 值["金額_" + k.代碼] === "" ? 0 : Number(值["金額_" + k.代碼]);
+      const 說 = 值["說明_" + k.代碼] || "";
+      const b = 預算們.find(function (x) { return x.科目 === k.代碼; });
+      if (b) 更新紀錄("預算", b.id, { 金額: 金, 說明: 說 }, "預算「" + 民國年(年度) + " " + k.名稱 + "」");
+      else if (金 || 說) 新增紀錄("預算", { 年度: 年度, 科目: k.代碼, 金額: 金, 說明: 說 }, "預算「" + 民國年(年度) + " " + k.名稱 + "」");
+    });
+    提示("已更新預算數");
+    if (完成後) 完成後();
+  }, { 寬: true });
+}
+
+
+/* ---------- 會務/13_活動報名.js ---------- */
+// 檔案說明：活動報名（建立活動、名額與候補、報名名單、匯入官網報名檔、簽到、出席率、通知名單、成果紀錄與照片）
+
+註冊頁面("活動報名", {
+  圖示: "📅",
+  說明: "先「新增活動」設定日期、名額、候補名額、截止日與費用；勾選「公開於官網」後，發布官網時會出現在活動頁供同仁報名。點活動進入後：「報名名單」可手動加入會員或非會員、匯入官網報名檔（超過名額自動列候補，有人取消時候補自動遞補）、列印簽到表；「簽到」可勾選或輸入員工編號按 Enter；「統計與通知」看出席率並取得未報名、未簽到名單；「成果紀錄」寫活動成果並上傳照片（存在協會資料夾的 附件/活動/）。",
+  繪製: function (容器, 參數) {
+    if (參數.活動id && 找("活動", 參數.活動id)) 繪製活動詳細(容器, 找("活動", 參數.活動id), 參數.頁籤);
+    else 繪製活動列表(容器);
+  }
+});
+
+// 活動欄位定義
+function 活動欄位() {
+  return [
+    { key: "名稱", 標題: "活動名稱", 必填: true, 寬: true },
+    { key: "類別", 標題: "類別", 類型: "選單", 選項: function () { return 狀態.資料.設定.活動類別; } },
+    { key: "日期", 標題: "活動日期", 類型: "日期", 必填: true },
+    { key: "開始時間", 標題: "開始時間", 類型: "時間" },
+    { key: "結束時間", 標題: "結束時間", 類型: "時間" },
+    { key: "地點", 標題: "地點" },
+    { key: "名額", 標題: "名額（0＝不限）", 類型: "數字", 最小: 0, 預設: 0 },
+    { key: "候補名額", 標題: "候補名額", 類型: "數字", 最小: 0, 預設: 0 },
+    { key: "截止日", 標題: "報名截止日", 類型: "日期" },
+    { key: "費用", 標題: "費用（元）", 類型: "金額", 最小: 0, 預設: 0 },
+    { key: "說明", 標題: "活動說明", 類型: "多行", 行數: 4 },
+    { key: "公開", 標題: "官網", 類型: "勾選", 勾選文字: "公開於官網（發布後同仁可報名）", 預設: true }
+  ];
+}
+
+// 某活動的報名統計：正取、候補、取消、簽到人數與出席率
+function 活動統計(活動id) {
+  const 列 = 集合("報名").filter(function (r) { return r.活動id === 活動id; });
+  const 正取 = 列.filter(function (r) { return r.狀態 === "正取"; });
+  const 簽到 = 正取.filter(function (r) { return r.簽到時間; }).length;
+  return {
+    正取: 正取.length, 候補: 列.filter(function (r) { return r.狀態 === "候補"; }).length,
+    取消: 列.filter(function (r) { return r.狀態 === "取消"; }).length, 簽到: 簽到,
+    出席率: 正取.length ? Math.round(簽到 / 正取.length * 1000) / 10 : null
+  };
+}
+
+// 活動目前的狀態文字（報名中、已截止、已結束）
+function 活動狀態(a) {
+  const 今 = 今天();
+  if (a.日期 < 今) return "已結束";
+  if (a.截止日 && a.截止日 < 今) return "已截止";
+  return "報名中";
+}
+
+// 畫活動列表
+function 繪製活動列表(容器) {
+  const 可編 = 可("活動.編輯");
+  const 表 = 資料表({
+    匯出檔名: "活動列表",
+    資料: function () { return 集合("活動"); },
+    預設排序: { key: "日期", 反向: true },
+    欄位: [
+      { key: "日期", 標題: "日期", 顯示: function (r) { return 民國(r.日期); } },
+      { key: "名稱", 標題: "活動名稱" },
+      { key: "類別", 標題: "類別" },
+      { key: "地點", 標題: "地點" },
+      { key: "狀態", 標題: "狀態", 值: 活動狀態, 顯示: function (r) { const s = 活動狀態(r); return h("span", { class: "標記 " + (s === "報名中" ? "成" : s === "已截止" ? "警" : "") }, s); } },
+      { key: "名額", 標題: "名額", 數字: true, 值: function (r) { return Number(r.名額) || 0; }, 顯示: function (r) { return Number(r.名額) ? String(r.名額) : "不限"; } },
+      { key: "正取", 標題: "正取", 數字: true, 值: function (r) { return 活動統計(r.id).正取; } },
+      { key: "候補", 標題: "候補", 數字: true, 值: function (r) { return 活動統計(r.id).候補; } },
+      { key: "簽到", 標題: "簽到", 數字: true, 值: function (r) { return 活動統計(r.id).簽到; } },
+      { key: "出席率", 標題: "出席率", 數字: true, 值: function (r) { const s = 活動統計(r.id); return r.日期 <= 今天() && s.出席率 != null ? s.出席率 : ""; }, 顯示: function (r) { const s = 活動統計(r.id); return r.日期 <= 今天() && s.出席率 != null ? s.出席率 + "%" : "—"; } },
+      { key: "公開", 標題: "官網", 值: function (r) { return r.公開 ? "公開" : "—"; } }
+    ],
+    篩選: [
+      { 標題: "類別", 選項: function () { return 狀態.資料.設定.活動類別; }, 取值: function (r) { return r.類別; } },
+      { 標題: "狀態", 選項: ["報名中", "已截止", "已結束"], 取值: 活動狀態 }
+    ],
+    點列: function (r) { 前往("活動報名", { 活動id: r.id }); }
+  });
+  // 已結束活動的平均出席率
+  const 已辦 = 集合("活動").filter(function (a) { return a.日期 <= 今天(); }).map(function (a) { return 活動統計(a.id); }).filter(function (s) { return s.正取; });
+  const 總正取 = 已辦.reduce(function (s, x) { return s + x.正取; }, 0), 總簽到 = 已辦.reduce(function (s, x) { return s + x.簽到; }, 0);
+  容器.appendChild(頁首("活動報名", [
+    可編 ? h("button", { class: "鈕 主", type: "button", id: "新增活動鈕", onclick: function () { 編輯活動(null, function (a) { 前往("活動報名", { 活動id: a.id }); }); } }, "＋ 新增活動") : null,
+    可編 ? h("button", { class: "鈕", type: "button", id: "匯入報名鈕", onclick: function () { 匯入報名檔(null, 表.重繪); } }, "匯入官網報名檔") : null
+  ]));
+  容器.appendChild(h("p", { class: "次要字" }, "已辦理 " + 已辦.length + " 場活動，整體出席率 " + (總正取 ? Math.round(總簽到 / 總正取 * 1000) / 10 : 0) + "%（簽到 " + 總簽到 + "／正取 " + 總正取 + "）"));
+  容器.appendChild(表.元素);
+}
+
+// 新增或編輯活動；完成後呼叫 完成後(活動)
+function 編輯活動(id, 完成後) {
+  const 原 = id ? 找("活動", id) : null;
+  const 選項 = {};
+  if (原) {
+    選項.額外按鈕 = [{
+      文字: "刪除活動", 危: true, 動作: async function (關) {
+        const n = 集合("報名").filter(function (r) { return r.活動id === id; }).length;
+        if (!(await 確認("確定刪除「" + 原.名稱 + "」？" + (n ? "（含 " + n + " 筆報名紀錄一併刪除）" : ""), "刪除"))) return false;
+        集合("報名").filter(function (r) { return r.活動id === id; }).forEach(function (r) { 刪除紀錄("報名", r.id); });
+        刪除紀錄("活動", id);
+        關(null);
+        前往("活動報名");
+      }
+    }];
+  }
+  return 表單對話框(原 ? "編輯活動" : "新增活動", 活動欄位(), 原 || { 日期: 今天(), 公開: true }, function (值) {
+    if (值.截止日 && 值.截止日 > 值.日期) return "報名截止日不能晚於活動日期";
+    ["名額", "候補名額", "費用"].forEach(function (k) { 值[k] = Number(值[k]) || 0; });
+    const a = 原 ? 更新紀錄("活動", id, 值) : 新增紀錄("活動", Object.assign({ 照片: [], 成果說明: "", 成果公開: false }, 值));
+    提示("已儲存活動");
+    if (完成後) 完成後(a);
+  }, 選項);
+}
+
+// 加入一筆報名：依名額決定正取或候補；額滿回傳錯誤文字
+function 加入報名(活動, 值) {
+  const 列 = 集合("報名").filter(function (r) { return r.活動id === 活動.id; });
+  const 已有 = 列.find(function (r) {
+    return r.狀態 !== "取消" && ((值.會員id && r.會員id === 值.會員id) || (!值.會員id && r.姓名 === 值.姓名 && (r.員工編號 || "") === (值.員工編號 || "")));
+  });
+  if (已有) return 值.姓名 + " 已經報名過了（" + 已有.狀態 + "）";
+  const 正取數 = 列.filter(function (r) { return r.狀態 === "正取"; }).length;
+  const 候補數 = 列.filter(function (r) { return r.狀態 === "候補"; }).length;
+  let 狀 = "正取";
+  if (Number(活動.名額) && 正取數 >= Number(活動.名額)) {
+    if (候補數 >= Number(活動.候補名額 || 0)) return "名額與候補都已額滿";
+    狀 = "候補";
+  }
+  return 新增紀錄("報名", Object.assign({ 活動id: 活動.id, 報名時間: 現在(), 狀態: 狀, 簽到時間: "", 已繳費: false, 來源: "手動" }, 值),
+    "報名「" + 活動.名稱 + "：" + 值.姓名 + "（" + 狀 + "）」");
+}
+
+// 從會員資料帶出報名欄位
+function 會員報名資料(m) {
+  return { 會員id: m.id, 姓名: m.姓名, 員工編號: m.員工編號 || "", 服務機關: m.服務機關 || "", 單位: m.單位 || "", Email: m.Email || "", 電話: m.公務電話 || "" };
+}
+
+// 取消報名：若取消的是正取，第一位候補自動遞補
+function 取消報名(r) {
+  const 原狀 = r.狀態;
+  更新紀錄("報名", r.id, { 狀態: "取消", 簽到時間: "" }, "取消報名「" + r.姓名 + "」");
+  if (原狀 !== "正取") return null;
+  const 候補 = 集合("報名").filter(function (x) { return x.活動id === r.活動id && x.狀態 === "候補"; }).sort(function (a, b) { return 比較(a.報名時間, b.報名時間); })[0];
+  if (候補) { 更新紀錄("報名", 候補.id, { 狀態: "正取" }, "候補遞補「" + 候補.姓名 + "」"); return 候補; }
+  return null;
+}
+
+// 畫活動詳細頁（資訊＋四個頁籤）
+function 繪製活動詳細(容器, a, 預設頁籤) {
+  const 可編 = 可("活動.編輯");
+  const 重畫 = function (頁籤) { 前往("活動報名", { 活動id: a.id, 頁籤: 頁籤 }); };
+  容器.appendChild(頁首(a.名稱, [
+    h("button", { class: "鈕", type: "button", onclick: function () { 前往("活動報名"); } }, "← 回活動列表"),
+    可編 ? h("button", { class: "鈕", type: "button", id: "編輯活動鈕", onclick: function () { 編輯活動(a.id, function () { 重畫(); }); } }, "編輯活動") : null
+  ]));
+  const s = 活動統計(a.id);
+  容器.appendChild(h("div", { class: "卡", style: "margin-bottom:1rem" },
+    h("div", { class: "標籤組" },
+      h("span", null, "📅 " + 民國(a.日期) + " " + (a.開始時間 || "") + (a.結束時間 ? "–" + a.結束時間 : "")),
+      h("span", null, "📍 " + (a.地點 || "未定")),
+      h("span", null, "名額 " + (Number(a.名額) || "不限") + (Number(a.候補名額) ? "＋候補 " + a.候補名額 : "")),
+      h("span", null, "截止 " + (民國(a.截止日) || "未定")),
+      h("span", null, "費用 " + (Number(a.費用) ? 金額(a.費用) + " 元" : "免費")),
+      h("span", { class: "標記 " + (活動狀態(a) === "報名中" ? "成" : "") }, 活動狀態(a)),
+      a.公開 ? h("span", { class: "標記 金" }, "官網公開") : null),
+    h("p", { class: "次要字", style: "margin:.5rem 0 0" }, "正取 " + s.正取 + "、候補 " + s.候補 + "、已簽到 " + s.簽到 + (s.出席率 != null ? "、出席率 " + s.出席率 + "%" : "")),
+    a.說明 ? h("p", { style: "white-space:pre-wrap;margin:.5rem 0 0" }, a.說明) : null));
+  const 頁籤 = 建立頁籤(["報名名單", "簽到", "統計與通知", "成果紀錄"], 預設頁籤, function (名, 區) {
+    if (名 === "報名名單") 繪製報名名單(區, a, 重畫);
+    else if (名 === "簽到") 繪製簽到(區, a);
+    else if (名 === "統計與通知") 繪製活動統計(區, a);
+    else 繪製成果紀錄(區, a);
+  });
+  容器.appendChild(頁籤.元素);
+}
+
+// 「報名名單」頁籤
+function 繪製報名名單(區, a, 重畫) {
+  const 可編 = 可("活動.編輯");
+  const 表 = 資料表({
+    匯出檔名: a.名稱 + "_報名名單",
+    資料: function () { return 集合("報名").filter(function (r) { return r.活動id === a.id; }); },
+    預設排序: { key: "報名時間" },
+    欄位: [
+      { key: "姓名", 標題: "姓名" }, { key: "員工編號", 標題: "員工編號" }, { key: "服務機關", 標題: "服務機關" }, { key: "單位", 標題: "單位" },
+      { key: "狀態", 標題: "狀態", 顯示: function (r) { return h("span", { class: "標記 " + ({ 正取: "成", 候補: "金", 取消: "危" }[r.狀態] || "") }, r.狀態); } },
+      { key: "報名時間", 標題: "報名時間", 顯示: function (r) { return 民國時間(r.報名時間); } },
+      { key: "來源", 標題: "來源" },
+      { key: "已繳費", 標題: "繳費", 值: function (r) { return Number(a.費用) ? (r.已繳費 ? "已繳" : "未繳") : "免費"; } },
+      { key: "簽到時間", 標題: "簽到", 顯示: function (r) { return r.簽到時間 ? "✔ " + 民國時間(r.簽到時間).slice(-5) : "—"; } }
+    ],
+    篩選: [{ 標題: "狀態", 選項: ["正取", "候補", "取消"], 取值: function (r) { return r.狀態; } }],
+    批次: 可編 ? [
+      { 文字: "取消報名", 動作: async function (列) {
+        const 有效 = 列.filter(function (r) { return r.狀態 !== "取消"; });
+        if (!有效.length || !(await 確認("確定取消 " + 有效.length + " 人的報名？正取取消後，候補會自動遞補。", "取消報名"))) return;
+        const 遞補 = 有效.map(取消報名).filter(Boolean);
+        提示("已取消" + (遞補.length ? "，遞補：" + 遞補.map(function (r) { return r.姓名; }).join("、") : ""));
+        表.重繪();
+      } },
+      { 文字: "標記已繳費", 動作: function (列) { 列.forEach(function (r) { 更新紀錄("報名", r.id, { 已繳費: true }); }); 表.重繪(); } },
+      { 文字: "複製 Outlook 收件者", 動作: function (列) { 顯示收件者(列); } }
+    ] : [],
+    工具: [
+      可編 ? h("button", { class: "鈕 主 小", type: "button", id: "加入會員報名鈕", onclick: function () { 挑選會員報名(a, 表.重繪); } }, "＋ 會員報名") : null,
+      可編 ? h("button", { class: "鈕 小", type: "button", onclick: function () { 非會員報名(a, 表.重繪); } }, "＋ 非會員") : null,
+      可編 ? h("button", { class: "鈕 小", type: "button", onclick: function () { 匯入報名檔(a, 表.重繪); } }, "匯入官網報名檔") : null,
+      h("button", { class: "鈕 小", type: "button", onclick: function () { 列印簽到表(a); } }, "列印簽到表")
+    ]
+  });
+  區.appendChild(表.元素);
+}
+
+// 從名冊挑會員加入報名（可搜尋姓名、機關、員工編號）
+function 挑選會員報名(a, 完成後) {
+  const 已報 = new Set(集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 !== "取消"; }).map(function (r) { return r.會員id; }));
+  const 搜 = h("input", { type: "search", placeholder: "輸入姓名、機關或員工編號", id: "挑選搜尋", style: "width:100%" });
+  const 清單 = h("div", { class: "挑選清單" });
+  const 訊息 = h("p", { class: "次要字", role: "status" });
+  const 畫 = function () {
+    const 字 = 搜.value.trim();
+    清空(清單);
+    集合("會員").filter(function (m) {
+      return m.會籍狀態 === "有效" && !已報.has(m.id) && (!字 || (m.姓名 + (m.服務機關 || "") + (m.員工編號 || "")).indexOf(字) >= 0);
+    }).slice(0, 50).forEach(function (m) {
+      清單.appendChild(h("button", { type: "button", onclick: function () {
+        const r = 加入報名(a, Object.assign(會員報名資料(m), { 來源: "手動" }));
+        if (typeof r === "string") { 訊息.textContent = r; return; }
+        已報.add(m.id);
+        訊息.textContent = "已加入：" + m.姓名 + "（" + r.狀態 + "）";
+        畫();
+        if (完成後) 完成後();
+      } }, m.姓名 + "　" + (m.服務機關 || "") + " " + (m.單位 || "") + (m.員工編號 ? "　#" + m.員工編號 : "")));
+    });
+  };
+  搜.addEventListener("input", 畫);
+  畫();
+  對話框("加入會員報名：" + a.名稱, [搜, 訊息, 清單], [{ 文字: "完成" }], { 開啟後: function () { 搜.focus(); } });
+}
+
+// 非會員（例如眷屬、來賓）報名
+function 非會員報名(a, 完成後) {
+  return 表單對話框("非會員報名", [
+    { key: "姓名", 標題: "姓名", 必填: true }, { key: "服務機關", 標題: "服務機關" }, { key: "單位", 標題: "單位" },
+    { key: "電話", 標題: "電話" }, { key: "Email", 標題: "Email", 類型: "Email" }, { key: "備註", 標題: "備註" }
+  ], {}, function (值) {
+    const r = 加入報名(a, Object.assign({ 會員id: "", 員工編號: "", 來源: "手動（非會員）" }, 值));
+    if (typeof r === "string") return r;
+    提示("已加入：" + 值.姓名 + "（" + r.狀態 + "）");
+    if (完成後) 完成後();
+  });
+}
+
+// 匯入官網產生的報名資料檔（可多選）；活動 為 null 時依檔案裡的活動編號對應
+function 匯入報名檔(活動, 完成後) {
+  選擇檔案(".json", true).then(async function (檔們) {
+    if (!檔們.length) return;
+    const 結果 = { 正取: 0, 候補: 0, 重複或額滿: [], 無法辨識: 0 };
+    for (const f of 檔們) {
+      try {
+        const j = JSON.parse(await f.text());
+        if (j.格式 !== "協會申請資料" || j.類型 !== "活動報名" || !j.資料 || !j.資料.姓名) { 結果.無法辨識++; continue; }
+        const a = 活動 || 找("活動", j.活動id) || 集合("活動").find(function (x) { return x.名稱 === j.活動名稱; });
+        if (!a || (活動 && j.活動id && j.活動id !== 活動.id)) { 結果.無法辨識++; continue; }
+        const d = j.資料;
+        const 會員 = 找重複會員({ 姓名: d.姓名, 員工編號: d.員工編號, Email: d.Email, 服務機關: d.服務機關 });
+        const 值 = 會員 ? 會員報名資料(會員) : { 會員id: "", 姓名: d.姓名, 員工編號: d.員工編號 || "", 服務機關: d.服務機關 || "", 單位: d.單位 || "", Email: d.Email || "", 電話: d.公務電話 || "" };
+        值.來源 = "官網報名";
+        值.備註 = d.備註 || "";
+        const r = 加入報名(a, 值);
+        if (typeof r === "string") 結果.重複或額滿.push(r);
+        else { 更新紀錄("報名", r.id, { 報名時間: j.申請時間 || r.報名時間 }); 結果[r.狀態]++; }
+      } catch (e) { 結果.無法辨識++; }
+    }
+    對話框("匯入報名檔結果", h("ul", null,
+      h("li", null, "正取 " + 結果.正取 + " 人、候補 " + 結果.候補 + " 人"),
+      結果.重複或額滿.length ? h("li", null, "未加入：" + 結果.重複或額滿.join("；")) : null,
+      h("li", null, "無法辨識或找不到對應活動 " + 結果.無法辨識 + " 個檔案")));
+    if (完成後) 完成後();
+  });
+}
+
+// 列印簽到表（正取名單＋簽名欄）
+function 列印簽到表(a) {
+  const 設 = 狀態.資料.設定;
+  const 名單 = 集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 === "正取"; }).sort(function (x, y) { return 比較(x.服務機關 + x.姓名, y.服務機關 + y.姓名); });
+  列印詢問(h("div", { class: "列印頁" },
+    h("h1", null, 設.協會名稱), h("div", { class: "副標" }, a.名稱 + "　簽到表" + (設.範例資料 ? "（範例資料）" : "")),
+    h("div", { class: "副標" }, "日期：" + 民國(a.日期) + " " + (a.開始時間 || "") + "　地點：" + (a.地點 || "")),
+    h("table", { class: "表" }, h("thead", null, h("tr", null, ["序", "服務機關", "單位", "姓名", "簽名"].map(function (t) { return h("th", null, t); }))),
+      h("tbody", null, 名單.map(function (r, i) { return h("tr", null, h("td", null, i + 1), h("td", null, r.服務機關), h("td", null, r.單位), h("td", null, r.姓名), h("td", { style: "width:35%;height:2.2em" }, "")); })))));
+}
+
+// 「簽到」頁籤：輸入員工編號或姓名按 Enter，或直接勾選
+function 繪製簽到(區, a) {
+  const 可編 = 可("活動.編輯");
+  const 輸入 = h("input", { class: "簽到輸入", id: "簽到輸入", placeholder: "輸入員工編號或姓名，按 Enter 簽到", disabled: !可編 });
+  const 訊息 = h("p", { role: "status", class: "次要字" });
+  const 計數 = h("p", { style: "font-size:1.2rem;font-weight:700" });
+  const 清單 = h("div", { class: "表捲" });
+  const 畫 = function () {
+    const 名單 = 集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 === "正取"; }).sort(function (x, y) { return 比較(x.姓名, y.姓名); });
+    const 已 = 名單.filter(function (r) { return r.簽到時間; }).length;
+    計數.textContent = "已簽到 " + 已 + "／" + 名單.length + " 人（出席率 " + (名單.length ? Math.round(已 / 名單.length * 1000) / 10 : 0) + "%）";
+    清空(清單).appendChild(h("table", { class: "表" },
+      h("thead", null, h("tr", null, h("th", null, "簽到"), h("th", null, "姓名"), h("th", null, "員工編號"), h("th", null, "服務機關"), h("th", null, "時間"))),
+      h("tbody", null, 名單.map(function (r) {
+        return h("tr", null,
+          h("td", null, h("input", { type: "checkbox", "aria-label": "簽到 " + r.姓名, checked: !!r.簽到時間, disabled: !可編, onchange: function (e) {
+            更新紀錄("報名", r.id, { 簽到時間: e.target.checked ? 現在() : "" }, (e.target.checked ? "簽到「" : "取消簽到「") + r.姓名 + "」");
+            畫();
+          } })),
+          h("td", null, r.姓名), h("td", null, r.員工編號 || ""), h("td", null, r.服務機關 || ""), h("td", null, r.簽到時間 ? 民國時間(r.簽到時間).slice(-5) : ""));
+      }))));
+  };
+  輸入.addEventListener("keydown", async function (e) {
+    if (e.key !== "Enter") return;
+    const 字 = 輸入.value.trim();
+    if (!字) return;
+    const 名單 = 集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 !== "取消"; });
+    let 符合 = 名單.filter(function (r) { return r.員工編號 && r.員工編號 === 字; });
+    if (!符合.length) 符合 = 名單.filter(function (r) { return r.姓名 === 字; });
+    if (符合.length > 1) { 訊息.textContent = "有 " + 符合.length + " 位同名，請改輸入員工編號或直接勾選"; return; }
+    let r = 符合[0];
+    if (!r) {
+      // 沒報名：如果是會員，詢問是否現場報名
+      const m = 集合("會員").find(function (x) { return x.會籍狀態 === "有效" && (x.員工編號 === 字 || x.姓名 === 字); });
+      if (!m) { 訊息.textContent = "查無「" + 字 + "」的報名資料"; 輸入.select(); return; }
+      if (!(await 確認(m.姓名 + " 沒有報名，要現場加入並簽到嗎？", "現場報名並簽到"))) return;
+      const 新 = 加入報名(Object.assign({}, a, { 名額: 0 }), Object.assign(會員報名資料(m), { 來源: "現場" }));
+      if (typeof 新 === "string") { 訊息.textContent = 新; return; }
+      r = 新;
+    }
+    if (r.狀態 === "候補") 更新紀錄("報名", r.id, { 狀態: "正取" }, "候補現場轉正取「" + r.姓名 + "」");
+    if (r.簽到時間) 訊息.textContent = r.姓名 + " 已經簽到過了";
+    else { 更新紀錄("報名", r.id, { 簽到時間: 現在() }, "簽到「" + r.姓名 + "」"); 訊息.textContent = "✔ " + r.姓名 + " 簽到完成"; }
+    輸入.value = "";
+    畫();
+  });
+  區.appendChild(輸入);
+  區.appendChild(訊息);
+  區.appendChild(計數);
+  區.appendChild(清單);
+  畫();
+  setTimeout(function () { 輸入.focus(); }, 0);
+}
+
+// 「統計與通知」頁籤：出席率、各機關統計、未報名與未簽到名單
+function 繪製活動統計(區, a) {
+  const s = 活動統計(a.id);
+  const 報名們 = 集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 === "正取"; });
+  const 機關們 = {};
+  報名們.forEach(function (r) {
+    const k = r.服務機關 || "（未填）";
+    機關們[k] = 機關們[k] || { 報名: 0, 簽到: 0 };
+    機關們[k].報名++;
+    if (r.簽到時間) 機關們[k].簽到++;
+  });
+  const 有報 = new Set(集合("報名").filter(function (r) { return r.活動id === a.id && r.狀態 !== "取消"; }).map(function (r) { return r.會員id; }));
+  const 未報名 = 集合("會員").filter(function (m) { return m.會籍狀態 === "有效" && !有報.has(m.id); });
+  const 未簽到 = 報名們.filter(function (r) { return !r.簽到時間; });
+  const 名單卡 = function (標題, 名單, 檔名) {
+    return h("div", { class: "卡" }, h("h2", null, 標題 + "（" + 名單.length + " 人）"),
+      h("div", { class: "表工具列" },
+        h("button", { class: "鈕 小", type: "button", disabled: !名單.length, onclick: function () { 顯示收件者(名單); } }, "複製 Outlook 收件者"),
+        h("button", { class: "鈕 小", type: "button", disabled: !名單.length, onclick: function () {
+          匯出表格(a.名稱 + "_" + 檔名, [["姓名", "服務機關", "單位", "Email", "電話"]].concat(名單.map(function (m) { return [m.姓名, m.服務機關 || "", m.單位 || "", m.Email || "", m.公務電話 || m.電話 || ""]; })), "csv");
+        } }, "匯出 CSV")),
+      h("p", { class: "小字 次要字" }, 名單.slice(0, 12).map(function (m) { return m.姓名; }).join("、") + (名單.length > 12 ? "…" : "")));
+  };
+  區.appendChild(h("div", { class: "格" },
+    h("div", { class: "卡 數字卡" }, h("div", { class: "標" }, "正取"), h("div", { class: "數字" }, s.正取), h("div", { class: "小字 次要字" }, "名額 " + (Number(a.名額) || "不限"))),
+    h("div", { class: "卡 數字卡" }, h("div", { class: "標" }, "候補"), h("div", { class: "數字" }, s.候補), h("div", { class: "小字 次要字" }, "取消 " + s.取消)),
+    h("div", { class: "卡 數字卡" }, h("div", { class: "標" }, "已簽到"), h("div", { class: "數字" }, s.簽到), h("div", { class: "小字 次要字" }, "未簽到 " + (s.正取 - s.簽到))),
+    h("div", { class: "卡 數字卡" }, h("div", { class: "標" }, "出席率"), h("div", { class: "數字", id: "出席率" }, s.出席率 == null ? "—" : s.出席率 + "%"), h("div", { class: "小字 次要字" }, "簽到／正取"))));
+  區.appendChild(h("div", { class: "卡", style: "margin-top:1rem" }, h("h2", null, "各機關出席情形"),
+    h("div", { class: "表捲" }, h("table", { class: "表" },
+      h("thead", null, h("tr", null, h("th", null, "服務機關"), h("th", { class: "數" }, "正取"), h("th", { class: "數" }, "簽到"), h("th", { class: "數" }, "出席率"))),
+      h("tbody", null, Object.keys(機關們).sort(比較).map(function (k) {
+        const x = 機關們[k];
+        return h("tr", null, h("td", null, k), h("td", { class: "數" }, x.報名), h("td", { class: "數" }, x.簽到), h("td", { class: "數" }, Math.round(x.簽到 / x.報名 * 1000) / 10 + "%"));
+      }))))));
+  區.appendChild(h("div", { class: "格2" }, 名單卡("通知名單：未報名的有效會員", 未報名, "未報名名單"), 名單卡("通知名單：已報名未簽到", 未簽到, "未簽到名單")));
+}
+
+// 「成果紀錄」頁籤：成果說明、是否公開、活動照片
+function 繪製成果紀錄(區, a) {
+  const 可編 = 可("活動.編輯");
+  const 說明 = h("textarea", { rows: 5, id: "成果說明", disabled: !可編 });
+  說明.value = a.成果說明 || "";
+  const 公開 = h("input", { type: "checkbox", checked: !!a.成果公開, disabled: !可編 });
+  const 牆 = h("div", { class: "相片牆" });
+  const 畫照片 = async function () {
+    清空(牆);
+    for (const 路徑 of (a.照片 || [])) {
+      const f = await 讀附件(路徑);
+      const 圖 = h("img", { alt: 路徑.split("/").pop() });
+      if (f) {
+        const url = URL.createObjectURL(f);
+        圖.addEventListener("load", function () { URL.revokeObjectURL(url); });
+        圖.addEventListener("error", function () { URL.revokeObjectURL(url); });
+        圖.src = url;
+      }
+      牆.appendChild(h("figure", null, 圖, h("figcaption", { class: "小字 次要字" }, f ? 路徑.split("/").pop().replace(/^[0-9a-f]{6}_/, "") : "（找不到檔案）",
+        可編 ? h("button", { class: "鈕 小 文字", type: "button", onclick: async function () {
+          if (!(await 確認("確定移除這張照片？", "移除"))) return;
+          await 刪附件(路徑);
+          更新紀錄("活動", a.id, { 照片: a.照片.filter(function (p) { return p !== 路徑; }) }, "移除活動照片");
+          畫照片();
+        } }, "移除") : null)));
+    }
+    if (!(a.照片 || []).length) 牆.appendChild(h("p", { class: "次要字" }, "還沒有照片"));
+  };
+  const 上傳 = h("input", { type: "file", accept: "image/*", multiple: true, id: "上傳照片", class: "隱藏" });
+  上傳.addEventListener("change", async function () {
+    try {
+      const 新路徑 = [];
+      for (const f of Array.from(上傳.files)) 新路徑.push(await 存附件(["活動", a.id], f));
+      更新紀錄("活動", a.id, { 照片: (a.照片 || []).concat(新路徑) }, "上傳活動照片 " + 新路徑.length + " 張");
+      提示("已上傳 " + 新路徑.length + " 張照片（檔案已存入協會資料夾，記得存檔）");
+      上傳.value = "";
+      畫照片();
+    } catch (e) { 提示(e.message, true); }
+  });
+  區.appendChild(h("div", { class: "卡" },
+    h("h2", null, "活動成果"), 說明,
+    h("p", null, h("label", null, 公開, " 成果與照片公開於官網")),
+    可編 ? h("button", { class: "鈕 主", type: "button", id: "儲存成果鈕", onclick: function () {
+      更新紀錄("活動", a.id, { 成果說明: 說明.value.trim(), 成果公開: 公開.checked }, "活動成果「" + a.名稱 + "」");
+      提示("已儲存成果紀錄");
+    } }, "儲存成果") : null));
+  區.appendChild(h("div", { class: "卡", style: "margin-top:1rem" },
+    h("div", { class: "頁首" }, h("h2", { style: "margin:0" }, "活動照片"),
+      可編 ? h("div", { class: "工具" }, h("button", { class: "鈕", type: "button", onclick: function () { 上傳.click(); } }, "上傳照片"), 上傳) : null),
+    牆));
+  畫照片();
+}
+
+
+/* ---------- 會務/14_官網發布.js ---------- */
+// 檔案說明：官網發布（編輯最新消息、會員福利、特約商店、權益成果、下載檔、常見問答、理監事、協會簡介；一鍵輸出官網資料檔）
+
+註冊頁面("官網發布", {
+  圖示: "🌐",
+  分隔: true,
+  可見: function () { return 可("官網.編輯"); },
+  說明: "在這裡編輯官網要顯示的內容。每一項都可以勾選「公開」決定要不要出現在官網。活動是在「活動報名」勾選「公開於官網」。改好後到「發布」頁籤按「發布到官網資料夾」，選官網所在的資料夾（裡面有 index.html），系統會寫入 資料/site-data.js，並把下載檔與公開的活動照片複製到 資料/檔案/。如果瀏覽器不支援選資料夾，可改按「下載官網資料檔」，再交給網站管理者放到 官網/資料/。官網資料檔只含公開資訊，不含會員名冊。",
+  繪製: function (容器, 參數) {
+    容器.appendChild(頁首("官網發布"));
+    const 頁籤 = 建立頁籤(["最新消息", "會員福利", "特約商店", "權益成果", "下載檔案", "常見問答", "理監事", "協會簡介", "發布"], 參數.頁籤, function (名, 區) {
+      if (名 === "協會簡介") 繪製協會簡介(區);
+      else if (名 === "發布") 繪製發布(區);
+      else 繪製官網集合(區, 名);
+    });
+    容器.appendChild(頁籤.元素);
+  }
+});
+
+// 各官網內容的設定：對應集合、表單欄位、列表欄位
+function 官網內容定義(名) {
+  const 設 = 狀態.資料.設定;
+  const 公開欄 = { key: "公開", 標題: "官網", 類型: "勾選", 勾選文字: "公開於官網", 預設: true };
+  const 公開顯示 = { key: "公開", 標題: "官網", 值: function (r) { return r.公開 === false ? "不公開" : "公開"; } };
+  const 日期欄 = { key: "日期", 標題: "日期", 顯示: function (r) { return 民國(r.日期); } };
+  return {
+    最新消息: {
+      集合: "消息",
+      欄位: [{ key: "標題", 標題: "標題", 必填: true, 寬: true }, { key: "分類", 標題: "分類", 類型: "選單", 選項: function () { return 設.消息分類; } },
+        { key: "日期", 標題: "日期", 類型: "日期", 必填: true, 預設: 今天() }, { key: "置頂", 標題: "置頂", 類型: "勾選", 勾選文字: "置頂" }, 公開欄,
+        { key: "內文", 標題: "內文", 類型: "多行", 行數: 8, 必填: true }],
+      列: [日期欄, { key: "標題", 標題: "標題" }, { key: "分類", 標題: "分類" }, { key: "置頂", 標題: "置頂", 值: function (r) { return r.置頂 ? "置頂" : ""; } }, 公開顯示],
+      排序: { key: "日期", 反向: true }
+    },
+    會員福利: {
+      集合: "福利",
+      欄位: [{ key: "名稱", 標題: "福利項目", 必填: true }, { key: "對象", 標題: "適用對象" }, 公開欄,
+        { key: "內容", 標題: "內容", 類型: "多行", 行數: 4 }, { key: "申請方式", 標題: "申請方式", 類型: "多行", 行數: 3 }],
+      列: [{ key: "名稱", 標題: "福利項目" }, { key: "對象", 標題: "適用對象" }, 公開顯示]
+    },
+    特約商店: {
+      集合: "特約商店",
+      欄位: [{ key: "名稱", 標題: "商店名稱", 必填: true }, { key: "類別", 標題: "類別" }, { key: "電話", 標題: "電話" }, { key: "地址", 標題: "地址", 寬: true }, 公開欄,
+        { key: "優惠內容", 標題: "優惠內容", 類型: "多行", 行數: 3 }],
+      列: [{ key: "名稱", 標題: "商店" }, { key: "類別", 標題: "類別" }, { key: "優惠內容", 標題: "優惠內容" }, 公開顯示]
+    },
+    權益成果: {
+      集合: "權益成果",
+      欄位: [{ key: "標題", 標題: "標題", 必填: true, 寬: true }, { key: "類型", 標題: "類型", 類型: "選單", 選項: ["建議案", "協商案", "其他"] },
+        { key: "日期", 標題: "日期", 類型: "日期", 預設: 今天() }, 公開欄,
+        { key: "摘要", 標題: "案由摘要", 類型: "多行", 行數: 4 }, { key: "結果", 標題: "辦理結果", 類型: "多行", 行數: 3 }],
+      列: [日期欄, { key: "標題", 標題: "標題" }, { key: "類型", 標題: "類型" }, 公開顯示],
+      排序: { key: "日期", 反向: true },
+      註: "依《公務人員協會法》第 6 條（建議事項）、第 7 條（協商事項）辦理之成果。第二階段「建議與協商案」模組完成後，可由案件直接發布到這裡。"
+    },
+    下載檔案: {
+      集合: "下載",
+      欄位: [{ key: "名稱", 標題: "名稱", 必填: true }, { key: "分類", 標題: "分類", 類型: "選單", 選項: ["表單", "章程", "會議紀錄", "其他"] },
+        { key: "說明", 標題: "說明", 寬: true }, 公開欄, { key: "檔案", 標題: "檔案（新增或替換）", 類型: "檔案", 寬: true }],
+      列: [{ key: "名稱", 標題: "名稱" }, { key: "分類", 標題: "分類" }, { key: "檔名", 標題: "檔案" }, 公開顯示]
+    },
+    常見問答: {
+      集合: "常見問答",
+      欄位: [{ key: "問題", 標題: "問題", 必填: true, 寬: true }, { key: "分類", 標題: "分類" }, { key: "排序", 標題: "排序（小的在前）", 類型: "數字", 預設: 10 }, 公開欄,
+        { key: "答案", 標題: "答案", 類型: "多行", 行數: 5, 必填: true }],
+      列: [{ key: "排序", 標題: "排序", 數字: true, 值: function (r) { return Number(r.排序) || 0; } }, { key: "問題", 標題: "問題" }, { key: "分類", 標題: "分類" }, 公開顯示],
+      排序: { key: "排序" }
+    },
+    理監事: {
+      集合: "理監事",
+      欄位: [{ key: "職稱", 標題: "職稱", 類型: "選單", 選項: ["理事長", "常務理事", "理事", "監事會召集人", "常務監事", "監事", "秘書長"], 必填: true },
+        { key: "姓名", 標題: "姓名", 必填: true }, { key: "服務機關", 標題: "服務機關", 類型: "選單", 選項: function () { return 設.服務機關; } },
+        { key: "排序", 標題: "排序（小的在前）", 類型: "數字", 預設: 10 }],
+      列: [{ key: "排序", 標題: "排序", 數字: true, 值: function (r) { return Number(r.排序) || 0; } }, { key: "職稱", 標題: "職稱" }, { key: "姓名", 標題: "姓名" }, { key: "服務機關", 標題: "服務機關" }],
+      排序: { key: "排序" },
+      註: "理監事名單會公開在官網「關於協會」頁。"
+    }
+  }[名];
+}
+
+// 畫某一種官網內容的列表（新增、編輯、刪除）
+function 繪製官網集合(區, 名) {
+  const 定 = 官網內容定義(名);
+  const 表 = 資料表({
+    匯出檔名: "官網_" + 名,
+    資料: function () { return 集合(定.集合); },
+    預設排序: 定.排序,
+    欄位: 定.列,
+    點列: function (r) { 編輯官網項目(名, r.id, 表.重繪); },
+    工具: [h("button", { class: "鈕 主 小", type: "button", id: "新增官網項目鈕", onclick: function () { 編輯官網項目(名, null, 表.重繪); } }, "＋ 新增")]
+  });
+  if (定.註) 區.appendChild(h("p", { class: "次要字 小字" }, 定.註));
+  區.appendChild(表.元素);
+}
+
+// 新增或編輯一個官網項目（下載檔案會把檔案存進 附件/官網下載/）
+function 編輯官網項目(名, id, 完成後) {
+  const 定 = 官網內容定義(名);
+  const 原 = id ? 找(定.集合, id) : null;
+  const 選項 = {};
+  if (原) {
+    選項.額外按鈕 = [{
+      文字: "刪除", 危: true, 動作: async function (關) {
+        if (!(await 確認("確定刪除這一項？", "刪除"))) return false;
+        if (原.附件) await 刪附件(原.附件);
+        刪除紀錄(定.集合, id);
+        關(null);
+        完成後();
+      }
+    }];
+  }
+  return 表單對話框((原 ? "編輯" : "新增") + "：" + 名, 定.欄位, 原 || {}, async function (值) {
+    const 檔 = 值.檔案;
+    delete 值.檔案;
+    if (名 === "下載檔案") {
+      if (!檔 && !(原 && 原.附件)) return "請選擇要提供下載的檔案";
+      if (檔) {
+        try {
+          const 路徑 = await 存附件(["官網下載"], 檔);
+          if (原 && 原.附件) await 刪附件(原.附件);
+          值.附件 = 路徑;
+          值.檔名 = 檔.name;
+        } catch (e) { return e.message; }
+      }
+    }
+    if (原) 更新紀錄(定.集合, id, 值); else 新增紀錄(定.集合, 值);
+    提示("已儲存，發布到官網後才會更新網站");
+    完成後();
+  }, 選項);
+}
+
+// 「協會簡介」頁籤：協會基本資料、宗旨、沿革、章程、聯絡資訊、法規連結
+function 繪製協會簡介(區) {
+  const 設 = 狀態.資料.設定;
+  const 欄位們 = [
+    { key: "協會名稱", 標題: "協會名稱", 必填: true }, { key: "標語", 標題: "標語" },
+    { key: "地址", 標題: "地址", 寬: true }, { key: "電話", 標題: "電話" }, { key: "傳真", 標題: "傳真" }, { key: "Email", 標題: "Email", 類型: "Email" },
+    { key: "服務時間", 標題: "服務時間" },
+    { key: "組別", 標題: "組別（以頓號分隔，組織架構圖用）", 寬: true },
+    { key: "宗旨", 標題: "宗旨", 類型: "多行", 行數: 4 }, { key: "沿革", 標題: "沿革", 類型: "多行", 行數: 6 }, { key: "章程", 標題: "章程", 類型: "多行", 行數: 10 },
+    { key: "法規連結", 標題: "相關法規連結（每行一筆：名稱｜網址）", 類型: "多行", 行數: 4 }
+  ];
+  const 初值 = Object.assign({}, 設, {
+    組別: (設.組別 || []).join("、"),
+    法規連結: (設.法規連結 || []).map(function (l) { return l.名稱 + "｜" + l.網址; }).join("\n")
+  });
+  const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, 初值[f.key]); }));
+  區.appendChild(h("div", { class: "卡" }, 表單,
+    h("p", null, h("button", { class: "鈕 主", type: "button", id: "儲存簡介鈕", onclick: function () {
+      const 值 = 讀表單(表單, 欄位們);
+      if (!值.協會名稱) return 提示("請填協會名稱", true);
+      值.組別 = 值.組別.split(/[、,，\s]+/).filter(Boolean);
+      值.法規連結 = 值.法規連結.split(/\n+/).map(function (行) {
+        const 段 = 行.split(/[｜|]/);
+        return { 名稱: (段[0] || "").trim(), 網址: (段[1] || "").trim() };
+      }).filter(function (l) { return l.名稱 && /^https?:\/\//i.test(l.網址); });
+      更新設定(值);
+      更新外框();
+      提示("已儲存協會簡介");
+    } }, "儲存協會簡介"))));
+}
+
+// 「發布」頁籤：統計要發布的內容，提供發布到官網資料夾或下載資料檔
+function 繪製發布(區) {
+  const 設 = 狀態.資料.設定;
+  const 官網資料 = 產生官網資料(狀態.資料, 現在());
+  const 計 = function (名, n) { return h("li", null, 名 + "：" + n + " 則"); };
+  區.appendChild(h("div", { class: "卡" },
+    h("h2", null, "這次會發布的內容"),
+    h("ul", null, 計("最新消息", 官網資料.消息.length), 計("活動", 官網資料.活動.length), 計("會員福利", 官網資料.福利.length),
+      計("特約商店", 官網資料.特約商店.length), 計("權益成果", 官網資料.權益成果.length), 計("下載檔案", 官網資料.下載.length),
+      計("常見問答", 官網資料.常見問答.length), 計("理監事", 官網資料.理監事.length)),
+    h("p", { class: "次要字" }, "上次發布：" + (設.最後發布 ? 民國時間(設.最後發布) + "（" + (設.最後發布人 || "") + "）" : "尚未發布")),
+    h("p", { class: "提醒" }, "官網資料檔只含公開資訊（不含會員名冊、帳務）。發布前請確認內容沒有不該公開的個資。"),
+    h("div", { class: "表工具列" },
+      支援資料夾() ? h("button", { class: "鈕 主", type: "button", id: "發布鈕", onclick: function () { 發布到官網資料夾(); } }, "發布到官網資料夾") : null,
+      h("button", { class: "鈕", type: "button", onclick: function () {
+        下載檔案("site-data.js", 官網資料檔內容(產生官網資料(狀態.資料, 現在())), "text/javascript");
+        提示("已下載 site-data.js，請放到 官網/資料/ 資料夾（下載檔與照片需另外複製到 官網/資料/檔案/）");
+      } }, "下載官網資料檔"))));
+}
+
+// 發布：選官網資料夾 → 寫入 資料/site-data.js → 複製下載檔與公開照片到 資料/檔案/
+async function 發布到官網資料夾() {
+  try {
+    const 夾 = await window.showDirectoryPicker({ id: "官網資料夾", mode: "readwrite" });
+    if (夾.requestPermission && (await 夾.requestPermission({ mode: "readwrite" })) !== "granted") throw new Error("沒有取得資料夾的寫入權限");
+    let 有首頁 = true;
+    try { await 夾.getFileHandle("index.html"); } catch (e) { 有首頁 = false; }
+    if (!有首頁 && !(await 確認("這個資料夾裡沒有 index.html，看起來不是官網資料夾。仍要寫入嗎？", "仍要寫入"))) return;
+    const 時間 = 現在();
+    const 官網資料 = 產生官網資料(狀態.資料, 時間);
+    const 資料夾 = await 夾.getDirectoryHandle("資料", { create: true });
+    const 檔案夾 = await 資料夾.getDirectoryHandle("檔案", { create: true });
+    // 要複製的附件：下載檔＋公開活動的照片
+    const 附件們 = 集合("下載").filter(function (d) { return d.公開 !== false && d.附件; }).map(function (d) { return d.附件; });
+    集合("活動").filter(function (a) { return a.公開 && a.成果公開; }).forEach(function (a) { (a.照片 || []).forEach(function (p) { 附件們.push(p); }); });
+    let 複製 = 0, 缺 = 0;
+    for (const 路徑 of 附件們) {
+      const f = await 讀附件(路徑);
+      if (!f) { 缺++; continue; }
+      await 寫檔(檔案夾, 路徑.split("/").pop(), f);
+      複製++;
+    }
+    await 寫檔(資料夾, "site-data.js", 官網資料檔內容(官網資料));
+    更新設定({ 最後發布: 時間, 最後發布人: 操作者() });
+    記錄操作("發布", "官網", "發布官網資料（附件 " + 複製 + " 個）");
+    提示("已發布到官網：資料檔＋" + 複製 + " 個檔案" + (缺 ? "（" + 缺 + " 個附件找不到）" : "") + "。記得存檔。");
+    重新繪製();
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    提示("發布失敗：" + e.message, true);
+  }
+}
+
+
+/* ---------- 會務/19_設定.js ---------- */
+// 檔案說明：設定（服務機關、會員類別與標籤、會費標準、會計科目、使用者與角色、備份份數）與操作紀錄
+
+註冊頁面("設定", {
+  圖示: "⚙",
+  可見: function () { return 可("設定.編輯"); },
+  說明: "「基本清單」維護服務機關（預設依《財政部組織法》第 5 條所列次級機關，組織調整時請增刪）、會員類別、會員標籤、活動類別、消息分類與備份份數。「會費標準」設定入會費與常年會費（依章程，經會員大會議決）。「會計科目」可自訂；預設科目依《公務人員協會法》第 27 條經費來源整理。「使用者與角色」新增可登入的幹部並設定角色、重設密碼、停用帳號。角色只控制畫面上的功能，不是真正的資安控管。協會簡介與聯絡資訊請到「官網發布 → 協會簡介」修改。",
+  繪製: function (容器, 參數) {
+    容器.appendChild(頁首("設定"));
+    const 頁籤 = 建立頁籤(["基本清單", "會費標準", "會計科目", "使用者與角色"], 參數.頁籤, function (名, 區) {
+      if (名 === "基本清單") 繪製基本清單(區);
+      else if (名 === "會費標準") 繪製會費標準(區);
+      else if (名 === "會計科目") 繪製會計科目(區);
+      else 繪製使用者(區);
+    });
+    容器.appendChild(頁籤.元素);
+  }
+});
+
+// 「基本清單」：每行一項的清單設定
+function 繪製基本清單(區) {
+  const 設 = 狀態.資料.設定;
+  const 清單們 = [["服務機關", "服務機關（每行一個）"], ["會員類別", "會員類別"], ["會員標籤", "會員標籤"], ["活動類別", "活動類別"], ["消息分類", "最新消息分類"]];
+  const 框們 = {};
+  const 表單 = h("div", { class: "表單" }, 清單們.map(function (x) {
+    const 框 = h("textarea", { rows: x[0] === "服務機關" ? 12 : 5, "aria-label": x[1] });
+    框.value = (設[x[0]] || []).join("\n");
+    框們[x[0]] = 框;
+    return h("div", { class: "欄" }, h("span", null, x[1]), 框);
+  }));
+  const 備份 = h("input", { type: "number", min: 5, max: 200, value: 設.備份份數 || 30, id: "備份份數" });
+  區.appendChild(h("div", { class: "卡" }, 表單,
+    h("p", null, h("label", null, "自動備份保留份數 ", 備份)),
+    h("button", { class: "鈕 主", type: "button", onclick: function () {
+      const 變更 = {};
+      清單們.forEach(function (x) { 變更[x[0]] = 框們[x[0]].value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean); });
+      if (!變更.服務機關.length || !變更.會員類別.length) return 提示("服務機關與會員類別至少要一項", true);
+      變更.備份份數 = Math.max(5, Number(備份.value) || 30);
+      更新設定(變更);
+      提示("已儲存設定");
+    } }, "儲存")));
+}
+
+// 「會費標準」：入會費、常年會費
+function 繪製會費標準(區) {
+  const 設 = 狀態.資料.設定;
+  const 欄位們 = [{ key: "入會費", 標題: "入會費（元）", 類型: "金額", 最小: 0 }, { key: "常年會費", 標題: "常年會費（元／年）", 類型: "金額", 最小: 0 }];
+  const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, 設.會費標準[f.key]); }));
+  區.appendChild(h("div", { class: "卡" },
+    h("p", { class: "次要字" }, "依《公務人員協會法》第 27 條，入會費與常年會費的數額及繳納方式須經會員（代表）大會議決，並訂入章程。"),
+    表單,
+    h("p", null, h("button", { class: "鈕 主", type: "button", id: "儲存會費標準鈕", onclick: function () {
+      const 值 = 讀表單(表單, 欄位們);
+      更新設定({ 會費標準: { 入會費: Number(值.入會費) || 0, 常年會費: Number(值.常年會費) || 0 } });
+      提示("已儲存會費標準");
+    } }, "儲存"))));
+}
+
+// 「會計科目」：可新增、修改、刪除（已用過的科目不可刪）
+function 繪製會計科目(區) {
+  const 重畫 = function () { 清空(區); 繪製會計科目(區); };
+  const 設 = 狀態.資料.設定;
+  const 欄位們 = [{ key: "代碼", 標題: "代碼", 必填: true }, { key: "名稱", 標題: "科目名稱", 必填: true }, { key: "類別", 標題: "類別", 類型: "選單", 選項: ["收入", "支出"], 必填: true }];
+  const 編輯 = function (原) {
+    表單對話框(原 ? "編輯科目" : "新增科目", 欄位們, 原 || { 類別: "支出" }, function (值) {
+      const 科目們 = 設.會計科目.slice();
+      if (科目們.some(function (k) { return k.代碼 === 值.代碼 && k !== 原; })) return "代碼重複";
+      if (原) {
+        if (原.代碼 !== 值.代碼 && 集合("傳票").some(function (v) { return v.科目 === 原.代碼; })) return "這個科目已有傳票使用，不能改代碼";
+        科目們[科目們.indexOf(原)] = 值;
+      } else 科目們.push(值);
+      科目們.sort(function (a, b) { return 比較(a.代碼, b.代碼); });
+      更新設定({ 會計科目: 科目們 });
+      重畫();
+    }, 原 ? { 額外按鈕: [{ 文字: "刪除", 危: true, 動作: function (關) {
+      if (集合("傳票").some(function (v) { return v.科目 === 原.代碼; })) { 提示("這個科目已有傳票使用，不能刪除", true); return false; }
+      更新設定({ 會計科目: 設.會計科目.filter(function (k) { return k !== 原; }) });
+      關(null); 重畫();
+    } }] } : null);
+  };
+  區.appendChild(h("p", { class: "次要字 小字" }, "預設科目依《公務人員協會法》第 27 條經費來源整理。正式報表請對照銓敘部《公務人員協會財務處理作業規定》所定科目（資產、負債、基金暨餘絀、收入、支出五類）。"));
+  區.appendChild(h("div", { class: "表工具列" }, h("button", { class: "鈕 主 小", type: "button", onclick: function () { 編輯(null); } }, "＋ 新增科目")));
+  區.appendChild(h("div", { class: "表捲" }, h("table", { class: "表" },
+    h("thead", null, h("tr", null, h("th", null, "代碼"), h("th", null, "科目名稱"), h("th", null, "類別"), h("th", null, "已用傳票"))),
+    h("tbody", null, 設.會計科目.map(function (k) {
+      return h("tr", { class: "可點", onclick: function () { 編輯(k); } }, h("td", null, k.代碼), h("td", null, k.名稱), h("td", null, k.類別),
+        h("td", null, 集合("傳票").filter(function (v) { return v.科目 === k.代碼; }).length));
+    })))));
+}
+
+// 「使用者與角色」：新增使用者、改角色、重設密碼、停用
+function 繪製使用者(區) {
+  const 重畫 = function () { 清空(區); 繪製使用者(區); };
+  區.appendChild(h("p", { class: "提醒" }, "角色只決定畫面上能做什麼、簽核由誰簽，不是真正的資安控管。真正的保護是共用資料夾的存取權限，請由資訊單位設定。"));
+  區.appendChild(h("div", { class: "表工具列" }, h("button", { class: "鈕 主 小", type: "button", id: "新增使用者鈕", onclick: function () {
+    表單對話框("新增使用者", [
+      { key: "姓名", 標題: "姓名", 必填: true }, { key: "角色", 標題: "角色", 類型: "選單", 選項: 角色清單, 必填: true, 預設: "承辦人" },
+      { key: "密碼", 標題: "初始密碼（至少 8 個字元）", 類型: "密碼", 必填: true }
+    ], {}, async function (值) {
+      if (集合("使用者").some(function (u) { return u.姓名 === 值.姓名; })) return "已有同名的使用者";
+      const 錯 = 檢查密碼(值.密碼);
+      if (錯) return 錯;
+      新增紀錄("使用者", Object.assign({ 姓名: 值.姓名, 角色: 值.角色, 停用: false }, await 產生密碼紀錄(值.密碼)));
+      提示("已新增使用者，請告知對方初始密碼並請其登入後修改");
+      重畫();
+    });
+  } }, "＋ 新增使用者")));
+  區.appendChild(h("div", { class: "表捲" }, h("table", { class: "表" },
+    h("thead", null, h("tr", null, ["姓名", "角色", "狀態", "最後修改", ""].map(function (t) { return h("th", null, t); }))),
+    h("tbody", null, 集合("使用者").map(function (u) {
+      const 是自己 = u.id === 狀態.使用者.id;
+      return h("tr", null, h("td", null, u.姓名 + (是自己 ? "（您）" : "")), h("td", null, u.角色),
+        h("td", null, h("span", { class: "標記 " + (u.停用 ? "危" : "成") }, u.停用 ? "停用" : "啟用")), h("td", null, 民國時間(u.修改時間)),
+        h("td", null,
+          h("button", { class: "鈕 小", type: "button", onclick: function () {
+            表單對話框("變更角色：" + u.姓名, [{ key: "角色", 標題: "角色", 類型: "選單", 選項: 角色清單, 必填: true }], u, function (值) {
+              if (是自己 && !["理事長", "秘書長"].includes(值.角色)) return "不能把自己改成無法管理設定的角色";
+              更新紀錄("使用者", u.id, { 角色: 值.角色 }); 重畫();
+            });
+          } }, "角色"),
+          h("button", { class: "鈕 小", type: "button", onclick: function () {
+            表單對話框("重設密碼：" + u.姓名, [{ key: "密碼", 標題: "新密碼（至少 8 個字元）", 類型: "密碼", 必填: true }], {}, async function (值) {
+              const 錯 = 檢查密碼(值.密碼);
+              if (錯) return 錯;
+              更新紀錄("使用者", u.id, await 產生密碼紀錄(值.密碼), "重設「" + u.姓名 + "」密碼");
+              提示("已重設密碼");
+            });
+          } }, "重設密碼"),
+          是自己 ? null : h("button", { class: "鈕 小", type: "button", onclick: function () {
+            更新紀錄("使用者", u.id, { 停用: !u.停用 }, (u.停用 ? "啟用「" : "停用「") + u.姓名 + "」"); 重畫();
+          } }, u.停用 ? "啟用" : "停用")));
+    })))));
+}
+
+註冊頁面("操作紀錄", {
+  圖示: "📜",
+  可見: function () { return 可("紀錄.檢視"); },
+  說明: "列出誰在什麼時間新增、修改、刪除了什麼資料（最多保留最近 5000 筆，存在資料檔裡）。可搜尋、篩選與匯出。",
+  繪製: function (容器) {
+    容器.appendChild(頁首("操作紀錄"));
+    const 人們 = function () { return Array.from(new Set(集合("操作紀錄").map(function (x) { return x.人; }))).sort(比較); };
+    容器.appendChild(資料表({
+      匯出檔名: "操作紀錄",
+      資料: function () { return 集合("操作紀錄"); },
+      預設排序: { key: "時間", 反向: true },
+      每頁: 30,
+      欄位: [
+        { key: "時間", 標題: "時間", 顯示: function (r) { return 民國時間(r.時間); } },
+        { key: "人", 標題: "操作人" }, { key: "動作", 標題: "動作" }, { key: "對象", 標題: "對象" }, { key: "說明", 標題: "說明" }
+      ],
+      篩選: [
+        { 標題: "操作人", 選項: 人們, 取值: function (r) { return r.人; } },
+        { 標題: "動作", 選項: ["新增", "修改", "刪除", "登入", "匯入", "發布", "建立"], 取值: function (r) { return r.動作; } }
+      ]
+    }).元素);
+  }
+});
+
+
+/* ---------- 會務/99_啟動.js ---------- */
+// 檔案說明：啟動（側欄選單、換頁、表頭按鈕、深淺色切換、Ctrl+S 存檔、關頁提醒、關於視窗、測試掛勾）
+
+// 換到某一頁（參數會傳給該頁的繪製函式）
+function 前往(名稱, 參數) {
+  const 頁 = 頁面表[名稱];
+  if (!頁 || !狀態.使用者) return;
+  if (頁.可見 && !頁.可見()) { 提示("您的角色沒有這個功能的權限", true); return; }
+  狀態.目前頁 = 名稱;
+  狀態.頁參數 = 參數 || null;
+  繪製側欄();
+  const 內容 = 清空(document.getElementById("內容"));
+  try {
+    頁.繪製(內容, 參數 || {});
+  } catch (e) {
+    內容.appendChild(h("p", { class: "錯誤" }, "畫面發生錯誤：" + e.message));
+    throw e;
+  }
+  document.getElementById("側欄").classList.remove("開");
+  內容.focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+}
+
+// 重新畫目前這一頁（例如存檔合併後資料變了）
+function 重新繪製() {
+  if (狀態.使用者 && 狀態.目前頁) 前往(狀態.目前頁, 狀態.頁參數);
+}
+
+// 畫左側功能選單（只列出目前角色看得到的功能）
+function 繪製側欄() {
+  const 側 = 清空(document.getElementById("側欄"));
+  if (!狀態.使用者) return;
+  頁面順序.forEach(function (名) {
+    const 頁 = 頁面表[名];
+    if (頁.可見 && !頁.可見()) return;
+    if (頁.分隔) 側.appendChild(h("div", { class: "分隔" }));
+    側.appendChild(h("button", { type: "button", "aria-current": 狀態.目前頁 === 名 ? "page" : null, onclick: function () { 前往(名); } },
+      h("span", { class: "圖示", "aria-hidden": "true" }, 頁.圖示 || "•"), 名));
+  });
+  側.appendChild(h("div", { class: "分隔" }));
+  側.appendChild(h("button", { type: "button", onclick: 改我的密碼 }, h("span", { class: "圖示", "aria-hidden": "true" }, "🔑"), "修改我的密碼"));
+  側.appendChild(h("button", { type: "button", onclick: 關於 }, h("span", { class: "圖示", "aria-hidden": "true" }, "ℹ"), "關於本系統"));
+  側.appendChild(h("button", { type: "button", id: "登出鈕", onclick: 登出 }, h("span", { class: "圖示", "aria-hidden": "true" }, "⏻"), "登出"));
+}
+
+// 更新表頭（協會名稱、使用者、存檔按鈕）與側欄
+function 更新外框() {
+  const 設 = 狀態.資料 && 狀態.資料.設定;
+  document.getElementById("協會名").textContent = 設 ? 設.協會名稱 : "會務管理系統";
+  document.title = (設 ? 設.協會名稱 + "｜" : "") + "會務管理系統 " + 版本;
+  document.getElementById("使用者區").textContent = 狀態.使用者 ? 狀態.使用者.姓名 + "（" + 狀態.使用者.角色 + "）" : "";
+  document.getElementById("存檔鈕").classList.toggle("隱藏", !(狀態.資料 && 狀態.使用者));
+  document.getElementById("選單鈕").classList.toggle("隱藏", !狀態.使用者);
+  更新存檔狀態();
+  繪製側欄();
+}
+
+// 切換深色／淺色（記在使用者紀錄裡，下次登入沿用）
+function 切換主題() {
+  const 根 = document.documentElement;
+  const 目前深 = 根.getAttribute("data-theme") ? 根.getAttribute("data-theme") === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const 新 = 目前深 ? "light" : "dark";
+  根.setAttribute("data-theme", 新);
+  if (狀態.使用者 && 狀態.資料) {
+    const u = 找("使用者", 狀態.使用者.id);
+    if (u) { u.主題 = 新; 標記未存(); }
+  }
+}
+
+// 顯示目前頁面的使用說明
+function 顯示說明() {
+  const 頁 = 頁面表[狀態.目前頁];
+  const 文字 = 頁 && 狀態.使用者 ? 頁.說明 : "請先選擇協會資料夾並登入。第一次使用時，選一個空資料夾，系統會引導您建立協會資料與第一位管理者。";
+  對話框("說明：" + (狀態.使用者 && 頁 ? 狀態.目前頁 : "開始使用"), [
+    h("p", null, 文字),
+    h("h3", null, "共通操作"),
+    h("ul", null,
+      h("li", null, "改完資料要按右上角「存檔」（或 Ctrl+S）。每次存檔前會自動把舊檔備份到「備份」資料夾，保留最近 30 份。"),
+      h("li", null, "多人同時使用時，存檔會自動合併別人的修改；同一筆資料兩邊都改時，會跳出對照讓您選。"),
+      h("li", null, "列表可以點欄位標題排序、用搜尋框與下拉選單篩選、勾選後做批次動作、匯出 CSV／Excel。"),
+      h("li", null, "角色只決定畫面上能做什麼，不是真正的資安控管；資料夾權限請由資訊單位設定。"))
+  ]);
+}
+
+// 關於本系統：版本、說明、使用的開源元件（本系統沒有使用外部元件）
+function 關於() {
+  對話框("關於本系統", [
+    h("p", null, h("img", { src: 會徽網址(), alt: "", width: 48, height: 48, style: "vertical-align:middle;margin-right:.5em" }), h("strong", null, "會務管理系統 " + 版本)),
+    h("p", null, "建置日期：" + 建置日期),
+    h("p", null, "單一離線 HTML：不連網、不使用瀏覽器儲存區；資料只存在您選的協會資料夾（協會資料.json、附件、備份）。"),
+    h("p", null, "開源元件：無。試算表讀寫、壓縮檔解析都由本程式以瀏覽器內建功能完成，沒有引用外部函式庫。"),
+    h("p", null, "會徽為自製圖形，可替換；未使用任何機關徽記。")
+  ]);
+}
+
+// 綁定表頭按鈕、快捷鍵與關頁提醒，然後顯示開始畫面
+function 啟動() {
+  document.getElementById("存檔鈕").addEventListener("click", function () { 執行存檔(); });
+  document.getElementById("主題鈕").addEventListener("click", 切換主題);
+  document.getElementById("說明鈕").addEventListener("click", 顯示說明);
+  document.getElementById("選單鈕").addEventListener("click", function () { document.getElementById("側欄").classList.toggle("開"); });
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (狀態.資料 && 狀態.使用者) 執行存檔(); }
+  });
+  window.addEventListener("beforeunload", function (e) {
+    if (狀態.未存) { e.preventDefault(); e.returnValue = ""; }
+  });
+  顯示開始畫面();
+  if (測試模式) window.__T = { 狀態: 狀態, 前往: 前往, 存檔: 存檔, 合併資料: 合併資料, 國字金額: 國字金額, 讀試算表: 讀試算表, 產生xlsx: 產生xlsx };
+}
+
+// 按存檔：顯示錯誤訊息而不是讓程式中斷
+async function 執行存檔() {
+  try {
+    await 存檔();
+  } catch (e) {
+    提示("存檔失敗：" + e.message, true);
+  }
+}
+
+啟動();
+
+})();
+</script>
+</body>
+</html>
