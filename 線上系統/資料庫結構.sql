@@ -759,7 +759,7 @@ declare 人 public.members; 信箱 text := lower(btrim(coalesce(p_login_email, '
 begin
   if not public.is_admin() then raise exception '只有具管理權限的幹部可以建立登入帳號'; end if;
   if 信箱 !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then raise exception 'Email 格式不正確'; end if;
-  if length(coalesce(p_password, '')) < 6 then raise exception '密碼至少 6 個字元'; end if;
+  if length(coalesce(p_password, '')) < 3 then raise exception '密碼至少 3 個字元'; end if;
   select * into 人 from public.members where id = p_member for update;
   if not found then raise exception '找不到這位會員'; end if;
   if 人.user_id is not null then raise exception '「%」已經有登入帳號；要換 Email 請先「解除帳號連結」', 人.name; end if;
@@ -799,7 +799,7 @@ returns void language plpgsql security definer set search_path = public, extensi
 declare 人 public.members;
 begin
   if not public.is_admin() then raise exception '只有具管理權限的幹部可以重設密碼'; end if;
-  if length(coalesce(p_password, '')) < 6 then raise exception '密碼至少 6 個字元'; end if;
+  if length(coalesce(p_password, '')) < 3 then raise exception '密碼至少 3 個字元'; end if;
   select * into 人 from public.members where id = p_member;
   if not found then raise exception '找不到這位會員'; end if;
   if 人.user_id is null then raise exception '「%」還沒有登入帳號，請改用「建立登入帳號」', 人.name; end if;
@@ -1039,6 +1039,13 @@ begin
     where id = p_request and status = '待刪除';
   if not found then raise exception '找不到待刪除的申請'; end if;
 end $$;
+
+-- 資料庫結構的版本（v2.6）：網頁登入後比對，資料庫沒有更新到網頁需要的版本時，提醒管理者重新執行這份 SQL。
+-- 這份 SQL 有修改時，這裡與 製作/src/線上/02_登入.js 的「需要資料庫版本」要一起改（測試會檢查兩者一致）
+create or replace function public.db_version() returns text
+language sql immutable as $$ select '2.6' $$;
+revoke execute on function public.db_version() from public, anon;
+grant execute on function public.db_version() to authenticated;
 
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
 revoke execute on function public.request_removal(uuid, text), public.confirm_removal(uuid), public.reject_removal(uuid, text) from public, anon;

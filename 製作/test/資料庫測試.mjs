@@ -183,7 +183,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查((await 以身分(db, 丁帳, () => db.query("select name from public.members"))).rows.map((r) => r.name).join() === "丁會員", "接管後丁看得到自己的會員資料");
   // 防呆與權限
   檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select public.create_member_login($1, 'x@gmail.example', 'abcd1234')", [戊id])), "只有具管理權限"), "一般會員不能建立登入帳號");
-  檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'x@gmail.example', 'short')", [戊id]), "至少 6 個字元"), "密碼太短被擋");
+  檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'x@gmail.example', 'ab')", [戊id]), "至少 3 個字元"), "密碼太短（少於 3 個字元）被擋");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'not-an-email', 'abcd1234')", [戊id]), "格式不正確"), "Email 格式不對被擋");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'y@gmail.example', 'abcd1234')", [丁id]), "已經有登入帳號"), "已有帳號的會員不能再建立");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'ding.personal@gmail.example', 'abcd1234')", [戊id]), "已經是名冊上「丁會員」的登入帳號"), "已連結別人的 Email 不能拿來建立");
@@ -594,6 +594,14 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     // 有名額設定的職稱不能刪（否則刪掉再加回來就沒有上限）
     檢查(await 應失敗(() => 秘3("select public.delete_board_title('理事長')"), "不能刪除"), "理事長有名額設定，不能刪除");
     檢查(await 應失敗(() => 秘3("select public.delete_board_title('候補理事')"), "不能刪除"), "候補理事有名額設定，不能刪除");
+  }
+
+  console.log("十四、資料庫版本與網頁一致");
+  {
+    const 網頁要 = fs.readFileSync(path.join(根目錄, "製作", "src", "線上", "02_登入.js"), "utf8").match(/const 需要資料庫版本 = "([\d.]+)"/)[1];
+    const 秘4 = (sql) => 以身分(db, 帳.秘書長, () => db.query(sql));
+    檢查((await 秘4("select public.db_version() as v")).rows[0].v === 網頁要, "資料庫結構的 db_version()（" + 網頁要 + "）與網頁需要的版本一致");
+    檢查(await 應失敗(() => 以身分(db, null, () => db.query("select public.db_version()"))), "未登入不能呼叫 db_version");
   }
 
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");

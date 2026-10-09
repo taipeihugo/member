@@ -76,12 +76,14 @@ async function 資料API(方法, 路徑, 參數, 內容, 使用者) {
       const 參 = Object.keys(內容 || {});
       const 值們 = 參.map((k) => 內容[k]);
       const 回傳集合 = (await db.query("select proretset from pg_proc where proname = $1", [名])).rows[0];
+      if (!回傳集合) throw Object.assign(new Error("Could not find the function public." + 名 + " in the schema cache"), { 狀態: 404, 代碼: "PGRST202" });
       const sql = `select * from public.${名}(${參.map((k, i) => `${k} => $${i + 1}`).join(", ")})`;
       const r = await db.query(sql, 值們);
       // 回傳多列的函式比照 Supabase 的 Max rows，一次最多回「最多列數」筆
       return 回傳集合 && 回傳集合.proretset ? r.rows.slice(0, 最多列數) : (r.rows[0] ? Object.values(r.rows[0])[0] : null);
     }
     const 表 = 路徑.match(/^\/rest\/v1\/([a-z_]+)$/)[1];
+    if (!(await db.query("select to_regclass($1) as t", ["public." + 表])).rows[0].t) throw Object.assign(new Error("Could not find the table 'public." + 表 + "' in the schema cache"), { 狀態: 404, 代碼: "PGRST205" });
     const 值們 = [];
     if (方法 === "GET") {
       // 比照 Supabase：一次最多回「最多列數」筆，超過的部分要用 limit／offset 分頁；Content-Range 告知總數
@@ -178,7 +180,7 @@ async function 攔截(route) {
       await route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify(結果) });
     }
   } catch (e) {
-    await route.fulfill({ status: e.狀態 || 400, headers: cors, contentType: "application/json", body: JSON.stringify({ message: e.message }) });
+    await route.fulfill({ status: e.狀態 || 400, headers: cors, contentType: "application/json", body: JSON.stringify(e.代碼 ? { code: e.代碼, message: e.message } : { message: e.message }) });
   }
 }
 
@@ -313,7 +315,9 @@ try {
     檢查((await 框().innerText()).includes("批次會員30"), "申請退會前列出勾選的人名");
     await 框().locator("[data-key='reason']").fill("人事異動，已離職");
     await 框().locator("button", { hasText: "送出申請" }).click();
-    await page.waitForSelector("text=已送出 1 件退會（刪除）申請");
+    await page.waitForSelector("dialog[open] >> text=已送出 1 件退會（刪除）申請");
+    檢查((await 框().innerText()).includes("申請審核 → 退會申請") && (await 框().locator("button", { hasText: "前往確認刪除" }).count()) === 1, "管理者送出退會申請後，詢問要不要前往「申請審核 → 退會申請」確認");
+    await 框().locator("button", { hasText: "稍後再說" }).click();
     檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "送出退會申請後會員還在名冊上（不會直接刪除）");
     // 取消：什麼都不送出
     await 搜尋框.fill("批次會員29");
@@ -327,14 +331,20 @@ try {
     檢查(!(await page.locator("#提示區").innerText()).includes("已送出 0"), "申請退會按取消：不顯示成功提示");
     await 搜尋框.fill("");
     await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
-    // 退會申請頁：管理者確認刪除，只刪這一位
-    await 選單("退會申請");
+    // 申請審核 → 退會申請頁籤：管理者確認刪除，只刪這一位
+    檢查(!(await page.locator("#側欄").innerText()).includes("退會申請"), "退會申請不再是獨立的選單項目（改在申請審核的頁籤）");
+    await 選單("申請審核");
+    await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
     await page.waitForSelector("#內容 tbody tr");
+    檢查((await page.locator("#內容").innerText()).includes("退會申請（待刪除）1 件"), "申請審核上方列出待刪除的退會申請件數");
+    await 截圖("專區_退會申請頁籤");
     檢查((await page.locator("#內容").innerText()).includes("人事異動，已離職") && (await page.locator("#內容").innerText()).includes("待刪除"), "退會申請頁列出原因與待刪除狀態");
     await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).locator("button", { hasText: "確認刪除" }).click();
     await 框().waitFor();
     await 框().locator("button", { hasText: "刪除" }).last().click();
     await page.waitForSelector("text=已刪除「批次會員30」");
+    await page.waitForTimeout(300);
+    檢查((await page.locator(".頁籤 button[aria-selected='true']").innerText()).includes("退會申請"), "確認刪除後仍停在「退會申請」頁籤");
     const 後 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
     檢查(後 === 前 - 1 && !(await db.query("select 1 from public.members where name = '批次會員30'")).rows.length && (await db.query("select 1 from public.members where name = '批次會員29'")).rows.length === 1,
       "管理者確認後只刪除這一位（" + 前 + " → " + 後 + "），其他會員都還在");
@@ -348,10 +358,10 @@ try {
     await 框().waitFor();
     await 框().locator("[data-key='reason']").fill("誤送，請保留");
     await 框().locator("button", { hasText: "送出申請" }).click();
-    await page.waitForSelector("text=已送出 1 件退會（刪除）申請");
-    await 搜尋框.fill("");
-    await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
-    await 選單("退會申請");
+    await page.waitForSelector("dialog[open] >> text=已送出 1 件退會（刪除）申請");
+    await 框().locator("button", { hasText: "前往確認刪除" }).click();
+    await page.waitForSelector(".頁籤 button[aria-selected='true'] >> text=退會申請");
+    檢查(true, "按「前往確認刪除」直接打開「申請審核 → 退會申請」");
     await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).locator("button", { hasText: "退回" }).click();
     await 框().waitFor();
     await 框().locator("[data-key='原因']").fill("資料有誤，會員仍在職");
@@ -771,6 +781,28 @@ try {
   模擬.刷新拒絕 = false;
   const 異常錯誤 = 主控台錯誤.splice(異常起點);
   檢查(異常錯誤.every((e) => /status of (400|401|409|503)|ERR_CONNECTION_RESET|Failed to fetch/.test(e)), "上述模擬異常只產生預期的網路錯誤（" + 異常錯誤.length + " 筆）");
+
+  console.log("十一之前、資料庫版本提醒：資料庫沒有更新到這一版時，幹部每一頁上方會提醒重新執行 SQL");
+  {
+    const 正確版 = fs.readFileSync(path.join(根目錄, "線上系統", "資料庫結構.sql"), "utf8").match(/function public\.db_version\(\)[\s\S]*?select '([\d.]+)'/)[1];
+    const 設版 = (版) => db.query("create or replace function public.db_version() returns text language sql immutable as $$ select '" + 版 + "' $$");
+    await 登入("sec@example.org", "staffpass1");
+    檢查(!(await page.locator("#資料庫版本提醒").count()), "資料庫是這一版時不顯示提醒");
+    await db.query("drop function public.db_version()");
+    const 舊版起點 = 主控台錯誤.length;
+    await 登入("sec@example.org", "staffpass1");
+    檢查((await page.locator("#資料庫版本提醒").innerText()).includes("SQL Editor"), "資料庫還是舊版（沒有版本函式）時，提醒管理者重新執行 SQL");
+    const 舊版錯誤 = 主控台錯誤.splice(舊版起點);
+    檢查(舊版錯誤.length === 1 && 舊版錯誤[0].includes("404"), "舊版資料庫只產生預期的 404（找不到版本函式），登入照常");
+    await 設版("99.9");
+    await 登入("sec@example.org", "staffpass1");
+    檢查((await page.locator("#資料庫版本提醒").innerText()).includes("重新整理"), "資料庫比網頁新時，提醒重新整理網頁");
+    await 設版(正確版);
+    await 登入("sec@example.org", "staffpass1");
+    檢查(!(await page.locator("#資料庫版本提醒").count()), "更新後提醒消失");
+    const 譯 = await page.evaluate(() => window.__T.翻譯錯誤({ code: "PGRST202", message: "Could not find the function public.request_removal(p_member, p_reason) in the schema cache" }, 404));
+    檢查(譯.includes("資料庫還沒更新") && 譯.includes("SQL Editor"), "呼叫到不存在的資料庫函式時，錯誤訊息說明要重新執行 SQL（不顯示英文原文）");
+  }
 
   console.log("十一、系統設定：增刪幹部角色與理監事職稱");
   await 登入("sec@example.org", "staffpass1");

@@ -70,10 +70,10 @@ function 修改我的資料() {
 // 修改登入密碼
 function 修改我的密碼() {
   表單對話框("修改密碼", [
-    { key: "新", 標題: "新密碼（至少 8 個字元）", 類型: "密碼", 必填: true },
+    { key: "新", 標題: "新密碼（至少 6 個字元）", 類型: "密碼", 必填: true },
     { key: "再", 標題: "再輸入一次", 類型: "密碼", 必填: true }
   ], {}, async function (值) {
-    if (值.新.length < 8) return "密碼至少 8 個字元";
+    if (值.新.length < 6) return "密碼至少 6 個字元";
     if (值.新 !== 值.再) return "兩次輸入的密碼不一樣";
     try { await 改密碼(值.新); 提示("密碼已修改"); } catch (e) { return e.message; }
   });

@@ -8,8 +8,12 @@ const 線上 = {
   角色們: [],      // 系統設定的幹部角色 [{name, is_admin, sort}]
   職稱們: [],      // 系統設定的理監事職稱 [{title, board_role, sort, max_count, candidate}]
   組名額: {},      // 理監事組的人數上限 {理事: 15, 監事: 5}（資料庫 board_limits；沒有資料時不顯示上限）
-  設定已讀: false  // 已讀過系統設定（清單可能是空的，也照用）
+  設定已讀: false,  // 已讀過系統設定（清單可能是空的，也照用）
+  資料庫提醒: ""     // 資料庫結構不是這一版需要的版本時，給幹部看的提醒（空字串＝沒問題）
 };
+
+// 這一版網頁需要的資料庫結構版本（與 線上系統/資料庫結構.sql 的 db_version() 一致；SQL 有改時兩邊一起改）
+const 需要資料庫版本 = "2.6";
 
 // 資料庫還沒更新到有「系統設定」時用的預設清單
 const 預設角色們 = [{ name: "理事長", is_admin: true }, { name: "秘書長", is_admin: true }, { name: "總幹事", is_admin: true }, { name: "會計", is_admin: false }, { name: "承辦人", is_admin: false }];
@@ -38,11 +42,22 @@ async function 讀取系統設定() {
   }
   // 理監事組的人數上限（v2.4）：資料庫還沒更新時沒有這張表，就不顯示上限
   try { 組 = await 查詢("board_limits", null, null, "board_role"); } catch (e) { if (e.狀態碼 !== 404) throw e; }
+  const 提醒 = await 檢查資料庫版本();
   // 讀取期間登出或換人登入：不要蓋掉下一位的設定
   if (連線.場次 !== 場) return;
   const 名額 = {};
   組.forEach(function (x) { 名額[x.board_role] = x.max_count; });
-  線上.角色們 = 角; 線上.職稱們 = 職; 線上.組名額 = 名額; 線上.設定已讀 = true;
+  線上.角色們 = 角; 線上.職稱們 = 職; 線上.組名額 = 名額; 線上.設定已讀 = true; 線上.資料庫提醒 = 提醒;
+}
+
+// 比對資料庫結構版本：回傳給幹部看的提醒文字（沒問題或讀不到時回空字串，不影響登入）
+async function 檢查資料庫版本() {
+  let 版 = "";
+  try { 版 = String(await 呼叫("db_version") || ""); }
+  catch (e) { if (e.狀態碼 === 404) 版 = "舊版"; else return ""; }
+  if (版 === 需要資料庫版本) return "";
+  if (版 !== "舊版" && Number(版) > Number(需要資料庫版本)) return "這個網頁是舊版（資料庫已經是 v" + 版 + "）。請重新整理頁面（按 Ctrl＋F5），再不行請清除瀏覽器快取。";
+  return "資料庫還沒更新到這一版（網頁需要 v" + 需要資料庫版本 + "，資料庫是" + (版 === "舊版" ? "較舊的版本" : " v" + 版) + "），退會申請、理監事名額等功能會失敗。請具管理權限的人到 Supabase 的 SQL Editor，貼上最新的「線上系統/資料庫結構.sql」全文並執行一次，再重新登入。";
 }
 
 // 建立置中的卡片畫面（登入、註冊等用）
@@ -68,7 +83,7 @@ function 輸入欄(標題, 屬性) {
 
 // 顯示登入畫面
 function 顯示登入頁(訊息) {
-  線上.會員 = null; 線上.幹部 = ""; 線上.申請 = null; 線上.角色們 = []; 線上.職稱們 = []; 線上.組名額 = {}; 線上.設定已讀 = false;
+  線上.會員 = null; 線上.幹部 = ""; 線上.申請 = null; 線上.角色們 = []; 線上.職稱們 = []; 線上.組名額 = {}; 線上.設定已讀 = false; 線上.資料庫提醒 = "";
   更新外框();
   const 信 = 輸入欄("Email", { id: "登入信箱", type: "email", autocomplete: "username" });
   const 密 = 輸入欄("密碼", { id: "登入密碼", type: "password", autocomplete: "current-password" });
@@ -96,7 +111,7 @@ function 顯示登入頁(訊息) {
 // 顯示註冊畫面
 function 顯示註冊頁() {
   const 信 = 輸入欄("個人 Email（收得到外部信的信箱）", { id: "註冊信箱", type: "email", autocomplete: "username" });
-  const 密 = 輸入欄("密碼（至少 8 個字元）", { id: "註冊密碼", type: "password", autocomplete: "new-password" });
+  const 密 = 輸入欄("密碼（至少 6 個字元）", { id: "註冊密碼", type: "password", autocomplete: "new-password" });
   const 再 = 輸入欄("再輸入一次密碼", { id: "註冊再次", type: "password", autocomplete: "new-password" });
   const 錯 = h("div", { role: "alert" });
   置中卡片("註冊帳號", [
@@ -106,7 +121,7 @@ function 顯示註冊頁() {
         清空(錯);
         const email = 信.欄.value.trim();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return 錯.appendChild(h("p", { class: "錯誤" }, "Email 格式不正確"));
-        if (密.欄.value.length < 8) return 錯.appendChild(h("p", { class: "錯誤" }, "密碼至少 8 個字元"));
+        if (密.欄.value.length < 6) return 錯.appendChild(h("p", { class: "錯誤" }, "密碼至少 6 個字元"));
         if (密.欄.value !== 再.欄.value) return 錯.appendChild(h("p", { class: "錯誤" }, "兩次輸入的密碼不一樣"));
         try {
           const 結果 = await 註冊帳號(email, 密.欄.value);
@@ -150,14 +165,14 @@ function 顯示忘記密碼頁() {
 
 // 從重設密碼信的連結回來：設定新密碼。畫面明顯標出是哪個帳號；設定完要用新密碼重新登入
 function 顯示設定新密碼頁() {
-  const 密 = 輸入欄("新密碼（至少 8 個字元）", { id: "新密碼", type: "password", autocomplete: "new-password" });
+  const 密 = 輸入欄("新密碼（至少 6 個字元）", { id: "新密碼", type: "password", autocomplete: "new-password" });
   const 再 = 輸入欄("再輸入一次", { id: "新密碼再次", type: "password", autocomplete: "new-password" });
   const 錯 = h("p", { class: "錯誤", role: "alert" });
   置中卡片("設定新密碼", [
     h("p", { class: "提醒" }, "正在為 " + (連線.帳號 ? 連線.帳號.email : "") + " 設定新密碼。如果這不是您的 Email，請直接關閉這個頁面。"),
     h("div", { class: "表單" }, 密.元素, 再.元素), 錯,
     h("button", { class: "鈕 主", type: "button", id: "儲存新密碼鈕", onclick: async function () {
-      if (密.欄.value.length < 8) return (錯.textContent = "密碼至少 8 個字元");
+      if (密.欄.value.length < 6) return (錯.textContent = "密碼至少 6 個字元");
       if (密.欄.value !== 再.欄.value) return (錯.textContent = "兩次輸入的密碼不一樣");
       try {
         await 改密碼(密.欄.value);
