@@ -34,8 +34,12 @@ function 職務標籤(m) {
 註冊頁面("我的資料", {
   圖示: "👤",
   可見: function () { return !!線上.會員; },
-  說明: "這裡是您在協會名冊上的資料。服務機關、單位、職稱、電話、性別可以自己修改；理監事、會員代表、會籍等由協會幹部維護，有誤請洽協會。",
-  繪製: function (容器) {
+  說明: "這裡是您在協會名冊上的資料。服務機關、單位、職稱、電話、性別可以自己修改；理監事、會員代表、會籍等由協會幹部維護，有誤請洽協會。要退出協會，在下方「退會」送出退會申請，由協會審核；審核前可以撤回。",
+  繪製: async function (容器) {
+    // 每次打開都重新讀取：編號重編、會籍改為退會、會員資料被刪除之後，畫面才會是最新的
+    await 重新讀取我的資料();
+    更新外框();
+    if (!線上.會員) { 提示("您已不在協會名冊上（退會申請可能已經核准），如有疑問請洽協會"); 前往("連結會員資料"); return; }
     const m = 線上.會員;
     const 列 = function (名, 值) { return h("div", { class: "欄" }, h("span", null, 名), h("div", null, 值 || "—")); };
     容器.appendChild(頁首("我的資料", [
@@ -46,8 +50,43 @@ function 職務標籤(m) {
       列("會員編號", m.member_no), 列("姓名", m.name), 列("性別", m.gender), 列("服務機關", m.agency), 列("服務單位", m.unit),
       列("職稱", m.title), 列("登入 Email（協會寄信用）", 連線.帳號.email), 列("名冊上的公務信箱（只存資料）", m.email), 列("公務電話", m.phone), 列("入會日期", 民國(m.join_date)), 列("會籍", m.status),
       h("div", { class: "欄 寬" }, h("span", null, "協會職務"), h("div", { class: "標籤組" }, 職務標籤(m))))));
+    容器.appendChild(await 退會卡(m));
   }
 });
+
+// 我的資料下方的「退會」卡片（v2.7）：送出退會申請、看審核結果、撤回
+async function 退會卡(m) {
+  let 申 = null;
+  // 讀不到（例如資料庫還沒更新到這一版）就先不顯示退會卡，我的資料其他部分照常顯示
+  try { 申 = (await 查詢("removal_requests", { member_id: m.id, by_self: true }, "requested_at.desc"))[0] || null; }
+  catch (e) { return h("div"); }
+  const 卡 = h("div", { class: "卡", id: "退會卡", style: "margin-top:1rem" }, h("h2", null, "退會"));
+  if (申 && 申.status === "待刪除") {
+    卡.appendChild(h("p", null, "您於 " + 民國時間(申.requested_at) + " 送出的退會申請正在審核（原因：" + 申.reason + "）。"));
+    卡.appendChild(h("button", { class: "鈕", type: "button", id: "撤回退會鈕", onclick: async function () {
+      if (!(await 確認("撤回這件退會申請？撤回後仍是協會會員。", "撤回申請"))) return;
+      try { await 呼叫("cancel_my_removal"); 提示("已撤回退會申請"); 重新繪製(); } catch (e) { 提示(e.message, true); }
+    } }, "撤回申請"));
+    return 卡;
+  }
+  if (m.status === "退會") {
+    卡.appendChild(h("p", null, "您的會籍是「退會」。" + (申 && 申.status === "已退會" ? "（退會申請已於 " + 民國時間(申.reviewed_at) + " 處理）" : "") + "如要恢復會籍，請洽協會。"));
+    return 卡;
+  }
+  if (申 && 申.status === "退回") 卡.appendChild(h("p", { class: "提醒" }, "上次的退會申請已退回" + (申.review_note ? "：" + 申.review_note : "") + "。"));
+  卡.appendChild(h("p", { class: "次要字" }, "要退出協會，請送出退會申請，由協會審核。"));
+  卡.appendChild(h("button", { class: "鈕 危", type: "button", id: "申請退會鈕", onclick: 申請本人退會 }, "申請退會"));
+  return 卡;
+}
+
+// 會員本人送出退會申請（要寫原因）
+function 申請本人退會() {
+  表單對話框("申請退會", [{ key: "原因", 標題: "退會原因", 類型: "多行", 行數: 3, 必填: true }], {}, async function (值) {
+    if (!String(值.原因 || "").trim()) return "請填寫退會原因";
+    try { await 呼叫("request_my_removal", { p_reason: 值.原因 }); 提示("已送出退會申請，請等協會審核"); 重新繪製(); }
+    catch (e) { return e.message; }
+  }, { 儲存文字: "送出退會申請", 前言: "送出後由協會審核。核准後會員資料會刪除；有繳費紀錄的會員改為會籍「退會」並保留紀錄。登入帳號仍可登入，但不再是會員。\n審核前可以撤回。" });
+}
 
 // 修改自己的資料（只能改性別、服務機關、單位、職稱、電話）
 function 修改我的資料() {

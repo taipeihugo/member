@@ -604,6 +604,92 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查(await 應失敗(() => 以身分(db, null, () => db.query("select public.db_version()"))), "未登入不能呼叫 db_version");
   }
 
+  console.log("十五、會員本人申請退會；清空申請清單；會員編號清空重編");
+  {
+    const db5 = await 建立資料庫();
+    const 新5 = async (email) => { const u = { id: crypto.randomUUID(), email }; await db5.query("insert into auth.users values ($1, $2, now())", [u.id, email]); return u; };
+    const 秘u = await 新5("sec15@gmail.example"), 辦u = await 新5("clerk15@gmail.example"), 甲u = await 新5("mem15a@gmail.example"), 乙u = await 新5("mem15b@gmail.example");
+    await db5.query("select public.make_staff('sec15@gmail.example', '秘書長', '秘十五', 'sec15@fia.example.gov')");
+    await db5.query("select public.make_staff('clerk15@gmail.example', '承辦人', '辦十五', 'clerk15@fia.example.gov')");
+    await db5.query("insert into public.members (name, email, user_id, join_date) values ('甲十五', 'a15@fia.example.gov', $1, '2020-05-01'), ('乙十五', 'b15@fia.example.gov', $2, '2019-01-01')", [甲u.id, 乙u.id]);
+    const 身 = (u) => (sql, p) => 以身分(db5, u, () => db5.query(sql, p));
+    const 秘5 = 身(秘u), 辦5 = 身(辦u), 甲5 = 身(甲u), 乙5 = 身(乙u);
+    // 會員本人申請退會
+    檢查(await 應失敗(() => 甲5("select public.request_my_removal('  ')"), "請填寫"), "會員申請退會一定要寫原因");
+    await 甲5("select public.request_my_removal('工作異動')");
+    檢查(await 應失敗(() => 甲5("select public.request_my_removal('再送')"), "審核中"), "審核中不能重複送退會申請");
+    const 甲列 = (await 甲5("select by_self, requested_by_name, status from public.removal_requests")).rows;
+    檢查(甲列.length === 1 && 甲列[0].by_self === true && 甲列[0].requested_by_name === "甲十五" && 甲列[0].status === "待刪除", "會員看得到自己的退會申請（標記為本人申請、待刪除）");
+    檢查((await 乙5("select count(*)::int n from public.removal_requests")).rows[0].n === 0, "會員看不到別人的退會申請");
+    檢查(await 應失敗(() => 以身分(db5, { id: crypto.randomUUID(), email: "x@x.org" }, () => db5.query("select public.request_my_removal('理由')")), "找不到您的會員資料"), "不是會員不能申請退會");
+    await 甲5("select public.cancel_my_removal()");
+    檢查((await db5.query("select count(*)::int n from public.removal_requests")).rows[0].n === 0, "會員可以撤回審核中的退會申請");
+    檢查(await 應失敗(() => 甲5("select public.cancel_my_removal()"), "沒有可以撤回"), "沒有審核中的申請時不能撤回");
+    // 管理者處理本人的申請：改為退會（資料保留）或確認刪除
+    const 甲申 = (await 甲5("select public.request_my_removal('工作異動') as id")).rows[0].id;
+    檢查(await 應失敗(() => 辦5("select public.retire_removal($1)", [甲申]), "只有具管理權限"), "承辦人不能把退會申請處理為改為退會");
+    await 秘5("select public.retire_removal($1)", [甲申]);
+    const 甲後 = (await db5.query("select status from public.members where user_id = $1", [甲u.id])).rows[0];
+    檢查(甲後 && 甲後.status === "退會" && (await db5.query("select status from public.removal_requests where id = $1", [甲申])).rows[0].status === "已退會", "改為退會：會籍改為退會、會員資料保留，申請單為已退會");
+    const 乙申 = (await 乙5("select public.request_my_removal('不再參加') as id")).rows[0].id;
+    await 秘5("select public.confirm_removal($1)", [乙申]);
+    檢查(!(await db5.query("select 1 from public.members where user_id = $1", [乙u.id])).rows.length && (await 秘5("select status from public.removal_requests where id = $1", [乙申])).rows[0].status === "已刪除", "管理者確認本人的退會申請後刪除會員資料，申請單為已刪除");
+    檢查((await 乙5("select count(*)::int n from public.removal_requests")).rows[0].n === 0, "會員資料刪除後，原帳號已不是會員，看不到申請單");
+    檢查(await 應失敗(() => 甲5("select public.request_my_removal('再退一次')"), "已經是「退會」"), "會籍已經是退會的人不能再申請退會");
+    // 幹部替會員送的申請：會員看不到內容，自己送時說明協會已在處理，也不能撤回
+    const 丙u = await 新5("mem15c@gmail.example");
+    const 丙列 = (await db5.query("insert into public.members (name, email, user_id) values ('丙會員十五', 'c15b@fia.example.gov', $1) returning id", [丙u.id])).rows[0].id;
+    const 丙5 = 身(丙u);
+    await 辦5("select public.request_removal($1, '人事通報離職')", [丙列]);
+    檢查((await 丙5("select count(*)::int n from public.removal_requests")).rows[0].n === 0, "幹部替會員送的退會申請，會員看不到內容");
+    檢查(await 應失敗(() => 丙5("select public.request_my_removal('我要退')"), "協會已經在處理"), "已有幹部送的申請時，會員自己送會說明協會已在處理");
+    檢查(await 應失敗(() => 丙5("select public.cancel_my_removal()"), "沒有可以撤回"), "會員不能撤回幹部送的申請");
+    // 換登入帳號：申請單跟著會員，不跟著舊帳號
+    const 丁u = await 新5("mem15d.old@gmail.example"), 丁新 = await 新5("mem15d.new@gmail.example");
+    const 丁列 = (await db5.query("insert into public.members (name, email, user_id) values ('丁會員十五', 'd15b@fia.example.gov', $1) returning id", [丁u.id])).rows[0].id;
+    await 身(丁u)("select public.request_my_removal('搬家')");
+    await 秘5("select public.unlink_member($1)", [丁列]);
+    await db5.query("update public.members set user_id = $1 where id = $2", [丁新.id, 丁列]);
+    檢查((await 身(丁u)("select count(*)::int n from public.removal_requests")).rows[0].n === 0 && await 應失敗(() => 身(丁u)("select public.cancel_my_removal()"), "沒有可以撤回"), "解除連結後，舊帳號看不到也撤不回這位會員的退會申請");
+    檢查((await 身(丁新)("select count(*)::int n from public.removal_requests")).rows[0].n === 1, "改連新帳號後，新帳號看得到自己的退會申請");
+    await 身(丁新)("select public.cancel_my_removal()");
+    檢查(!(await db5.query("select 1 from public.removal_requests where member_id = $1", [丁列])).rows.length, "新帳號可以撤回");
+    // 管理者不能處理自己的退會申請
+    const 秘申 = (await 秘5("select public.request_my_removal('卸任退會') as id")).rows[0].id;
+    檢查(await 應失敗(() => 秘5("select public.retire_removal($1)", [秘申]), "不能處理自己的退會申請"), "管理者不能把自己的退會申請處理為改為退會");
+    檢查(await 應失敗(() => 秘5("select public.confirm_removal($1)", [秘申]), "不能刪除自己"), "管理者也不能確認刪除自己");
+    await 秘5("select public.cancel_my_removal()");
+    // 清空清單：只有管理者；預設只清已處理的，選了才連待審一起清
+    const 連A = await 新5("la15@gmail.example"), 連B = await 新5("lb15@gmail.example");
+    const 連申A = (await 以身分(db5, 連A, () => db5.query("select public.submit_link_request('連A', '', '', '', '', '', '') as id"))).rows[0].id;
+    await 以身分(db5, 連B, () => db5.query("select public.submit_link_request('連B', '', '', '', '', '', '')"));
+    await 秘5("select public.reject_link_request($1, '查無此人')", [連申A]);
+    檢查(await 應失敗(() => 辦5("select public.clear_review_list('link_requests')"), "只有具管理權限"), "承辦人不能清空清單");
+    檢查((await 秘5("select public.clear_review_list('link_requests') as n")).rows[0].n === 1 && (await db5.query("select string_agg(status, ',') s from public.link_requests")).rows[0].s === "待審", "清空只清已處理的紀錄，待審的保留");
+    檢查((await 秘5("select public.clear_review_list('link_requests', true) as n")).rows[0].n === 1 && !(await db5.query("select 1 from public.link_requests")).rows.length, "選擇「連待審的一起」才會清掉待審的");
+    const 入A = await 新5("aa15@gmail.example"), 入B = await 新5("ab15@gmail.example");
+    const 入申A = (await 以身分(db5, 入A, () => db5.query("select public.submit_application('入A', '', '', '財政部國庫署', '', '', '', '') as id"))).rows[0].id;
+    await 以身分(db5, 入B, () => db5.query("select public.submit_application('入B', '', '', '財政部國庫署', '', '', '', '')"));
+    await 秘5("select public.reject_application($1, '資料不全')", [入申A]);
+    檢查((await 秘5("select public.clear_review_list('applications') as n")).rows[0].n === 1 && (await db5.query("select count(*)::int n from public.applications")).rows[0].n === 1, "入會申請清單也能清空已處理的");
+    檢查((await 秘5("select public.clear_review_list('removal_requests') as n")).rows[0].n === 2, "退會申請清單也能清空已處理的（已退會、已刪除）");
+    檢查(await 應失敗(() => 秘5("select public.clear_review_list('members', true)"), "不認得"), "只能清空申請審核的三種清單（不能拿來清會員）");
+    // 會員編號清空重編
+    await db5.query("insert into public.members (name, email, member_no, agency, join_date) values ('丙十五', 'c15@x.org', 'M0050', '財政部賦稅署', '2018-03-01'), ('丁十五', 'd15@x.org', 'M0009', '財政部國庫署', null)");
+    檢查(await 應失敗(() => 辦5("select public.renumber_members('編號')"), "只有具管理權限"), "承辦人不能重編會員編號");
+    檢查(await 應失敗(() => 秘5("select public.renumber_members('亂排')"), "排序方式"), "排序方式只能是三種之一");
+    const 前序 = (await db5.query("select name from public.members order by nullif(regexp_replace(member_no, '\\D', '', 'g'), '')::numeric")).rows.map((r) => r.name);
+    const 人數5 = (await 秘5("select public.renumber_members('編號') as n")).rows[0].n;
+    const 重後 = (await db5.query("select name, member_no from public.members order by member_no")).rows;
+    檢查(人數5 === 重後.length && 重後.every((r, i) => r.member_no === "M" + String(i + 1).padStart(4, "0")), "重編後編號從 M0001 連續編到 M" + String(重後.length).padStart(4, "0") + "（補掉空號）");
+    檢查(重後.map((r) => r.name).join() === 前序.join(), "照目前編號順序重編，人的先後不變");
+    await 秘5("select public.renumber_members('入會日期')");
+    const 依日 = (await db5.query("select name from public.members order by member_no")).rows.map((r) => r.name);
+    檢查(依日[0] === "丙十五" && 依日[依日.length - 1] === "丁十五", "依入會日期重編：最早入會的排第一，沒有入會日期的排最後");
+    const 新號 = (await db5.query("insert into public.members (name, email) values ('戊十五', 'e15@x.org') returning member_no")).rows[0].member_no;
+    檢查(新號 === "M" + String(依日.length + 1).padStart(4, "0"), "重編後新增的會員接著編號");
+  }
+
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");
   失敗.forEach((f) => console.log("  ✘ " + f));
   process.exit(失敗.length ? 1 : 0);

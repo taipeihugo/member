@@ -369,6 +369,33 @@ try {
     await page.waitForSelector("text=保留在名冊上");
     檢查((await db.query("select count(*)::int n from public.members where name = '批次會員29'")).rows[0].n === 1, "退回退會申請後會員保留");
     檢查((await db.query("select status, review_note from public.removal_requests where member_name = '批次會員29'")).rows[0].review_note === "資料有誤，會員仍在職", "退回的原因留在申請單上");
+    // 改為退會：不刪除，只把會籍改為退會
+    await 選單("會員管理");
+    await 搜尋框.fill("批次會員28");
+    await page.waitForTimeout(200);
+    await page.locator("#內容 tbody tr", { hasText: "批次會員28" }).first().locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
+    await 框().locator("[data-key='reason']").fill("本人表示退會");
+    await 框().locator("button", { hasText: "送出申請" }).click();
+    await 框().locator("button", { hasText: "前往確認刪除" }).click();
+    await page.waitForSelector("#內容 tbody tr >> text=批次會員28");
+    await page.locator("#內容 tbody tr", { hasText: "批次會員28" }).locator("button", { hasText: "改為退會" }).click();
+    await 框().locator("button", { hasText: "改為退會" }).last().click();
+    await page.waitForSelector("text=會籍改為退會");
+    檢查((await db.query("select status from public.members where name = '批次會員28'")).rows[0].status === "退會" && (await db.query("select status from public.removal_requests where member_name = '批次會員28'")).rows[0].status === "已退會", "改為退會：會員保留、會籍改為退會，申請單為已退會");
+    // 重編會員編號：清空後依目前順序重新編成 M0001 起（批次會員30 刪除留下的空號補上）
+    await 選單("會員管理");
+    await 搜尋框.fill("");
+    const 重編前 = (await db.query("select name from public.members order by nullif(regexp_replace(member_no, '\\D', '', 'g'), '')::numeric")).rows.map((r) => r.name);
+    await page.click("#重編編號鈕");
+    await 框().locator("#重編順序").selectOption("編號");
+    await 框().locator("button", { hasText: "清空重編" }).click();
+    await page.waitForSelector("text=位會員的編號");
+    const 重編後 = (await db.query("select name, member_no from public.members order by member_no")).rows;
+    檢查(重編後.every((r, i) => r.member_no === "M" + String(i + 1).padStart(4, "0")) && 重編後.map((r) => r.name).join() === 重編前.join(),
+      "重編會員編號：從 M0001 連續編到 M" + String(重編後.length).padStart(4, "0") + "，順序不變");
+    await page.waitForTimeout(300);
+    檢查((await page.locator("#內容 tbody tr").first().innerText()).includes("M0001"), "重編後名冊立即顯示新編號");
     await 選單("會員管理");
     await 搜尋框.fill("");
   }
@@ -476,6 +503,37 @@ try {
   await 框().locator("button", { hasText: "儲存" }).click();
   await page.waitForSelector("text=分機 5566");
   檢查(true, "會員修改自己的電話");
+  // 網頁已是新版、資料庫還沒更新（退會申請單沒有 by_self 欄，v2.4～v2.6）：我的資料照常顯示，只是沒有退會卡
+  await db.query("alter table public.removal_requests drop column by_self cascade");
+  const 舊表起點 = 主控台錯誤.length;
+  await 選單("活動報名");
+  await 選單("我的資料");
+  await page.waitForSelector("#修改我的資料鈕");
+  await page.waitForTimeout(300);
+  檢查((await page.locator("#內容").innerText()).includes("分機 5566") && !(await page.locator("#退會卡").count()), "資料庫還沒更新時，我的資料照常顯示（只是沒有退會卡）");
+  const 舊表錯誤 = 主控台錯誤.splice(舊表起點);
+  檢查(舊表錯誤.every((x) => x.includes("400")), "舊版資料表只產生預期的 400（" + 舊表錯誤.length + " 筆）");
+  await db.exec(fs.readFileSync(path.join(根目錄, "線上系統", "資料庫結構.sql"), "utf8"));
+  await 選單("活動報名");
+  await 選單("我的資料");
+  await page.waitForSelector("#申請退會鈕");
+  // 會員本人申請退會：要寫原因；審核中可以撤回；再送一次留給幹部處理
+  await page.click("#申請退會鈕");
+  await 框().locator("[data-key='原因']").fill("工作異動，想先退出");
+  await 框().locator("button", { hasText: "送出退會申請" }).click();
+  await page.waitForSelector("#撤回退會鈕");
+  const 本人申 = (await db.query("select by_self, status, requested_by_name from public.removal_requests where member_name = '甲會員'")).rows;
+  檢查(本人申.length === 1 && 本人申[0].by_self && 本人申[0].status === "待刪除", "會員本人可以送出退會申請（標記為本人申請、待刪除）");
+  檢查((await page.locator("#退會卡").innerText()).includes("正在審核"), "我的資料顯示退會申請正在審核");
+  await 截圖("專區_本人申請退會");
+  await page.click("#撤回退會鈕");
+  await 框().locator("button", { hasText: "撤回申請" }).click();
+  await page.waitForSelector("#申請退會鈕");
+  檢查(!(await db.query("select 1 from public.removal_requests where member_name = '甲會員'")).rows.length, "審核前可以撤回退會申請");
+  await page.click("#申請退會鈕");
+  await 框().locator("[data-key='原因']").fill("工作異動");
+  await 框().locator("button", { hasText: "送出退會申請" }).click();
+  await page.waitForSelector("#撤回退會鈕");
   await 選單("活動報名");
   await page.waitForSelector("text=年終會員聯誼餐敘");
   await page.locator(".卡", { hasText: "年終會員聯誼餐敘" }).locator("button", { hasText: "我要報名" }).click();
@@ -596,6 +654,38 @@ try {
       "刪除已核准的連結申請，不影響已連結的會員帳號");
     await db.query("delete from public.applications where name = '舊申請乙'");
   }
+  // 會員本人送出的退會申請：申請審核 → 退會申請，標示「本人申請」；這裡退回（甲之後還要用）
+  {
+    await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
+    await page.waitForSelector("#內容 tbody tr >> text=甲會員");
+    檢查((await page.locator("#內容 tbody tr", { hasText: "甲會員" }).innerText()).includes("本人申請"), "退會申請頁籤標示會員本人送出的申請");
+    await page.locator("#內容 tbody tr", { hasText: "甲會員" }).locator("button", { hasText: "退回" }).click();
+    await 框().locator("[data-key='原因']").fill("請先繳清本年度會費再辦理");
+    await 框().locator("button", { hasText: "退回" }).last().click();
+    await page.waitForSelector("text=保留在名冊上");
+  }
+  // 清空清單：預設只清已處理的；勾選後連待審的一起清
+  {
+    const 用戶 = (await db.query("select id, email from auth.users where email in ('newbie@gmail.example', 'yi.home@gmail.example') order by email")).rows;
+    await db.query("insert into public.link_requests (user_id, login_email, name, status) values ($1, $2, '已退回的連結', '退回'), ($3, $4, '待審的連結', '待審')", [用戶[0].id, 用戶[0].email, 用戶[1].id, 用戶[1].email]);
+    await 選單("會員管理");
+    await 選單("申請審核");
+    await page.locator(".頁籤 button", { hasText: "帳號連結" }).click();
+    await page.click("#清空清單鈕");
+    await 框().waitFor();
+    檢查((await 框().innerText()).includes("已處理") && (await 框().locator("#連待審").count()) === 1, "清空清單前說明要刪幾筆，並可選擇連待審的一起清");
+    await 框().locator("button", { hasText: "清空" }).last().click();
+    await page.waitForSelector("text=已清空");
+    const 剩連 = (await db.query("select status from public.link_requests")).rows.map((r) => r.status);
+    檢查(剩連.length === 1 && 剩連[0] === "待審", "清空清單預設只清已處理的紀錄，待審的保留（" + 剩連.join() + "）");
+    檢查((await page.locator(".頁籤 button[aria-selected='true']").innerText()).includes("帳號連結"), "清空後停在同一個頁籤");
+    await page.click("#清空清單鈕");
+    await 框().locator("#連待審").check();
+    await 框().locator("button", { hasText: "清空" }).last().click();
+    await page.waitForSelector("text=已清空 1 筆");
+    await page.waitForTimeout(300);
+    檢查(!(await db.query("select 1 from public.link_requests")).rows.length, "勾選「連同待審」後全部清空");
+  }
   await 選單("活動管理");
   await page.locator("#內容 tbody tr", { hasText: "年終會員聯誼餐敘" }).click();
   await page.waitForSelector("#葷素_素");
@@ -624,6 +714,7 @@ try {
 
   console.log("七、會員看繳費紀錄、新會員登入");
   await 登入("jia.home@gmail.example", "memberpass1");
+  檢查((await page.locator("#退會卡").innerText()).includes("請先繳清本年度會費再辦理") && (await page.locator("#申請退會鈕").count()) === 1, "退會申請被退回後，會員看得到原因，也可以再申請");
   await 選單("繳費紀錄");
   await page.waitForSelector("text=115-0001");
   檢查(true, "會員看得到自己的繳費紀錄與收據號");

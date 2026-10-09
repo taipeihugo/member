@@ -13,7 +13,7 @@ const 線上 = {
 };
 
 // 這一版網頁需要的資料庫結構版本（與 線上系統/資料庫結構.sql 的 db_version() 一致；SQL 有改時兩邊一起改）
-const 需要資料庫版本 = "2.6";
+const 需要資料庫版本 = "2.7";
 
 // 資料庫還沒更新到有「系統設定」時用的預設清單
 const 預設角色們 = [{ name: "理事長", is_admin: true }, { name: "秘書長", is_admin: true }, { name: "總幹事", is_admin: true }, { name: "會計", is_admin: false }, { name: "承辦人", is_admin: false }];

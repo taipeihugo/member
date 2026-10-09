@@ -228,8 +228,8 @@ $$;
 -- 產生下一個會員編號（M0001…）
 create or replace function public.next_member_no() returns text
 language sql volatile security definer set search_path = public as $$
-  select 'M' || lpad((coalesce(max(nullif(regexp_replace(member_no, '\D', '', 'g'), '')::int), 0) + 1)::text, 4, '0')
-  from public.members
+  select 'M' || lpad(n::text, greatest(4, length(n::text)), '0')
+  from (select coalesce(max(nullif(regexp_replace(member_no, '\D', '', 'g'), '')::numeric), 0) + 1 as n from public.members) t
 $$;
 
 -- ---------- 觸發程序 ----------
@@ -969,7 +969,7 @@ create table if not exists public.removal_requests (
   member_agency text not null default '',
   member_email text not null default '',
   reason text not null check (length(trim(reason)) > 0),
-  status text not null default '待刪除' check (status in ('待刪除', '已刪除', '退回')),
+  status text not null default '待刪除' check (status in ('待刪除', '已刪除', '已退會', '退回')),
   requested_by uuid references auth.users (id) on delete set null,
   requested_by_name text not null default '',
   requested_at timestamptz not null default now(),
@@ -978,11 +978,16 @@ create table if not exists public.removal_requests (
   review_note text not null default ''
 );
 create unique index if not exists removal_requests_one_pending on public.removal_requests (member_id) where status = '待刪除';
+-- v2.7：會員本人也能送退會申請（by_self）；管理者可以處理為「已退會」（會籍改為退會，資料保留）
+alter table public.removal_requests add column if not exists by_self boolean not null default false;
+alter table public.removal_requests drop constraint if exists removal_requests_status_check;
+alter table public.removal_requests add constraint removal_requests_status_check check (status in ('待刪除', '已刪除', '已退會', '退回'));
 alter table public.removal_requests enable row level security;
 revoke all on public.removal_requests from anon, authenticated;
 grant select on public.removal_requests to authenticated;
 drop policy if exists removal_requests_select on public.removal_requests;
-create policy removal_requests_select on public.removal_requests for select to authenticated using (public.is_staff());
+-- 會員看得到「自己這筆會員資料」的本人申請（以會員判斷，不以送件帳號判斷：換了登入帳號的會員照樣看得到，舊帳號看不到）
+create policy removal_requests_select on public.removal_requests for select to authenticated using (public.is_staff() or (by_self and member_id = public.my_member_id()));
 
 -- 送出退會（刪除）申請：任何幹部；不能送自己；同一位會員只能有一件待刪除
 create or replace function public.request_removal(p_member uuid, p_reason text)
@@ -1040,10 +1045,109 @@ begin
   if not found then raise exception '找不到待刪除的申請'; end if;
 end $$;
 
+-- 會員本人送出退會申請（v2.7）：寫明原因；同一人只能有一件待刪除；由具管理權限的幹部在「申請審核 → 退會申請」處理
+create or replace function public.request_my_removal(p_reason text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare 人 public.members; 編號 uuid; 本人送的 boolean;
+begin
+  if btrim(coalesce(p_reason, '')) = '' then raise exception '請填寫退會的原因'; end if;
+  select * into 人 from public.members where user_id = auth.uid();
+  if not found then raise exception '找不到您的會員資料'; end if;
+  if 人.status = '退會' then raise exception '您的會籍已經是「退會」，不需要再申請'; end if;
+  select by_self into 本人送的 from public.removal_requests where member_id = 人.id and status = '待刪除';
+  if found then
+    if 本人送的 then raise exception '您已經有一件退會申請在審核中'; end if;
+    raise exception '協會已經在處理您的退會，如有疑問請洽協會';
+  end if;
+  insert into public.removal_requests (member_id, member_no, member_name, member_agency, member_email, reason, requested_by, requested_by_name, by_self)
+    values (人.id, coalesce(人.member_no, ''), 人.name, 人.agency, 人.email, btrim(p_reason), auth.uid(), 人.name, true)
+    returning id into 編號;
+  return 編號;
+end $$;
+
+-- 會員撤回自己還在審核中的退會申請
+create or replace function public.cancel_my_removal()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.removal_requests where member_id = public.my_member_id() and by_self and status = '待刪除';
+  if not found then raise exception '沒有可以撤回的退會申請'; end if;
+end $$;
+
+-- 管理者把退會申請處理為「改為退會」（v2.7）：只把會籍改為退會，會員資料、收據、報名紀錄都保留（有繳費紀錄的人用這個）
+create or replace function public.retire_removal(p_request uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare 申 public.removal_requests; 我名 text;
+begin
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以處理退會申請'; end if;
+  select * into 申 from public.removal_requests where id = p_request and status = '待刪除' for update;
+  if not found then raise exception '找不到待刪除的申請'; end if;
+  if 申.member_id is null then raise exception '這位會員已經不在名冊上，請改為退回這件申請'; end if;
+  if 申.member_id = public.my_member_id() then raise exception '不能處理自己的退會申請，請由另一位具管理權限的幹部處理'; end if;
+  update public.members set status = '退會' where id = 申.member_id;
+  select name into 我名 from public.members where user_id = auth.uid();
+  update public.removal_requests set status = '已退會', review_note = '會籍改為退會，資料保留', reviewed_by = coalesce(我名, ''), reviewed_at = now()
+    where id = 申.id;
+end $$;
+
+-- 清空「申請審核」的清單（v2.7，只有具管理權限的幹部）：預設只清已處理的紀錄（核准、退回、已刪除、已退會）；
+-- p_with_pending 為真時連待審（待刪除）的一起清。一筆一筆刪（配合「一次只能刪一筆」的保護），回傳刪了幾筆
+create or replace function public.clear_review_list(p_list text, p_with_pending boolean default false)
+returns int language plpgsql security definer set search_path = public as $$
+declare 列 record; 筆數 int := 0;
+begin
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以清空清單'; end if;
+  if p_list = 'link_requests' then
+    for 列 in select id from public.link_requests where coalesce(p_with_pending, false) or status <> '待審' loop
+      delete from public.link_requests where id = 列.id; 筆數 := 筆數 + 1;
+    end loop;
+  elsif p_list = 'applications' then
+    for 列 in select id from public.applications where coalesce(p_with_pending, false) or status <> '待審' loop
+      delete from public.applications where id = 列.id; 筆數 := 筆數 + 1;
+    end loop;
+  elsif p_list = 'removal_requests' then
+    for 列 in select id from public.removal_requests where coalesce(p_with_pending, false) or status <> '待刪除' loop
+      delete from public.removal_requests where id = 列.id; 筆數 := 筆數 + 1;
+    end loop;
+  else
+    raise exception '不認得的清單：%', p_list;
+  end if;
+  return 筆數;
+end $$;
+
+-- 會員編號清空重編（v2.7，只有具管理權限的幹部）：依指定順序重新編成 M0001、M0002…（補掉刪除留下的空號）。
+-- p_order：'編號'（照目前的編號順序）、'入會日期'（早的在前）、'機關姓名'（服務機關、姓名）；回傳重編的人數
+create or replace function public.renumber_members(p_order text default '編號')
+returns int language plpgsql security definer set search_path = public as $$
+declare 順序 uuid[]; 人 uuid; 序 int := 0;
+begin
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以重編會員編號'; end if;
+  if coalesce(p_order, '') not in ('編號', '入會日期', '機關姓名') then raise exception '排序方式只能是：編號、入會日期、機關姓名'; end if;
+  -- 重編期間不讓別人新增或修改會員（避免撞號）
+  lock table public.members in share row exclusive mode;
+  select array_agg(id order by
+      case when p_order = '入會日期' then join_date end nulls last,
+      case when p_order = '機關姓名' then agency end, case when p_order = '機關姓名' then name end,
+      nullif(regexp_replace(coalesce(member_no, ''), '\D', '', 'g'), '')::numeric nulls last, member_no, created_at, id)
+    into 順序 from public.members;
+  if 順序 is null then return 0; end if;
+  -- 先全部改成暫時的編號（清空），再依序編號，才不會和還沒改到的人撞號
+  update public.members set member_no = 'TMP-' || id::text;
+  foreach 人 in array 順序 loop
+    序 := 序 + 1;
+    update public.members set member_no = 'M' || lpad(序::text, greatest(4, length(序::text)), '0') where id = 人;
+  end loop;
+  return 序;
+end $$;
+
+revoke execute on function public.request_my_removal(text), public.cancel_my_removal(), public.retire_removal(uuid),
+  public.clear_review_list(text, boolean), public.renumber_members(text) from public, anon;
+grant execute on function public.request_my_removal(text), public.cancel_my_removal(), public.retire_removal(uuid),
+  public.clear_review_list(text, boolean), public.renumber_members(text) to authenticated;
+
 -- 資料庫結構的版本（v2.6）：網頁登入後比對，資料庫沒有更新到網頁需要的版本時，提醒管理者重新執行這份 SQL。
 -- 這份 SQL 有修改時，這裡與 製作/src/線上/02_登入.js 的「需要資料庫版本」要一起改（測試會檢查兩者一致）
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '2.6' $$;
+language sql immutable as $$ select '2.7' $$;
 revoke execute on function public.db_version() from public, anon;
 grant execute on function public.db_version() to authenticated;
 
