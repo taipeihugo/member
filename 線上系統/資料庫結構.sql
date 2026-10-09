@@ -703,7 +703,7 @@ declare 人 public.members; 信箱 text := lower(btrim(coalesce(p_login_email, '
 begin
   if not public.is_admin() then raise exception '只有具管理權限的幹部可以建立登入帳號'; end if;
   if 信箱 !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' then raise exception 'Email 格式不正確'; end if;
-  if length(coalesce(p_password, '')) < 8 then raise exception '密碼至少 8 個字元'; end if;
+  if length(coalesce(p_password, '')) < 6 then raise exception '密碼至少 6 個字元'; end if;
   select * into 人 from public.members where id = p_member for update;
   if not found then raise exception '找不到這位會員'; end if;
   if 人.user_id is not null then raise exception '「%」已經有登入帳號；要換 Email 請先「解除帳號連結」', 人.name; end if;
