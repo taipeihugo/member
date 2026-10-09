@@ -271,6 +271,43 @@ try {
   檢查((await page.locator("#內容").innerText()).includes("有效會員 35 人；理事 1 人、監事 1 人、會員代表 2 人"), "匯入後人數統計即時更新（超過單次回傳上限仍完整讀取）");
   檢查((await page.locator(".分頁列").innerText()).includes("共 35 筆"), "會員列表分頁讀取全部 35 筆（模擬上限 25 筆）");
   await 截圖("專區_會員管理");
+  console.log("三之一、刪除會員：個人資料視窗沒有刪除鈕；勾選後按「刪除勾選的會員」只刪那一位");
+  {
+    const 前 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
+    const 搜尋框 = page.locator(".表工具列 input[type=search]");
+    await 搜尋框.fill("批次會員30");
+    await page.waitForTimeout(200);
+    await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).first().click();
+    await 框().waitFor();
+    檢查(!(await 框().innerText()).includes("刪除會員") && (await 框().locator("button", { hasText: "刪除" }).count()) === 0, "個人資料視窗裡沒有刪除按鈕");
+    await 框().locator("button.關").click();
+    await page.waitForTimeout(150);
+    await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).first().locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "刪除勾選的會員" }).click();
+    await 框().waitFor();
+    const 確認文 = await 框().innerText();
+    檢查(確認文.includes("勾選的 1 位會員") && 確認文.includes("批次會員30") && !確認文.includes("批次會員29"), "刪除前列出勾選的人數與名字");
+    await 截圖("專區_刪除勾選會員");
+    await 框().locator("button", { hasText: "刪除 1 位會員" }).click();
+    await page.waitForSelector("text=已刪除 1 位會員");
+    const 後 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
+    檢查(後 === 前 - 1 && !(await db.query("select 1 from public.members where name = '批次會員30'")).rows.length && (await db.query("select 1 from public.members where name = '批次會員29'")).rows.length === 1,
+      "只刪除勾選的那一位（" + 前 + " → " + 後 + "），其他會員都還在");
+    檢查((await page.locator("#提示區").innerText()).includes("名冊目前共 " + 後 + " 人"), "刪除後提示名冊目前的人數");
+    await page.waitForTimeout(200);
+    檢查((await page.locator("#內容").innerText()).includes("全部共 " + 後 + " 筆"), "搜尋結果變空時顯示全部筆數（不會誤以為全部被刪）");
+    await 搜尋框.fill("");
+    await page.waitForTimeout(200);
+    檢查((await page.locator(".分頁列").innerText()).includes("共 " + 後 + " 筆"), "清除搜尋後列出全部會員");
+    // 勾選兩位、取消確認：一位都沒刪
+    await page.locator("#內容 tbody tr").nth(0).locator(".勾 input").check();
+    await page.locator("#內容 tbody tr").nth(1).locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "刪除勾選的會員" }).click();
+    await 框().locator("button", { hasText: "取消" }).click();
+    await page.waitForTimeout(200);
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 後, "確認視窗按取消：一位都沒刪");
+    await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
+  }
   // 同名同機關的不同人、沒有 Email 的重複列、兩列對應到名冊同一人
   await db.query(`insert into public.members (name, agency, employee_no, email) values ('王同名', '財政部臺北國稅局', 'E001', 'wang.same@example.org'), ('張重複', '財政部高雄國稅局', '', 'z@example.org')`);
   // 匯入一個檔案，回傳預覽文字，按「開始匯入」並等完成訊息
@@ -433,7 +470,22 @@ try {
   延遲["rpc:member_login_email"] = 0;
   檢查(await page.isVisible("#登入信箱") && (await page.locator("dialog[open]").count()) === 0, "開啟會員資料途中登出：登入畫面上不會出現會員資料視窗");
   await 登入("sec@example.org", "staffpass1");
+  // 複製 Email 收件者：一律用登入 Email，不用名冊上的公務信箱；沒有帳號的人另外列出
+  await 選單("會員管理");
+  await page.fill(".表工具列 input[type=search]", "會員");
+  await page.waitForTimeout(200);
+  await page.locator("#內容 thead .勾 input").check();
+  await page.locator(".批次列 button", { hasText: "複製 Email 收件者" }).click();
+  await page.waitForSelector("#收件者框");
+  const 收件者 = await page.locator("#收件者框").inputValue();
+  檢查(收件者.includes("甲會員 <jia.home@gmail.example>") && !收件者.includes("jia@example.org") && !收件者.includes("batch1@example.org"), "複製 Email 收件者用會員的登入 Email，不用名冊上的公務信箱");
+  檢查((await page.locator("#沒有登入帳號").innerText()).includes("批次會員1"), "沒有登入帳號的會員另外列出（沒有可寄信的 Email）");
+  await 截圖("專區_收件者");
+  await 框().locator(".框尾 button", { hasText: "關閉" }).click();
+  await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
+  await page.fill(".表工具列 input[type=search]", "");
   await 選單("申請審核");
+  檢查((await page.locator("#內容 thead").innerText()).includes("登入 Email（寄信用）"), "帳號連結申請把登入 Email 標為寄信用，公務信箱只存資料");
   await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator("button", { hasText: "核准" }).click();
   檢查((await 框().locator("[data-key='member'] option:checked").innerText()).includes("乙理事長"), "核准連結時自動預選名冊上對應的會員（公務信箱相同）");
   await 截圖("專區_核准連結");
@@ -448,6 +500,32 @@ try {
   await 框().locator("button", { hasText: "核准" }).click();
   await page.waitForSelector("text=已核准");
   檢查((await db.query("select status from public.applications")).rows[0].status === "核准", "核准入會申請");
+  // 申請紀錄可以勾選刪除（只刪勾選的那筆，不影響已建立或已連結的會員）
+  {
+    const 新進帳 = (await db.query("select id from auth.users where email = 'newbie@gmail.example'")).rows[0].id;
+    await db.query("insert into public.applications (user_id, login_email, name, status) values ($1, 'newbie@gmail.example', '舊申請甲', '退回'), ($1, 'newbie@gmail.example', '舊申請乙', '退回')", [新進帳]);
+    await 選單("會員管理");
+    await 選單("申請審核");
+    await page.locator(".頁籤 button", { hasText: "入會申請" }).click();
+    檢查((await page.locator("#內容 tbody tr", { hasText: "新進同仁" }).innerText()).includes("newbie@gmail.example"), "入會申請列出申請人的登入 Email（寄信用）");
+    await page.locator("#內容 tbody tr", { hasText: "舊申請甲" }).locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "刪除勾選的申請" }).click();
+    檢查((await 框().innerText()).includes("舊申請甲") && !(await 框().innerText()).includes("舊申請乙"), "刪除申請前列出勾選的那筆");
+    await 框().locator("button", { hasText: "刪除 1 筆申請" }).click();
+    await page.waitForSelector("text=已刪除 1 筆申請");
+    const 剩 = (await db.query("select name from public.applications")).rows.map((r) => r.name);
+    檢查(!剩.includes("舊申請甲") && 剩.includes("舊申請乙") && 剩.includes("新進同仁"), "入會申請勾選刪除：只刪勾選的那筆");
+    await page.waitForTimeout(300);
+    await page.locator(".頁籤 button", { hasText: "帳號連結" }).click();
+    await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "刪除勾選的申請" }).click();
+    await 框().locator("button", { hasText: "刪除 1 筆申請" }).click();
+    await page.waitForSelector("text=已刪除 1 筆申請");
+    檢查(!(await db.query("select 1 from public.link_requests where login_email = 'yi.home@gmail.example'")).rows.length &&
+      (await db.query("select u.email from public.members m join auth.users u on u.id = m.user_id where m.email = 'yi@example.org'")).rows[0].email === "yi.home@gmail.example",
+      "刪除已核准的連結申請，不影響已連結的會員帳號");
+    await db.query("delete from public.applications where name = '舊申請乙'");
+  }
   await 選單("活動管理");
   await page.locator("#內容 tbody tr", { hasText: "年終會員聯誼餐敘" }).click();
   await page.waitForSelector("#葷素_素");

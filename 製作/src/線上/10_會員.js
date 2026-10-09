@@ -44,7 +44,7 @@ function 職務標籤(m) {
     if (m.status !== "有效") 容器.appendChild(h("p", { class: "提醒" }, "您的會籍狀態為「" + m.status + "」，如有疑問請洽協會。"));
     容器.appendChild(h("div", { class: "卡" }, h("div", { class: "表單" },
       列("會員編號", m.member_no), 列("姓名", m.name), 列("性別", m.gender), 列("服務機關", m.agency), 列("服務單位", m.unit),
-      列("職稱", m.title), 列("Email", m.email), 列("公務電話", m.phone), 列("入會日期", 民國(m.join_date)), 列("會籍", m.status),
+      列("職稱", m.title), 列("登入 Email（協會寄信用）", 連線.帳號.email), 列("名冊上的公務信箱（只存資料）", m.email), 列("公務電話", m.phone), 列("入會日期", 民國(m.join_date)), 列("會籍", m.status),
       h("div", { class: "欄 寬" }, h("span", null, "協會職務"), h("div", { class: "標籤組" }, 職務標籤(m))))));
   }
 });
@@ -168,7 +168,7 @@ function 報名對話框(a) {
   說明: "您的帳號還沒連到名冊上的會員資料。請送出連結申請，由協會核對名冊後連結（也可以請協會直接替您建立帳號）。還不是會員，請改用「入會申請」。",
   繪製: function (容器) {
     容器.appendChild(頁首("連結會員資料"));
-    容器.appendChild(h("p", { class: "次要字" }, "登入帳號：" + 連線.帳號.email + "。已經是協會會員的同仁，請送出連結申請，協會核對名冊後就會連到您的資料；還不是會員請到「入會申請」。"));
+    容器.appendChild(h("p", { class: "次要字" }, "登入帳號：" + 連線.帳號.email + "（協會的通知與重設密碼信都寄到這個 Email）。已經是協會會員的同仁，請送出連結申請，協會核對名冊後就會連到您的資料；還不是會員請到「入會申請」。"));
     const 申 = 線上.連結申請;
     const 卡 = h("div", { class: "卡" }, h("h2", null, "送出連結申請"));
     容器.appendChild(卡);
@@ -180,7 +180,7 @@ function 報名對話框(a) {
     const 欄位們 = [
       { key: "name", 標題: "姓名", 必填: true }, { key: "agency", 標題: "服務機關", 類型: "選單", 選項: 預設服務機關.concat(["其他"]), 必填: true },
       { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" },
-      { key: "office_email", 標題: "公務電子郵件信箱（名冊上的）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
+      { key: "office_email", 標題: "名冊上的公務信箱（只用來核對，不會寄信）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
       { key: "note", 標題: "備註", 類型: "多行", 行數: 2 }
     ];
     const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, 申 ? 申[f.key] : ""); }));
@@ -219,14 +219,14 @@ function 報名對話框(a) {
       { key: "name", 標題: "姓名", 必填: true }, { key: "gender", 標題: "性別", 類型: "選單", 選項: ["女", "男"] },
       { key: "employee_no", 標題: "員工編號" }, { key: "agency", 標題: "服務機關", 類型: "選單", 選項: 預設服務機關.concat(["其他"]), 必填: true },
       { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" }, { key: "phone", 標題: "公務電話" },
-      { key: "email", 標題: "公務電子郵件信箱", 類型: "Email", 說明: "列入名冊用；登入仍用您註冊的個人 Email" },
+      { key: "email", 標題: "公務電子郵件信箱", 類型: "Email", 說明: "只列入名冊存資料、不會寄信；協會的通知與重設密碼信都寄到您登入用的 Email" },
       { key: "note", 標題: "備註", 類型: "多行", 行數: 2 },
       { key: "同意", 標題: "個人資料告知", 類型: "勾選", 勾選文字: "我同意協會僅為辦理入會及會務蒐集、處理及利用以上資料" }
     ];
     const 表單 = h("form", { class: "表單", onsubmit: function (e) { e.preventDefault(); } }, 欄位們.map(function (f) { return 表單欄位(f, 申 ? 申[f.key] : ""); }));
     const 錯 = h("p", { class: "錯誤", role: "alert" });
     容器.appendChild(h("div", { class: "卡" },
-      h("p", null, "登入帳號：" + 連線.帳號.email + "。已經是會員的同仁請改用「連結會員資料」，不用重新申請。"), 表單, 錯,
+      h("p", null, "登入帳號：" + 連線.帳號.email + "（協會的通知都寄到這個 Email）。已經是會員的同仁請改用「連結會員資料」，不用重新申請。"), 表單, 錯,
       h("button", { class: "鈕 主", type: "button", id: "送出申請鈕", onclick: async function () {
         const 值 = 讀表單(表單, 欄位們);
         if (!值.name || !值.agency) return (錯.textContent = "請填寫姓名與服務機關");

@@ -212,6 +212,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   const 己申 = (await 以身分(db, 己帳, () => db.query("select public.submit_application('己同仁', '男', '', '財政部國庫署', '', '', '', '', 'JI@mail.mof.gov.tw') as id"))).rows[0].id;
   await 秘("select public.approve_application($1)", [己申]);
   檢查((await 以身分(db, 己帳, () => db.query("select email from public.members"))).rows[0].email === "ji@mail.mof.gov.tw", "入會申請填的公務信箱寫入名冊，帳號用個人信箱登入");
+  檢查((await db.query("select login_email, email from public.applications where id = $1", [己申])).rows[0].login_email === 己帳.email.toLowerCase(), "入會申請另外記下申請人的登入 Email（寄信用），公務信箱只存資料");
 
   // 第一位幹部用個人信箱登入、名冊用公務信箱
   const 庚帳 = await 新帳("geng.personal@gmail.example");
@@ -425,6 +426,32 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     await db.exec(fs.readFileSync(path.join(根目錄, "線上系統", "資料庫結構.sql"), "utf8"));
     檢查(!(await db.query("select 1 from public.board_titles where title = '常務監事'")).rows.length && (await db.query("select 1 from public.board_titles where title = '候補理事'")).rows.length === 1,
       "重新執行結構不會把刪掉的預設職稱加回來，也不會清掉新增的職稱");
+  }
+  console.log("十二、刪除只能一筆一筆；申請可刪除；寄信用登入 Email");
+  {
+    const 秘2 = (sql, p) => 以身分(db, 帳.秘書長, () => db.query(sql, p));
+    const 前 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
+    檢查(await 應失敗(() => 秘2("delete from public.members where staff_role = '' and user_id is null"), "一次只能刪除一筆"), "管理者一次刪很多位會員會被擋（整批取消）");
+    // 連管理者也一起刪時，可能先被「不能沒有管理者」擋下；不論哪個原因，都要整批取消
+    檢查(await 應失敗(() => 秘2("delete from public.members"), ""), "沒有條件的刪除（全部）也會被擋");
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "上述被擋後一位都沒少");
+    const 單 = (await db.query("insert into public.members (name, email) values ('要刪的人', 'todelete@fia.example.gov') returning id")).rows[0].id;
+    await 秘2("delete from public.members where id = $1", [單]);
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "一次刪一位可以，只少那一位");
+    // 申請紀錄可以刪（幹部），一次一筆
+    const 申帳 = { id: crypto.randomUUID(), email: "del.applicant@gmail.example" };
+    await db.query("insert into auth.users values ($1, $2, now())", [申帳.id, 申帳.email]);
+    const 連申 = (await 以身分(db, 申帳, () => db.query("select public.submit_link_request('刪除測試', '', '', '', '', '', '') as id"))).rows[0].id;
+    const 入申 = (await db.query("insert into public.applications (user_id, name, status) values ($1, '刪除測試二', '退回') returning id", [申帳.id])).rows[0].id;
+    檢查((await 以身分(db, 申帳, () => db.query("delete from public.link_requests where id = $1 returning id", [連申]))).rows.length === 0, "申請人不能刪自己的連結申請（只有幹部能刪）");
+    await 秘2("delete from public.link_requests where id = $1", [連申]);
+    await 秘2("delete from public.applications where id = $1", [入申]);
+    檢查(!(await db.query("select 1 from public.link_requests where id = $1", [連申])).rows.length && !(await db.query("select 1 from public.applications where id = $1", [入申])).rows.length, "幹部可以刪除連結申請、入會申請");
+    檢查(await 應失敗(() => 秘2("delete from public.applications"), "一次只能刪除一筆") || (await db.query("select count(*)::int n from public.applications")).rows[0].n <= 1, "申請紀錄也不能一次刪一大批");
+    // 寄信用登入 Email
+    const 信 = (await 秘2("select public.member_login_emails(array(select id from public.members)) as j")).rows[0].j;
+    檢查(信.some((x) => x.email === "jia@example.org") && 信.every((x) => x.member_id && x.email), "幹部取得會員的登入 Email（寄信用；沒有帳號的人不列）");
+    檢查(await 應失敗(() => 以身分(db, 帳.甲, () => db.query("select public.member_login_emails(array[$1::uuid])", [甲id])), "沒有權限"), "一般會員不能取得別人的登入 Email");
   }
   // 不能把系統弄到沒有任何人具管理權限
   {

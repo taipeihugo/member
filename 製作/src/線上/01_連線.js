@@ -289,13 +289,25 @@ function 新增(表, 資料) {
   return 請求("/rest/v1/" + 表, { 方法: "POST", 內容: 資料, 標頭: { Prefer: "return=representation" } });
 }
 
+// 檢查修改／刪除的條件：每個條件都要有實際的值（沒有條件或值是空的，會變成改到或刪掉整張表）
+function 檢查條件(條件) {
+  const 鍵 = Object.keys(條件 || {});
+  const 壞 = !鍵.length || 鍵.some(function (k) {
+    const v = 條件[k];
+    return v == null || v === "" || v === "undefined" || v === "null" || (Array.isArray(v) && !v.length);
+  });
+  if (壞) throw new Error("程式錯誤：沒有指定要處理哪一筆資料，已取消（避免改到全部資料）");
+}
+
 // 依條件修改資料，回傳修改後的資料
-function 修改(表, 條件, 資料) {
+async function 修改(表, 條件, 資料) {
+  檢查條件(條件);
   return 請求("/rest/v1/" + 表 + "?" + 篩選參數(條件), { 方法: "PATCH", 內容: 資料, 標頭: { Prefer: "return=representation" } });
 }
 
-// 依條件刪除資料
-function 刪除(表, 條件) {
+// 依條件刪除資料（一定要有條件，不會刪整張表）
+async function 刪除(表, 條件) {
+  檢查條件(條件);
   return 請求("/rest/v1/" + 表 + "?" + 篩選參數(條件), { 方法: "DELETE", 標頭: { Prefer: "return=representation" } });
 }
 

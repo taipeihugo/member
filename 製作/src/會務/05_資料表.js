@@ -4,7 +4,7 @@
 //   欄位：[{key, 標題, 值(r), 顯示(r)→文字或元素, 數字:bool, 不排序:bool, 不匯出:bool}]
 //   資料()：回傳要顯示的紀錄陣列
 //   篩選：[{標題, 選項()→陣列, 取值(r)→值或值陣列}]
-//   批次：[{文字, 動作(已選紀錄們)}]（有設定才顯示勾選欄）
+//   批次：[{文字, 動作(已選紀錄們), 危:bool（紅色按鈕）, 可見()→bool（不設定＝都看得到）}]（有設定才顯示勾選欄）
 //   點列(r)、工具(額外按鈕陣列)、匯出檔名、每頁（預設 20）、預設排序 {key, 反向}
 function 資料表(設定) {
   const 狀 = { 搜尋: "", 篩選: {}, 排序: 設定.預設排序 ? 設定.預設排序.key : null, 反向: 設定.預設排序 ? !!設定.預設排序.反向 : false, 頁: 0, 已選: new Set() };
@@ -95,21 +95,27 @@ function 資料表(設定) {
         }));
     }));
     清空(表區).appendChild(h("table", { class: "表" }, h("thead", null, 表頭), 身));
-    if (!列.length) 表區.appendChild(h("div", { class: "空" }, 設定.空白文字 || "沒有資料"));
+    // 全部有幾筆（搜尋、篩選前），讓人分得出是「沒有資料」還是「被搜尋條件篩掉」
+    const 全部筆數 = 設定.資料().length;
+    const 有條件 = !!狀.搜尋 || Object.keys(狀.篩選).some(function (k) { return 狀.篩選[k]; });
+    if (!列.length) 表區.appendChild(h("div", { class: "空" }, 有條件 && 全部筆數
+      ? "沒有符合目前搜尋或篩選條件的資料（全部共 " + 全部筆數 + " 筆，清除搜尋框或篩選就會再出現）"
+      : 設定.空白文字 || "沒有資料"));
     // 批次動作列
     清空(批次列);
     批次列.classList.toggle("隱藏", !(有勾選 && 狀.已選.size));
     if (有勾選 && 狀.已選.size) {
       批次列.appendChild(h("strong", null, "已勾選 " + 狀.已選.size + " 筆"));
       設定.批次.forEach(function (b) {
-        批次列.appendChild(h("button", { class: "鈕 小", type: "button", onclick: function () { b.動作(已選紀錄()); } }, b.文字));
+        if (b.可見 && !b.可見()) return;
+        批次列.appendChild(h("button", { class: "鈕 小" + (b.危 ? " 危" : ""), type: "button", onclick: function () { b.動作(已選紀錄()); } }, b.文字));
       });
       批次列.appendChild(h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(true, "csv"); } }, "匯出勾選"));
       批次列.appendChild(h("button", { class: "鈕 小 文字", type: "button", onclick: function () { 狀.已選.clear(); 繪製(); } }, "取消勾選"));
     }
     // 分頁
     清空(分頁列);
-    分頁列.appendChild(h("span", { class: "次要字 小字" }, "共 " + 列.length + " 筆"));
+    分頁列.appendChild(h("span", { class: "次要字 小字" }, "共 " + 列.length + " 筆" + (有條件 ? "（全部 " + 全部筆數 + " 筆）" : "")));
     if (頁數 > 1) {
       分頁列.appendChild(h("button", { class: "鈕 小", type: "button", disabled: 狀.頁 === 0, onclick: function () { 狀.頁--; 繪製(); } }, "上一頁"));
       分頁列.appendChild(h("span", null, "第 " + (狀.頁 + 1) + " / " + 頁數 + " 頁"));

@@ -166,6 +166,9 @@ create table if not exists public.applications (
   created_at timestamptz not null default now()
 );
 create unique index if not exists applications_one_pending on public.applications (user_id) where status = '待審';
+-- 申請人的登入 Email（系統寄信用；email 欄是名冊上的公務信箱，只存資料）。舊資料由帳號補上
+alter table public.applications add column if not exists login_email text not null default '';
+update public.applications a set login_email = lower(u.email) from auth.users u where u.id = a.user_id and a.login_email = '' and u.email is not null;
 
 -- ---------- 身分判斷函式 ----------
 
@@ -410,7 +413,7 @@ begin
   return 狀;
 end $$;
 
--- 線上入會申請（已是會員、或已有待審申請時不能重複送）；p_email 是公務電子郵件信箱（名冊用），沒填就用登入 Email
+-- 線上入會申請（已是會員、或已有待審申請時不能重複送）；p_email 是名冊上的公務信箱（只存資料、不寄信），沒填就用登入 Email；登入 Email 另外記在 login_email（寄信用）
 drop function if exists public.submit_application(text, text, text, text, text, text, text, text);
 create or replace function public.submit_application(p_name text, p_gender text, p_employee_no text, p_agency text,
   p_unit text, p_title text, p_phone text, p_note text, p_email text default '')
@@ -422,8 +425,8 @@ begin
   if exists (select 1 from public.applications where user_id = auth.uid() and status = '待審') then raise exception '您已有一件申請在審核中'; end if;
   信箱 := lower(trim(coalesce(p_email, '')));
   if 信箱 = '' then select lower(email) into 信箱 from auth.users where id = auth.uid(); end if;
-  insert into public.applications (user_id, name, gender, employee_no, agency, unit, title, email, phone, note)
-    values (auth.uid(), trim(p_name), coalesce(p_gender, ''), coalesce(p_employee_no, ''), coalesce(p_agency, ''),
+  insert into public.applications (user_id, login_email, name, gender, employee_no, agency, unit, title, email, phone, note)
+    values (auth.uid(), coalesce((select lower(email) from auth.users where id = auth.uid()), ''), trim(p_name), coalesce(p_gender, ''), coalesce(p_employee_no, ''), coalesce(p_agency, ''),
       coalesce(p_unit, ''), coalesce(p_title, ''), coalesce(信箱, ''), coalesce(p_phone, ''), coalesce(p_note, ''))
     returning id into 編號;
   return 編號;
@@ -586,10 +589,12 @@ create unique index if not exists link_requests_one_pending on public.link_reque
 
 alter table public.link_requests enable row level security;
 revoke all on public.link_requests from anon, authenticated;
-grant select on public.link_requests to authenticated;
+grant select, delete on public.link_requests to authenticated;
 
 drop policy if exists link_requests_select on public.link_requests;
 create policy link_requests_select on public.link_requests for select to authenticated using (user_id = auth.uid() or public.is_staff());
+drop policy if exists link_requests_delete on public.link_requests;
+create policy link_requests_delete on public.link_requests for delete to authenticated using (public.is_staff());
 
 -- 帳號一連結到會員資料（不論透過建立登入帳號、核准連結、核准入會或 make_staff），
 -- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請
@@ -862,14 +867,44 @@ drop trigger if exists members_keep_admin on public.members;
 create trigger members_keep_admin after update of staff_role, status, user_id or delete on public.members
   for each row execute function public.members_keep_admin();
 
+-- 防止一次刪掉一大批（v2.3）：網頁上一次只刪一筆（勾選多筆時逐筆刪），同一個刪除指令刪到兩筆以上就整批取消
+-- （SQL Editor 不受限）
+create or replace function public.delete_one_at_a_time() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is not null and (select count(*) from 刪除的 ) > 1 then
+    raise exception '一次只能刪除一筆資料（這次的刪除會刪到 % 筆，已全部取消）', (select count(*) from 刪除的);
+  end if;
+  return null;
+end $$;
+drop trigger if exists members_delete_one on public.members;
+create trigger members_delete_one after delete on public.members
+  referencing old table as 刪除的 for each statement execute function public.delete_one_at_a_time();
+drop trigger if exists applications_delete_one on public.applications;
+create trigger applications_delete_one after delete on public.applications
+  referencing old table as 刪除的 for each statement execute function public.delete_one_at_a_time();
+drop trigger if exists link_requests_delete_one on public.link_requests;
+create trigger link_requests_delete_one after delete on public.link_requests
+  referencing old table as 刪除的 for each statement execute function public.delete_one_at_a_time();
+
+-- 幹部取得會員的登入 Email（寄信用）：系統只寄信到登入 Email，名冊上的公務信箱只存資料、不用來寄信。
+-- 回傳 JSON 陣列 [{member_id, email}]（沒有登入帳號的人不列）
+create or replace function public.member_login_emails(p_members uuid[])
+returns json language plpgsql stable security definer set search_path = public as $$
+begin
+  if not public.is_staff() then raise exception '沒有權限'; end if;
+  return (select coalesce(json_agg(json_build_object('member_id', m.id, 'email', u.email)), '[]'::json)
+    from public.members m join auth.users u on u.id = m.user_id where m.id = any(p_members));
+end $$;
+
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
-revoke execute on function public.end_sessions(uuid), public.members_keep_admin() from public, anon, authenticated;
-revoke execute on function public.member_login_email(uuid), public.submit_link_request(text, text, text, text, text, text, text),
+revoke execute on function public.end_sessions(uuid), public.members_keep_admin(), public.delete_one_at_a_time() from public, anon, authenticated;
+revoke execute on function public.member_login_email(uuid), public.member_login_emails(uuid[]), public.submit_link_request(text, text, text, text, text, text, text),
   public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),
   public.create_member_login(uuid, text, text), public.set_member_password(uuid, text), public.confirm_member_identity(uuid),
   public.add_staff_role(text, boolean), public.delete_staff_role(text), public.set_staff_role_admin(text, boolean), public.reorder_staff_roles(text[]),
   public.add_board_title(text, text), public.delete_board_title(text), public.reorder_board_titles(text[]) from public, anon;
-grant execute on function public.member_login_email(uuid), public.submit_link_request(text, text, text, text, text, text, text),
+grant execute on function public.member_login_email(uuid), public.member_login_emails(uuid[]), public.submit_link_request(text, text, text, text, text, text, text),
   public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),
   public.create_member_login(uuid, text, text), public.set_member_password(uuid, text), public.confirm_member_identity(uuid),
   public.add_staff_role(text, boolean), public.delete_staff_role(text), public.set_staff_role_admin(text, boolean), public.reorder_staff_roles(text[]),

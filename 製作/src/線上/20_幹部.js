@@ -5,7 +5,7 @@
   圖示: "👥",
   分隔: true,
   可見: 是幹部,
-  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存；職稱與幹部角色的選項在「系統設定」增刪。幹部角色只有具管理權限的幹部（預設是理事長、秘書長、總幹事）能指派；已連結帳號的會員，帳號要是由他們建立或核准連結的才能指派，否則請先解除帳號連結、再替他建立登入帳號。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同、員工編號與姓名都相同，或姓名＋服務機關相同（名冊上只有一位且 Email、員工編號沒有矛盾）的視為同一人並更新資料，其他新增；無法判斷的列會列出並略過，更新時空白的儲存格不會清掉原有資料。登入帳號：具管理權限的幹部點會員後按「建立登入帳號」，填 Email 與初始密碼即可直接登入（不用收驗證信，適合收不到外部信的公務信箱或測試帳號）；會員也可以自己註冊後送「連結申請」，到「申請審核」核准。「帳號」欄可篩出還沒有帳號的人。",
+  說明: "管理全體會員。點一列可編輯：理監事職稱只能選一個（理事、監事互斥），「會員代表」可另外勾選，兩者可並存；職稱與幹部角色的選項在「系統設定」增刪。幹部角色只有具管理權限的幹部（預設是理事長、秘書長、總幹事）能指派；已連結帳號的會員，帳號要是由他們建立或核准連結的才能指派，否則請先解除帳號連結、再替他建立登入帳號。「匯入名冊」支援 Excel／CSV／ODS，標準欄位為 姓名、女0男1、服務機關、服務單位、職稱、電子郵件信箱（可再加 公務電話、員工編號、理監事、會員代表）；Email 相同、員工編號與姓名都相同，或姓名＋服務機關相同（名冊上只有一位且 Email、員工編號沒有矛盾）的視為同一人並更新資料，其他新增；無法判斷的列會列出並略過，更新時空白的儲存格不會清掉原有資料。登入帳號：具管理權限的幹部點會員後按「建立登入帳號」，填 Email 與初始密碼即可直接登入（不用收驗證信，適合收不到外部信的公務信箱或測試帳號）；會員也可以自己註冊後送「連結申請」，到「申請審核」核准。「帳號」欄可篩出還沒有帳號的人。寄信：「複製 Email 收件者」一律用每位會員的登入 Email；名冊上的公務信箱只存資料、不拿來寄信，沒有登入帳號的人會另外列出。刪除：勾選要刪的會員（可先搜尋），按上方出現的「刪除勾選的會員」（只有具管理權限的幹部看得到），確認名單後只刪勾選的那幾位；系統一次只刪一筆，不會整批清空名冊。",
   繪製: async function (容器) {
     let 名冊 = await 查詢("members", null, "member_no.asc");
     const 統計 = h("p", { class: "次要字" });
@@ -24,7 +24,7 @@
       預設排序: { key: "member_no" },
       欄位: [
         { key: "member_no", 標題: "編號" }, { key: "name", 標題: "姓名" }, { key: "gender", 標題: "性別" },
-        { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" }, { key: "email", 標題: "Email" },
+        { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" }, { key: "email", 標題: "公務信箱" },
         { key: "職務", 標題: "協會職務", 值: 職務文字 },
         { key: "status", 標題: "會籍", 顯示: function (r) { return h("span", { class: "標記 " + (r.status === "有效" ? "成" : "危") }, r.status); } },
         { key: "帳號", 標題: "帳號", 值: function (r) { return r.user_id ? "已有帳號" : "沒有帳號"; } }
@@ -38,7 +38,14 @@
       ],
       點列: function (r) { 編輯線上會員(r, 機關們(), 重載); },
       批次: [
-        { 文字: "複製 Email 收件者", 動作: function (列) { 顯示信箱(列); } }
+        { 文字: "複製 Email 收件者", 動作: function (列) { 顯示信箱(列); } },
+        { 文字: "刪除勾選的會員", 危: true, 可見: 是管理者, 動作: async function (列) {
+          const 結果 = await 刪除勾選("members", 列, "位會員", "這些人的報名與繳費紀錄會一併刪除；只是不再是會員的話，建議改用會籍「退會」保留紀錄。");
+          if (!結果) return;
+          let 現況 = "";
+          try { await 重載(); 現況 = "名冊目前共 " + 名冊.length + " 人"; } catch (e) { 現況 = "重新讀取名冊失敗，請重新整理"; }
+          回報刪除結果(結果, "位會員", 現況);
+        } }
       ]
     });
     容器.appendChild(頁首("會員管理", [
@@ -53,12 +60,78 @@
   }
 });
 
-// 顯示 Email 收件者字串
-function 顯示信箱(列) {
-  const 字串 = 列.filter(function (m) { return m.email; }).map(function (m) { return m.name.replace(/[<>;,"]/g, "") + " <" + m.email + ">"; }).join("; ");
-  const 框 = h("textarea", { rows: 6, readonly: true });
+// 顯示 Email 收件者字串：一律用會員的「登入 Email」（本人提供、收得到信）；名冊上的公務信箱只存資料，不拿來寄信
+// 列可以是會員（id＝會員編號）或報名紀錄（member_id＝會員編號）
+async function 顯示信箱(列) {
+  const 名字 = {};
+  列.forEach(function (r) { 名字[r.member_id || r.id] = r.name || r.member_name || ""; });
+  const 編號們 = Object.keys(名字);
+  const 場 = 連線.場次;
+  let 信箱們;
+  try { 信箱們 = await 呼叫("member_login_emails", { p_members: 編號們 }) || []; }
+  catch (e) { if (連線.場次 === 場) 提示("無法讀取登入 Email：" + e.message, true); return; }
+  // 讀取期間登出或換人登入：不顯示（避免個資出現在下一位的畫面）
+  if (連線.場次 !== 場 || !連線.帳號) return;
+  const 有 = {};
+  信箱們.forEach(function (x) { if (x.email) 有[x.member_id] = x.email; });
+  const 乾淨 = function (s) { return String(s || "").replace(/[<>;,"]/g, ""); };
+  const 字串 = 編號們.filter(function (id) { return 有[id]; }).map(function (id) { return 乾淨(名字[id]) + " <" + 有[id] + ">"; }).join("; ");
+  const 沒有 = 編號們.filter(function (id) { return !有[id]; }).map(function (id) { return 名字[id] || "（未填姓名）"; });
+  const 框 = h("textarea", { rows: 6, readonly: true, id: "收件者框" });
   框.value = 字串;
-  對話框("Email 收件者", [h("p", null, "複製後貼到郵件的「密件副本」欄。"), 框], [{ 文字: "關閉" }]);
+  對話框("Email 收件者", [
+    h("p", null, "共 " + (編號們.length - 沒有.length) + " 人。複製後貼到郵件的「密件副本」欄。"),
+    h("p", { class: "次要字 小字" }, "這裡用的是每位會員自己的「登入 Email」；名冊上的公務信箱只存資料、不用來寄信（多半收不到外部郵件）。"),
+    框,
+    沒有.length ? h("p", { class: "提醒", id: "沒有登入帳號" }, "下列 " + 沒有.length + " 人還沒有登入帳號，沒有可寄信的 Email（未列入上面）：" +
+      沒有.slice(0, 50).join("、") + (沒有.length > 50 ? "…等" : "")) : null
+  ], [{ 文字: "關閉" }]);
+}
+
+// 一筆一筆刪除勾選的資料（先列出名字請使用者確認；每次只刪一筆，資料庫也不允許一次刪多筆）。
+// 取消回傳 null；否則回傳 {成功：刪掉幾筆, 失敗們：["名字：原因"], 中斷：網路等錯誤（之後的沒有處理）, 未處理：幾筆沒處理}
+async function 刪除勾選(表, 列, 單位, 提醒) {
+  if (!列.length) return null;
+  const 名 = function (r) { return r.name || "（未填姓名）"; };
+  const 清單 = 列.slice(0, 20).map(名).join("、") + (列.length > 20 ? "…等 " + 列.length + " " + 單位 : "");
+  const 好 = await 對話框("刪除勾選的資料", [
+    h("p", null, "確定刪除勾選的 " + 列.length + " " + 單位 + "？只會刪除勾選的這幾筆，其他資料不受影響。"),
+    h("p", { class: "保留換行", id: "刪除清單" }, 清單),
+    提醒 ? h("p", { class: "提醒" }, 提醒) : null,
+    h("p", { class: "錯誤" }, "刪除後無法復原。")
+  ], [{ 文字: "取消", 值: false }, { 文字: "刪除 " + 列.length + " " + 單位, 危: true, 值: true }]);
+  if (好 !== true) return null;
+  const 場 = 連線.場次;
+  const 結果 = { 成功: 0, 失敗們: [], 中斷: null, 未處理: 0 };
+  for (let i = 0; i < 列.length; i++) {
+    const r = 列[i];
+    // 中途登出或換人登入：停止，剩下的不刪
+    if (連線.場次 !== 場) { 結果.未處理 = 列.length - i; break; }
+    if (表 === "members" && 連線.帳號 && r.user_id === 連線.帳號.id) { 結果.失敗們.push(名(r) + "：不能刪除自己的會員資料"); continue; }
+    try {
+      const 回 = await 刪除(表, { id: r.id });
+      if (Array.isArray(回) && 回.length) 結果.成功++;
+      else 結果.失敗們.push(名(r) + "：沒有刪到（可能已被別人刪除，或沒有權限）");
+    } catch (e) {
+      if (暫時錯誤(e)) { 結果.中斷 = e; 結果.未處理 = 列.length - i; break; }
+      結果.失敗們.push(名(r) + "：" + e.message);
+    }
+  }
+  // 換人登入：不在下一位的畫面上顯示結果
+  if (連線.場次 !== 場 && 連線.帳號) return null;
+  return 結果;
+}
+
+// 顯示刪除結果：全部成功用提示，有失敗或中斷時開視窗列出
+function 回報刪除結果(結果, 單位, 現況) {
+  const 摘要 = "已刪除 " + 結果.成功 + " " + 單位 + (現況 ? "（" + 現況 + "）" : "");
+  if (!結果.失敗們.length && !結果.中斷 && !結果.未處理) return 提示(摘要);
+  對話框("刪除結果", [
+    h("p", null, 摘要 + "。"),
+    結果.中斷 ? h("p", { class: "錯誤" }, "中途發生問題，剩下 " + 結果.未處理 + " 筆沒有刪除：" + 結果.中斷.message + "。最後送出的那一筆可能已刪除，請重新整理後確認。") :
+      結果.未處理 ? h("p", { class: "錯誤" }, "登入狀態改變，剩下 " + 結果.未處理 + " 筆沒有刪除。") : null,
+    結果.失敗們.length ? h("ul", { class: "錯誤" }, 結果.失敗們.slice(0, 30).map(function (x) { return h("li", null, x); })) : null
+  ]);
 }
 
 // 新增或編輯一位會員（理監事職稱單選，會員代表另外勾選）；管理者另外看得到這位會員連結的登入帳號，指派幹部前可以核對
@@ -81,7 +154,7 @@ async function 編輯線上會員(原, 機關們, 完成後) {
     { key: "name", 標題: "姓名", 必填: true }, { key: "gender", 標題: "性別", 類型: "選單", 選項: ["女", "男"] },
     { key: "employee_no", 標題: "員工編號" }, { key: "agency", 標題: "服務機關", 類型: "選單", 選項: 機關們, 必填: true },
     { key: "unit", 標題: "服務單位" }, { key: "title", 標題: "職稱" },
-    { key: "email", 標題: "Email（名冊上的公務信箱）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
+    { key: "email", 標題: "Email（名冊上的公務信箱，只存資料、不寄信）", 類型: "Email" }, { key: "phone", 標題: "公務電話" },
     { key: "join_date", 標題: "入會日期", 類型: "日期" }, { key: "status", 標題: "會籍", 類型: "選單", 選項: ["有效", "停權", "退會"], 必填: true },
     { key: "理監事", 標題: "理監事職稱（理事、監事只能擇一）", 類型: "選單", 選項: 理監事選項(), 不加空白: true },
     { key: "is_representative", 標題: "會員代表", 類型: "勾選", 勾選文字: "是會員代表（可同時為理事或監事）" },
@@ -103,10 +176,6 @@ async function 編輯線上會員(原, 機關們, 完成後) {
     if (原.user_id) 選項.額外按鈕.push({ 文字: "解除帳號連結", 動作: async function (關) {
       if (!(await 確認("解除「" + 原.name + "」的帳號連結？之後要再替他建立登入帳號，或由他送連結申請。", "解除連結"))) return false;
       try { await 呼叫("unlink_member", { p_member: 原.id }); 關(null); 提示("已解除連結"); 完成後(); } catch (e) { 提示(e.message, true); return false; }
-    } });
-    選項.額外按鈕.push({ 文字: "刪除會員", 危: true, 動作: async function (關) {
-      if (!(await 確認("確定刪除「" + 原.name + "」？報名與繳費紀錄會一併刪除。建議改用會籍「退會」保留紀錄。", "刪除"))) return false;
-      try { await 刪除("members", { id: 原.id }); 關(null); 提示("已刪除"); 完成後(); } catch (e) { 提示(e.message, true); return false; }
     } });
   }
   return 表單對話框(原 ? "編輯會員：" + 原.name : "新增會員", 欄位們, 初值, async function (值) {
@@ -144,7 +213,7 @@ function 檢查密碼(值) {
 // 管理者替會員建立登入帳號（不用收驗證信，馬上可以登入）；Email 已註冊過時直接完成驗證並改成這組密碼
 function 建立登入帳號(原, 完成後) {
   表單對話框("建立登入帳號：" + 原.name, [
-    { key: "email", 標題: "登入 Email", 類型: "Email", 必填: true, 說明: "請填本人親自提供的 Email（不要直接照抄名冊）；公務信箱或測試帳號都可以，收不到信也沒關係（不寄驗證信）" },
+    { key: "email", 標題: "登入 Email", 類型: "Email", 必填: true, 說明: "請填本人親自提供、收得到信的 Email（不要直接照抄名冊）：系統的通知、重設密碼信、「複製 Email 收件者」都只寄到這個登入 Email；名冊上的公務信箱只存資料，多半收不到外部信。測試帳號收不到信也能建立（不寄驗證信）" },
     { key: "密碼", 標題: "初始密碼（至少 8 個字元）", 類型: "密碼", 必填: true },
     { key: "再次", 標題: "再輸入一次", 類型: "密碼", 必填: true }
   ], {}, async function (值) {
@@ -473,7 +542,7 @@ async function 匯入線上名冊(名冊, 完成後) {
 註冊頁面("申請審核", {
   圖示: "✅",
   可見: 是幹部,
-  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。「入會申請」：還不是會員的同仁送出的申請，核准後一律建立一筆新的會員資料並連結帳號；名冊上已有相同公務信箱的會員時不能核准，請退回，並請申請人改送「連結申請」，再到「帳號連結」核對後連結（或由具管理權限的幹部在「會員管理」替那位會員建立登入帳號）。退回時填寫原因，申請人登入後看得到。",
+  說明: "「帳號連結」：已在名冊上的會員用個人 Email 註冊後送出的連結申請，請核對姓名、機關、公務信箱後，選擇名冊上對應的會員並核准。系統寄信一律用申請人的登入 Email；公務信箱只用來核對、存資料。「入會申請」：還不是會員的同仁送出的申請，核准後一律建立一筆新的會員資料並連結帳號；名冊上已有相同公務信箱的會員時不能核准，請退回，並請申請人改送「連結申請」，再到「帳號連結」核對後連結（或由具管理權限的幹部在「會員管理」替那位會員建立登入帳號）。退回時填寫原因，申請人登入後看得到。不需要的申請紀錄可以勾選後按「刪除勾選的申請」（只刪申請紀錄，不影響已連結或已建立的會員資料）。",
   繪製: async function (容器, 參數) {
     const [申們, 連們, 名冊] = await Promise.all([查詢("applications", null, "created_at.desc"), 查詢("link_requests", null, "created_at.desc"), 查詢("members", null, "member_no.asc")]);
     const 待連 = 連們.filter(function (a) { return a.status === "待審"; }).length;
@@ -501,7 +570,7 @@ function 繪製連結審核(區, 連們, 名冊) {
     欄位: [
       { key: "created_at", 標題: "申請時間", 顯示: function (r) { return 民國時間(r.created_at); } },
       { key: "name", 標題: "姓名" }, { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" },
-      { key: "office_email", 標題: "公務信箱" }, { key: "login_email", 標題: "登入 Email（個人）" },
+      { key: "login_email", 標題: "登入 Email（寄信用）" }, { key: "office_email", 標題: "名冊上的公務信箱（只存資料）" },
       { key: "status", 標題: "狀態", 顯示: 審核狀態 },
       { key: "操作", 標題: "", 不排序: true, 不匯出: true, 顯示: function (r) {
         if (r.status !== "待審") return h("span", { class: "小字 次要字" }, (r.reviewed_by || "") + " " + 民國時間(r.reviewed_at));
@@ -510,6 +579,7 @@ function 繪製連結審核(區, 連們, 名冊) {
       } }
     ],
     篩選: [{ 標題: "狀態", 選項: ["待審", "核准", "退回"], 取值: function (r) { return r.status; } }],
+    批次: [{ 文字: "刪除勾選的申請", 危: true, 動作: function (列) { 刪除申請("link_requests", 列); } }],
     空白文字: "沒有帳號連結申請"
   }).元素);
 }
@@ -526,7 +596,7 @@ function 核准連結(r, 名冊) {
       選項: 可選.map(function (m) { return { 值: m.id, 字: 說明(m) }; }) }
   ], { member: 建議 ? 建議.id : "" }, async function (值) {
     const m = 可選.find(function (x) { return x.id === 值.member; });
-    const 好 = await 確認("申請人「" + r.name + "」（" + (r.agency || "") + "，公務信箱 " + (r.office_email || "未填") + "，登入 Email " + r.login_email + "）\n將連結到名冊上的：" + (m ? 說明(m) : "") + "\n確定是同一人嗎？", "確定連結");
+    const 好 = await 確認("申請人「" + r.name + "」（" + (r.agency || "") + "）\n登入 Email（系統寄信用）：" + r.login_email + "\n名冊上的公務信箱（只用來核對）：" + (r.office_email || "未填") + "\n將連結到名冊上的：" + (m ? 說明(m) : "") + "\n確定是同一人嗎？", "確定連結");
     if (!好) return "已取消，請重新選擇";
     try { await 呼叫("approve_link_request", { p_request: r.id, p_member: 值.member }); 提示("已連結：" + r.name); 重新繪製(); } catch (e) { return e.message; }
   }, { 儲存文字: "核准連結" });
@@ -551,7 +621,7 @@ function 繪製入會審核(區, 申們, 名冊) {
     欄位: [
       { key: "created_at", 標題: "申請時間", 顯示: function (r) { return 民國時間(r.created_at); } },
       { key: "name", 標題: "姓名" }, { key: "gender", 標題: "性別" }, { key: "agency", 標題: "服務機關" }, { key: "unit", 標題: "服務單位" },
-      { key: "title", 標題: "職稱" }, { key: "email", 標題: "公務信箱" },
+      { key: "title", 標題: "職稱" }, { key: "login_email", 標題: "登入 Email（寄信用）" }, { key: "email", 標題: "公務信箱（只存資料）" },
       { key: "status", 標題: "狀態", 顯示: 審核狀態 },
       { key: "操作", 標題: "", 不排序: true, 不匯出: true, 顯示: function (r) {
         if (r.status !== "待審") return h("span", { class: "小字 次要字" }, (r.reviewed_by || "") + " " + 民國時間(r.reviewed_at));
@@ -568,8 +638,18 @@ function 繪製入會審核(區, 申們, 名冊) {
       } }
     ],
     篩選: [{ 標題: "狀態", 選項: ["待審", "核准", "退回"], 取值: function (r) { return r.status; } }],
+    批次: [{ 文字: "刪除勾選的申請", 危: true, 動作: function (列) { 刪除申請("applications", 列); } }],
     空白文字: "沒有入會申請"
   }).元素);
+}
+
+// 刪除勾選的申請紀錄（帳號連結或入會申請），一筆一筆刪，完成後重畫這一頁
+async function 刪除申請(表, 列) {
+  const 結果 = await 刪除勾選(表, 列, "筆申請", "只刪除申請紀錄；已經核准而連結或建立的會員資料、登入帳號都不受影響。" +
+    (列.some(function (r) { return r.status === "待審"; }) ? "勾選的申請有些還在待審，刪除後申請人要重新送出。" : ""));
+  if (!結果) return;
+  回報刪除結果(結果, "筆申請", "");
+  重新繪製();
 }
 
 // ===== 活動管理 =====
@@ -637,7 +717,7 @@ async function 繪製活動名單(容器, 活動id) {
   名冊.forEach(function (m) { 依編號[m.id] = m; });
   const 列們 = 報名們.map(function (r) {
     const m = 依編號[r.member_id] || {};
-    return Object.assign({}, r, { 姓名: m.name || "", 機關: m.agency || "", 單位: m.unit || "", Email: m.email || "", email: m.email || "", name: m.name || "" });
+    return Object.assign({}, r, { 姓名: m.name || "", 機關: m.agency || "", 單位: m.unit || "", name: m.name || "" });
   });
   const 有效 = 列們.filter(function (r) { return r.status !== "取消"; });
   const 計 = function (條件) { return 有效.filter(條件).length; };
@@ -710,7 +790,7 @@ function 代為報名(a, 名冊, 有效報名) {
     const [名冊, 費] = await Promise.all([查詢("members", { status: "有效" }, "member_no.asc"), 查詢("fees", { year: 年 })]);
     const 列們 = 名冊.map(function (m) {
       const f = 費.find(function (x) { return x.member_id === m.id && x.item === "常年會費"; });
-      return { id: m.id, member_no: m.member_no, name: m.name, agency: m.agency, email: m.email, 狀態: f ? "已繳" : "未繳", 繳費日: f ? f.paid_date : "", 金額: f ? f.amount : 0, 收據號: f ? f.receipt_no : "" };
+      return { id: m.id, member_no: m.member_no, name: m.name, agency: m.agency, 狀態: f ? "已繳" : "未繳", 繳費日: f ? f.paid_date : "", 金額: f ? f.amount : 0, 收據號: f ? f.receipt_no : "" };
     });
     const 已 = 列們.filter(function (r) { return r.狀態 === "已繳"; });
     const 年選 = h("select", { "aria-label": "年度", onchange: function () { 前往("會費管理", { 年: Number(年選.value) }); } },
