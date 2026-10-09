@@ -426,25 +426,26 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查((await db.query("select max_count, candidate from public.board_titles where title = '候補理事'")).rows[0].max_count === 5, "升級後預設就有「候補理事」（上限 5 位，候補）");
     await 長("update public.members set board_title = '候補理事', board_role = '' where id = $1", [副列]);
     檢查((await db.query("select board_role from public.members where id = $1", [副列])).rows[0].board_role === "理事", "新職稱可以用，理事或監事依職稱的歸類自動決定");
-    檢查(await 應失敗(() => 長("select public.delete_board_title('候補理事')"), "還有 1 位會員"), "還有人是這個職稱時不能刪除");
+    檢查(await 應失敗(() => 長("select public.delete_board_title('候補理事')"), "不能刪除"), "候補理事有名額設定，不能刪除（有人在用，也不能刪掉再加回來）");
     檢查(await 應失敗(() => 長("select public.add_board_title('理|事', '理事')"), "不能有"), "職稱不能含「|」");
     檢查(await 應失敗(() => 長("select public.add_board_title('顧問', '會員代表')"), "理事」或「監事"), "職稱只能歸類為理事或監事");
-    await 長("select public.delete_board_title('常務監事')");
+    await 長("select public.delete_board_title('監事會召集人')");
     await db.exec(fs.readFileSync(path.join(根目錄, "線上系統", "資料庫結構.sql"), "utf8"));
-    檢查(!(await db.query("select 1 from public.board_titles where title = '常務監事'")).rows.length && (await db.query("select 1 from public.board_titles where title = '候補理事'")).rows.length === 1,
+    檢查(!(await db.query("select 1 from public.board_titles where title = '監事會召集人'")).rows.length && (await db.query("select 1 from public.board_titles where title = '候補理事'")).rows.length === 1,
       "重新執行結構不會把刪掉的預設職稱加回來，也不會清掉新增的職稱");
   }
   console.log("十二、刪除只能一筆一筆；申請可刪除；寄信用登入 Email");
   {
     const 秘2 = (sql, p) => 以身分(db, 帳.秘書長, () => db.query(sql, p));
     const 前 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
-    檢查(await 應失敗(() => 秘2("delete from public.members where staff_role = '' and user_id is null"), "一次只能刪除一筆"), "管理者一次刪很多位會員會被擋（整批取消）");
-    // 連管理者也一起刪時，可能先被「不能沒有管理者」擋下；不論哪個原因，都要整批取消
-    檢查(await 應失敗(() => 秘2("delete from public.members"), ""), "沒有條件的刪除（全部）也會被擋");
-    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "上述被擋後一位都沒少");
+    // 會員只能經由退會（刪除）申請單、由管理者確認後刪除（v2.5）；網頁與 REST 都不能直接 DELETE 會員
+    檢查(await 應失敗(() => 秘2("delete from public.members where staff_role = '' and user_id is null"), "permission denied"), "管理者不能直接刪除會員（REST DELETE 被拒，一次刪很多位也一樣）");
+    檢查(await 應失敗(() => 秘2("delete from public.members"), "permission denied"), "沒有條件的刪除（全部）也被拒絕");
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "上述被拒後一位都沒少");
     const 單 = (await db.query("insert into public.members (name, email) values ('要刪的人', 'todelete@fia.example.gov') returning id")).rows[0].id;
-    await 秘2("delete from public.members where id = $1", [單]);
-    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "一次刪一位可以，只少那一位");
+    檢查(await 應失敗(() => 秘2("delete from public.members where id = $1", [單]), "permission denied"), "管理者一次刪一位也不能直接刪（要走退會申請）");
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前 + 1, "被拒後那一位仍在名冊上");
+    await db.query("delete from public.members where id = $1", [單]);  // 測試資料清理（SQL Editor 身分）
     // 申請紀錄可以刪（幹部），一次一筆
     const 申帳 = { id: crypto.randomUUID(), email: "del.applicant@gmail.example" };
     await db.query("insert into auth.users values ($1, $2, now())", [申帳.id, 申帳.email]);
@@ -482,7 +483,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查(await 應失敗(() => 唯("update public.members set staff_role = '會計' where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能把自己改成不具管理權限的角色");
     檢查(await 應失敗(() => 唯("update public.members set status = '停權' where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能把自己停權");
     檢查(await 應失敗(() => 唯("select public.unlink_member($1)", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能解除自己的帳號連結");
-    檢查(await 應失敗(() => 唯("delete from public.members where id = $1", [唯一列]), "沒有任何人具管理權限"), "唯一的管理者不能刪除自己");
+    檢查(await 應失敗(() => 唯("delete from public.members where id = $1", [唯一列]), "permission denied"), "會員不能被直接 DELETE（唯一的管理者也一樣，只能經退會申請）");
     // 有第二位管理者後就可以卸任
     const 二 = { id: crypto.randomUUID(), email: "second@gmail.example" };
     await db2.query("insert into auth.users values ($1, $2, now())", [二.id, 二.email]);
@@ -579,6 +580,20 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     const 已 = (await db3.query("select status, member_id, member_name, reviewed_by from public.removal_requests where id = $1", [再申])).rows[0];
     檢查(已.status === "已刪除" && 已.member_id === null && 已.member_name === "要退會甲" && 已.reviewed_by === "秘十三", "申請單保留姓名、狀態改為已刪除、記下確認的管理者");
     檢查((await db3.query("select count(*)::int n from public.members where name = '理事長甲'")).rows[0].n === 1, "刪除一位不影響其他會員（含理事長）");
+    // 直接 DELETE 不行（會繞過收據與報名檢查）；收據只有管理者能刪；待審的申請只有管理者能刪（v2.5）
+    檢查(await 應失敗(() => 秘3("delete from public.members where id = $1", [有報]), "permission denied"), "管理者不能用 REST 直接刪會員（會繞過退會申請與收據、報名檢查）");
+    檢查((await 辦3("delete from public.fees where member_id = $1 returning id", [有收據])).rows.length === 0, "承辦人不能刪除收據");
+    檢查((await 秘3("select count(*)::int n from public.fees")).rows[0].n === 1, "收據仍在（承辦人刪不掉，管理者也還沒刪）");
+    const 待審申 = (await db3.query("select id from public.applications where user_id = $1 and status = '待審'", [新申u.id])).rows[0].id;
+    檢查((await 辦3("delete from public.applications where id = $1 returning id", [待審申])).rows.length === 0, "承辦人不能刪除待審的入會申請");
+    const 連u2 = await 新3("link13b@gmail.example");
+    const 連申2 = (await 以身分(db3, 連u2, () => db3.query("select public.submit_link_request('連結乙', '', '', '', '', '', '') as id"))).rows[0].id;
+    檢查((await 辦3("delete from public.link_requests where id = $1 returning id", [連申2])).rows.length === 0, "承辦人不能刪除待審的連結申請");
+    檢查((await 秘3("delete from public.link_requests where id = $1 returning id", [連申2])).rows.length === 1, "管理者可以刪除待審的連結申請");
+    檢查((await 秘3("delete from public.applications where id = $1 returning id", [待審申])).rows.length === 1, "管理者可以刪除待審的入會申請");
+    // 有名額設定的職稱不能刪（否則刪掉再加回來就沒有上限）
+    檢查(await 應失敗(() => 秘3("select public.delete_board_title('理事長')"), "不能刪除"), "理事長有名額設定，不能刪除");
+    檢查(await 應失敗(() => 秘3("select public.delete_board_title('候補理事')"), "不能刪除"), "候補理事有名額設定，不能刪除");
   }
 
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");

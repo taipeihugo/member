@@ -8,9 +8,11 @@
     await 讀取系統設定();
     const 名冊 = await 查詢("members", null, "member_no.asc");
     const 人數 = function (欄, 值) { return 名冊.filter(function (m) { return m[欄] === 值; }).length; };
+    // 只計有效會員（名額只算有效會員；停權、退會不占名額）
+    const 有效人數 = function (欄, 值) { return 名冊.filter(function (m) { return m[欄] === 值 && m.status === "有效"; }).length; };
     容器.appendChild(頁首("系統設定"));
     容器.appendChild(角色設定卡(人數));
-    容器.appendChild(職稱設定卡(人數));
+    容器.appendChild(職稱設定卡(人數, 有效人數));
     容器.appendChild(幹部名單卡(名冊));
   }
 });
@@ -106,17 +108,18 @@ function 組名額說明() {
 }
 
 // 理監事職稱設定卡片：清單（類別、名額、人數、順序、刪除）＋新增
-function 職稱設定卡(人數) {
+function 職稱設定卡(人數, 有效人數) {
   const 職稱們 = 線上.職稱們;
   const 名稱們 = 職稱們.map(function (t) { return t.title; });
   const 列們 = 職稱們.map(function (t, i) {
     const 數 = 人數("board_title", t.title);
+    const 有效數 = 有效人數("board_title", t.title);
     return h("tr", { dataset: { title: t.title } },
       h("td", null, 順序按鈕(名稱們, i, "reorder_board_titles", "p_titles")),
       h("td", null, h("strong", null, t.title)),
       h("td", null, h("span", { class: "標記 " + (t.board_role === "理事" ? "金" : "") }, t.board_role)),
       h("td", null, 名額文字(t)),
-      h("td", { class: "數" }, 數 + " 人"),
+      h("td", { class: "數" }, 有效數 + " 人" + (數 > 有效數 ? "（另 " + (數 - 有效數) + " 位停權或退會）" : "")),
       h("td", null, h("button", { class: "鈕 小 危", type: "button", disabled: 數 > 0, title: 數 > 0 ? "還有會員是這個職稱，請先改掉" : "", onclick: async function () {
         if (!(await 確認("刪除理監事職稱「" + t.title + "」？", "刪除"))) return;
         改設定("delete_board_title", { p_title: t.title }, "已刪除「" + t.title + "」");
@@ -128,7 +131,7 @@ function 職稱設定卡(人數) {
     h("h2", null, "理監事職稱"),
     h("p", { class: "次要字 小字" }, "一位會員只能有一個職稱，所以理事、監事互斥；「會員代表」在會員資料另外勾選，可與任一職稱並存。" + 組名額說明()),
     h("div", { class: "表捲" }, h("table", { class: "表", id: "職稱表" },
-      h("thead", null, h("tr", null, ["順序", "職稱", "類別", "名額", "目前人數", ""].map(function (t) { return h("th", null, t); }))),
+      h("thead", null, h("tr", null, ["順序", "職稱", "類別", "名額", "目前人數（有效）", ""].map(function (t) { return h("th", null, t); }))),
       h("tbody", null, 列們))),
     h("div", { class: "表工具列", style: "margin-top:.6rem" }, 名, 類,
       h("button", { class: "鈕 主", type: "button", id: "新增職稱鈕", onclick: function () {

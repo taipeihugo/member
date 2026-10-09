@@ -263,6 +263,30 @@ try {
   await 框().locator("button", { hasText: "開始匯入" }).click();
   await page.waitForSelector("text=匯入完成：新增 33、更新 1");
   檢查(true, "混有看不懂理監事的列時，整批照樣匯入成功（欄位一致）");
+  // 名額交接：甲（理事）改為理事長、乙（現任理事長）改為理事。甲排在前面，第一輪會因乙還佔著名額被擋，乙改完後再試一次
+  {
+    const 原 = (await db.query("select email, board_role, board_title from public.members where email in ('jia@example.org', 'yi@example.org') order by email")).rows;
+    const 交接 = path.join(輸出, "名額交接.csv");
+    fs.writeFileSync(交接, "\uFEFF姓名,女0男1,服務機關,服務單位,職稱,電子郵件信箱,理監事\n" +
+      "甲會員,0,財政部賦稅署,稽核組,專員,JIA@example.org,理事長\n" +
+      "乙理事長,1,財政部關務署,稽查組,科長,yi@example.org,理事\n");
+    const [交選] = await Promise.all([page.waitForEvent("filechooser"), page.click("#匯入名冊鈕")]);
+    await 交選.setFiles(交接);
+    await 框().waitFor();
+    const 交起點 = 主控台錯誤.length;
+    await 框().locator("button", { hasText: "開始匯入" }).click();
+    await page.waitForSelector("text=匯入完成：新增 0、更新 2");
+    await page.waitForTimeout(300);
+    const 交錯 = 主控台錯誤.splice(交起點);
+    檢查(交錯.length === 1 && 交錯[0].includes("400"), "名額交接的第一輪被擋只產生預期的 400（被拒絕的那一筆）");
+    const 交後 = (await db.query("select email, board_role, board_title from public.members where email in ('jia@example.org', 'yi@example.org') order by email")).rows;
+    檢查(交後[0].board_title === "理事長" && 交後[1].board_title === "理事", "名額交接的匯入：甲排在前也能成功（第一輪被擋，乙改完後再試）");
+    // 還原原本的職稱（順序：先放下理事長，再接任）
+    await db.query("update public.members set board_role = $1, board_title = $2 where email = 'jia@example.org'", [原[0].board_role, 原[0].board_title]);
+    await db.query("update public.members set board_role = $1, board_title = $2 where email = 'yi@example.org'", [原[1].board_role, 原[1].board_title]);
+    await 選單("會員管理");
+  }
+
   const 乙 = (await db.query("select board_role, board_title, is_representative from public.members where email = 'yi@example.org'")).rows[0];
   const 丙 = (await db.query("select board_role, is_representative from public.members where email = 'bing@example.org'")).rows[0];
   檢查(乙.board_role === "理事" && 乙.board_title === "理事長" && 乙.is_representative, "匯入：理事長＋會員代表");
@@ -300,6 +324,7 @@ try {
     await 框().locator("button", { hasText: "取消" }).click();
     await page.waitForTimeout(200);
     檢查((await db.query("select count(*)::int n from public.removal_requests")).rows[0].n === 1, "申請退會按取消：沒有送出任何申請");
+    檢查(!(await page.locator("#提示區").innerText()).includes("已送出 0"), "申請退會按取消：不顯示成功提示");
     await 搜尋框.fill("");
     await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
     // 退會申請頁：管理者確認刪除，只刪這一位

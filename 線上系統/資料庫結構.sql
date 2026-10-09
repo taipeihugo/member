@@ -327,7 +327,7 @@ alter table public.applications enable row level security;
 revoke all on public.members, public.activities, public.registrations, public.fees, public.applications from anon, authenticated;
 grant select, insert, update, delete on public.activities, public.fees to authenticated;
 -- 會員表：帳號連結（user_id）只能經由函式（建立登入帳號、核准連結、核准入會、解除連結）修改，幹部直接改資料表碰不到
-grant select, delete on public.members to authenticated;
+grant select on public.members to authenticated;
 grant insert (member_no, name, gender, employee_no, agency, unit, title, email, phone, join_date, category, status,
   board_role, board_title, is_representative, staff_role, note) on public.members to authenticated;
 grant update (member_no, name, gender, employee_no, agency, unit, title, email, phone, join_date, category, status,
@@ -343,8 +343,8 @@ drop policy if exists members_insert on public.members;
 create policy members_insert on public.members for insert to authenticated with check (public.is_staff());
 drop policy if exists members_update on public.members;
 create policy members_update on public.members for update to authenticated using (public.is_staff()) with check (public.is_staff());
+-- 會員不能直接 DELETE（v2.5）：只能經由退會（刪除）申請單、管理者確認（confirm_removal），才會檢查收據與報名
 drop policy if exists members_delete on public.members;
-create policy members_delete on public.members for delete to authenticated using (public.is_admin());
 
 drop policy if exists activities_select on public.activities;
 create policy activities_select on public.activities for select to authenticated using (is_public or public.is_staff());
@@ -358,14 +358,20 @@ create policy registrations_write on public.registrations for all to authenticat
 
 drop policy if exists fees_select on public.fees;
 create policy fees_select on public.fees for select to authenticated using (member_id = public.my_member_id() or public.is_staff());
+-- 收據：幹部可以登記與修改；刪除收據只有管理者（v2.5）
 drop policy if exists fees_write on public.fees;
-create policy fees_write on public.fees for all to authenticated using (public.is_staff()) with check (public.is_staff());
+create policy fees_write on public.fees for insert to authenticated with check (public.is_staff());
+drop policy if exists fees_update on public.fees;
+create policy fees_update on public.fees for update to authenticated using (public.is_staff()) with check (public.is_staff());
+drop policy if exists fees_delete on public.fees;
+create policy fees_delete on public.fees for delete to authenticated using (public.is_admin());
 
 drop policy if exists applications_select on public.applications;
 create policy applications_select on public.applications for select to authenticated using (user_id = auth.uid() or public.is_staff());
 drop policy if exists applications_update on public.applications;
+-- 刪除申請紀錄：幹部可以刪已處理（核准或退回）的；待審的只有管理者能刪（v2.5），避免不經審核就讓申請消失
 drop policy if exists applications_delete on public.applications;
-create policy applications_delete on public.applications for delete to authenticated using (public.is_staff());
+create policy applications_delete on public.applications for delete to authenticated using (public.is_staff() and (status <> '待審' or public.is_admin()));
 
 -- ---------- 會員自己能做的事（透過函式，只能動自己的資料） ----------
 
@@ -642,8 +648,9 @@ grant select, delete on public.link_requests to authenticated;
 
 drop policy if exists link_requests_select on public.link_requests;
 create policy link_requests_select on public.link_requests for select to authenticated using (user_id = auth.uid() or public.is_staff());
+-- 同上（v2.5）：待審的連結申請只有管理者能刪
 drop policy if exists link_requests_delete on public.link_requests;
-create policy link_requests_delete on public.link_requests for delete to authenticated using (public.is_staff());
+create policy link_requests_delete on public.link_requests for delete to authenticated using (public.is_staff() and (status <> '待審' or public.is_admin()));
 
 -- 帳號一連結到會員資料（不論透過建立登入帳號、核准連結、核准入會或 make_staff），
 -- 就自動結案這個帳號還在待審的連結申請與入會申請，避免留下無法處理的申請
@@ -886,6 +893,10 @@ declare 人數 int;
 begin
   if not public.is_admin() then raise exception '只有具管理權限的幹部可以修改系統設定'; end if;
   if not exists (select 1 from public.board_titles where title = p_title) then raise exception '找不到「%」這個職稱', p_title; end if;
+  -- 有名額設定（上限或候補）的職稱不能刪：否則刪掉再加回來，名額設定就沒了（v2.5）；只能由開發者在 SQL Editor 調整
+  if exists (select 1 from public.board_titles where title = p_title and (max_count is not null or candidate)) then
+    raise exception '「%」有名額設定，不能刪除（只能由開發者在資料庫調整）', p_title;
+  end if;
   select count(*) into 人數 from public.members where board_title = p_title;
   if 人數 > 0 then raise exception '還有 % 位會員是「%」，請先改掉他們的職稱再刪除', 人數, p_title; end if;
   delete from public.board_titles where title = p_title;
@@ -1002,7 +1013,8 @@ begin
   select * into 申 from public.removal_requests where id = p_request and status = '待刪除' for update;
   if not found then raise exception '找不到待刪除的申請'; end if;
   if 申.member_id is null then raise exception '這位會員已經不在名冊上，請改為退回這件申請'; end if;
-  select * into 人 from public.members where id = 申.member_id;
+  -- 先鎖住會員列：收據或報名若在檢查之後才寫入，會被擋在這把鎖後面，寫入時會因會員已刪除而失敗（v2.5）
+  select * into 人 from public.members where id = 申.member_id for update;
   if 人.id = public.my_member_id() then raise exception '不能刪除自己的會員資料'; end if;
   if exists (select 1 from public.fees where member_id = 人.id) then
     raise exception '「%」有繳費紀錄（收據），不能直接刪除。請退回這件申請，改把會籍設為「退會」保留紀錄', 人.name;
