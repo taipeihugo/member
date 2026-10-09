@@ -183,7 +183,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
   檢查((await 以身分(db, 丁帳, () => db.query("select name from public.members"))).rows.map((r) => r.name).join() === "丁會員", "接管後丁看得到自己的會員資料");
   // 防呆與權限
   檢查(await 應失敗(() => 以身分(db, 丁帳, () => db.query("select public.create_member_login($1, 'x@gmail.example', 'abcd1234')", [戊id])), "只有具管理權限"), "一般會員不能建立登入帳號");
-  檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'x@gmail.example', 'short')", [戊id]), "至少 8 個字元"), "密碼太短被擋");
+  檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'x@gmail.example', 'short')", [戊id]), "至少 6 個字元"), "密碼太短被擋");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'not-an-email', 'abcd1234')", [戊id]), "格式不正確"), "Email 格式不對被擋");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'y@gmail.example', 'abcd1234')", [丁id]), "已經有登入帳號"), "已有帳號的會員不能再建立");
   檢查(await 應失敗(() => 秘("select public.create_member_login($1, 'ding.personal@gmail.example', 'abcd1234')", [戊id]), "已經是名冊上「丁會員」的登入帳號"), "已連結別人的 Email 不能拿來建立");
@@ -288,10 +288,14 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     const 將任乙 = (await db.query("insert into public.members (name, email) values ('將任乙', 'future2@fia.example.gov') returning id")).rows[0].id;
     const 分身2 = await 新("clerk.alt2@gmail.example"), 分身3 = await 新("clerk.alt3@gmail.example");
     const 甲申 = (await 以身分(db, 分身2, () => db.query("select public.submit_link_request('將任甲', '', '', '', '', '', '') as id"))).rows[0].id;
-    await 辦("select public.approve_link_request($1, $2)", [甲申, 將任甲]);
     const 乙申 = (await 以身分(db, 分身3, () => db.query("select public.submit_link_request('將任乙', '', '', '', '', '', '') as id"))).rows[0].id;
-    await 辦("select public.approve_link_request($1, $2)", [乙申, 將任乙]);
+    檢查(await 應失敗(() => 辦("select public.approve_link_request($1, $2)", [甲申, 將任甲]), "只有具管理權限"), "承辦人不能核准連結申請（v2.4 起只有管理者核准或退回）");
+    // 承辦人改過這兩位的姓名（身分資料）→ 之後管理者核准連結時不算管理者連結
+    await 辦("update public.members set name = '將任甲（改）' where id = $1", [將任甲]);
+    await 辦("update public.members set name = '將任乙（改）' where id = $1", [將任乙]);
     const 長 = (sql, p) => 以身分(db, 長帳, () => db.query(sql, p));
+    await 長("select public.approve_link_request($1, $2)", [甲申, 將任甲]);
+    await 長("select public.approve_link_request($1, $2)", [乙申, 將任乙]);
     檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]), "還沒經具管理權限"), "承辦人核准連結的會員，理事長不能直接指派幹部角色（防分身奪權）");
     檢查(await 應失敗(() => 長("update public.members set staff_role = '總幹事' where id = $1", [將任乙]), "還沒經具管理權限"), "同上（另一位）");
     檢查((await 以身分(db, 分身2, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "", "上述被擋後，分身帳號仍不是幹部");
@@ -299,6 +303,8 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     await 長("select public.unlink_member($1)", [將任甲]);
     檢查((await db.query("select linked_by_admin from public.members where id = $1", [將任甲])).rows[0].linked_by_admin === false, "解除連結後「管理者連結」標記歸零");
     await 長("select public.create_member_login($1, 'future1.self@gmail.example', 'future123')", [將任甲]);
+    檢查(await 應失敗(() => 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]), "還沒經具管理權限"), "管理者替改過身分資料的會員建立帳號後，還要先「已向本人核對」才能指派");
+    await 長("select public.confirm_member_identity($1)", [將任甲]);
     await 長("update public.members set staff_role = '秘書長' where id = $1", [將任甲]);
     const 本人 = { id: (await db.query("select id from auth.users where email = 'future1.self@gmail.example'")).rows[0].id };
     檢查((await 以身分(db, 本人, () => db.query("select public.my_staff_role() as r"))).rows[0].r === "秘書長", "管理者建立帳號連結的會員可以指派幹部角色");
@@ -346,10 +352,11 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     // 3. 入會申請不依自填信箱連到既有會員
     const 冒用 = await 新("fake.applicant@gmail.example");
     const 冒申 = (await 以身分(db, 冒用, () => db.query("select public.submit_application('新人張三', '', '', '財政部賦稅署', '', '', '', '', 'bing3@fia.example.gov') as id"))).rows[0].id;
-    檢查(await 應失敗(() => 辦("select public.approve_application($1)", [冒申]), "名冊已有公務信箱"), "入會申請填了名冊上已有的公務信箱時，核准會被擋下並提示改走帳號連結");
+    檢查(await 應失敗(() => 辦("select public.approve_application($1)", [冒申]), "只有具管理權限"), "承辦人不能核准入會申請（v2.4 起只有管理者）");
+    檢查(await 應失敗(() => 長("select public.approve_application($1)", [冒申]), "名冊已有公務信箱"), "入會申請填了名冊上已有的公務信箱時，核准會被擋下並提示改走帳號連結");
     檢查((await db.query("select user_id, status from public.members where id = $1", [一般列])).rows[0].user_id === null, "被冒用信箱的會員資料沒有被連走");
     const 正常申 = (await 以身分(db, await 新("newcomer@gmail.example"), () => db.query("select public.submit_application('新進丁', '', '', '財政部國庫署', '', '', '', '', 'ding4@fia.example.gov') as id"))).rows[0].id;
-    await 辦("select public.approve_application($1)", [正常申]);
+    await 長("select public.approve_application($1)", [正常申]);
     const 備註 = (await db.query("select review_note from public.applications where id = $1", [正常申])).rows[0].review_note;
     檢查(/^新建會員 M\d{4}$/.test(備註), "核准入會的審核備註記錄新建的會員編號（" + 備註 + "）");
     // 4. make_staff 的防呆
@@ -416,7 +423,7 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查((await db.query("select name from public.staff_roles order by sort, name limit 1")).rows[0].name === "承辦人", "可以調整角色在選單上的順序");
     // 職稱
     檢查(await 應失敗(() => 辦("select public.add_board_title('候補理事', '理事')"), "只有具管理權限"), "承辦人不能新增職稱");
-    await 長("select public.add_board_title('候補理事', '理事')");
+    檢查((await db.query("select max_count, candidate from public.board_titles where title = '候補理事'")).rows[0].max_count === 5, "升級後預設就有「候補理事」（上限 5 位，候補）");
     await 長("update public.members set board_title = '候補理事', board_role = '' where id = $1", [副列]);
     檢查((await db.query("select board_role from public.members where id = $1", [副列])).rows[0].board_role === "理事", "新職稱可以用，理事或監事依職稱的歸類自動決定");
     檢查(await 應失敗(() => 長("select public.delete_board_title('候補理事')"), "還有 1 位會員"), "還有人是這個職稱時不能刪除");
@@ -447,7 +454,11 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     await 秘2("delete from public.link_requests where id = $1", [連申]);
     await 秘2("delete from public.applications where id = $1", [入申]);
     檢查(!(await db.query("select 1 from public.link_requests where id = $1", [連申])).rows.length && !(await db.query("select 1 from public.applications where id = $1", [入申])).rows.length, "幹部可以刪除連結申請、入會申請");
-    檢查(await 應失敗(() => 秘2("delete from public.applications"), "一次只能刪除一筆") || (await db.query("select count(*)::int n from public.applications")).rows[0].n <= 1, "申請紀錄也不能一次刪一大批");
+    // 先補幾筆申請紀錄，確保真的有「一大批」可以刪；被擋後筆數要與刪除前相同（不能靠「剩 0 筆」之類的條件假過）
+    await db.query("insert into public.applications (user_id, name, status) values ($1, '刪除測試三', '退回'), ($1, '刪除測試四', '退回')", [申帳.id]);
+    const 申數 = (await db.query("select count(*)::int n from public.applications")).rows[0].n;
+    檢查(申數 >= 2 && (await 應失敗(() => 秘2("delete from public.applications"), "一次只能刪除一筆")) && (await db.query("select count(*)::int n from public.applications")).rows[0].n === 申數, "申請紀錄也不能一次刪一大批（被擋後筆數不變）");
+    for (const 名 of ["刪除測試三", "刪除測試四"]) await 秘2("delete from public.applications where name = $1", [名]);
     // 寄信用登入 Email
     const 信 = (await 秘2("select public.member_login_emails(array(select id from public.members)) as j")).rows[0].j;
     檢查(信.some((x) => x.email === "jia@example.org") && 信.every((x) => x.member_id && x.email), "幹部取得會員的登入 Email（寄信用；沒有帳號的人不列）");
@@ -478,6 +489,96 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     await db2.query("select public.make_staff('second@gmail.example', '理事長', '第二位', 'second@fia.example.gov')");
     await 唯("update public.members set staff_role = '' where id = $1", [唯一列]);
     檢查((await db2.query("select staff_role from public.members where id = $1", [唯一列])).rows[0].staff_role === "", "另有管理者時可以卸下自己的管理角色");
+  }
+
+  console.log("十三、理監事名額；只有管理者核准或退回；退會（刪除）申請單");
+  {
+    const db3 = await 建立資料庫();
+    const 新3 = async (email) => { const u = { id: crypto.randomUUID(), email }; await db3.query("insert into auth.users values ($1, $2, now())", [u.id, email]); return u; };
+    const 秘u = await 新3("sec13@gmail.example"), 會u = await 新3("acc13@gmail.example"), 辦u = await 新3("clerk13@gmail.example");
+    await db3.query("select public.make_staff('sec13@gmail.example', '秘書長', '秘十三', 'sec13@fia.example.gov')");
+    await db3.query("select public.make_staff('acc13@gmail.example', '會計', '會計十三', 'acc13@fia.example.gov')");
+    await db3.query("select public.make_staff('clerk13@gmail.example', '承辦人', '辦十三', 'clerk13@fia.example.gov')");
+    const 秘3 = (sql, p) => 以身分(db3, 秘u, () => db3.query(sql, p));
+    const 會3 = (sql, p) => 以身分(db3, 會u, () => db3.query(sql, p));
+    const 辦3 = (sql, p) => 以身分(db3, 辦u, () => db3.query(sql, p));
+    const 入 = (名, 職, email) => 秘3("insert into public.members (name, email, board_title) values ($1, $2, $3) returning id", [名, email, 職]);
+    const 人數 = async (職) => (await db3.query("select count(*)::int n from public.members where board_title = $1 and status = '有效'", [職])).rows[0].n;
+
+    // 理監事名額
+    await 入("理事長甲", "理事長", "q1@x.org");
+    檢查(await 應失敗(() => 入("理事長乙", "理事長", "q2@x.org"), "最多 1 位"), "理事長只能有 1 位");
+    await 入("常務監事甲", "常務監事", "q3@x.org");
+    檢查(await 應失敗(() => 入("常務監事乙", "常務監事", "q4@x.org"), "最多 1 位"), "常務監事只能有 1 位");
+    檢查(await 應失敗(() => 秘3("insert into public.members (name, email, board_title) values ('兩位理事長A', 'q5@x.org', '理事長'), ('兩位理事長B', 'q6@x.org', '理事長')"), "最多 1 位"), "一個指令同時新增兩位理事長也會被擋（整批取消）");
+    檢查((await 人數("理事長")) === 1, "上述被擋後，理事長仍然只有 1 位");
+    for (let i = 1; i <= 14; i++) await 入("理事" + i, "理事", "r" + i + "@x.org");
+    檢查((await db3.query("select count(*)::int n from public.members where board_role = '理事' and status = '有效'")).rows[0].n === 15, "理事組可以放滿 15 位（含理事長）");
+    檢查(await 應失敗(() => 入("理事超額", "理事", "r15@x.org"), "理事組最多 15 位"), "理事組滿 15 位後，第 16 位會被擋");
+    for (let i = 1; i <= 4; i++) await 入("監事" + i, "監事", "s" + i + "@x.org");
+    檢查(await 應失敗(() => 入("監事超額", "監事", "s5@x.org"), "監事組最多 5 位"), "監事組含常務監事最多 5 位");
+    for (let i = 1; i <= 5; i++) await 入("候補理事" + i, "候補理事", "c" + i + "@x.org");
+    檢查(await 應失敗(() => 入("候補理事超額", "候補理事", "c6@x.org"), "「候補理事」最多 5 位"), "候補理事最多 5 位");
+    檢查((await db3.query("select count(*)::int n from public.members where board_title = '候補理事'")).rows[0].n === 5, "理事組已滿時仍可登記候補理事（候補不占理事名額）");
+    await 入("候補監事1", "候補監事", "cs1@x.org"); await 入("候補監事2", "候補監事", "cs2@x.org");
+    檢查(await 應失敗(() => 入("候補監事超額", "候補監事", "cs3@x.org"), "「候補監事」最多 2 位"), "候補監事最多 2 位");
+    await 秘3("update public.members set phone = '分機 1' where email = 'q1@x.org'");
+    檢查((await db3.query("select phone from public.members where email = 'q1@x.org'")).rows[0].phone === "分機 1", "名額已滿時，修改其他欄位（電話）不受影響");
+    await 秘3("update public.members set status = '停權' where email = 'r1@x.org'");
+    await 入("理事替補", "理事", "r16@x.org");
+    檢查(await 應失敗(() => 秘3("update public.members set status = '有效' where email = 'r1@x.org'"), "理事組最多 15 位"), "停權會釋出名額；原來的人重新有效時又要占名額，名額已滿就會被擋");
+
+    // 只有管理者核准或退回
+    const 新申u = await 新3("applicant13@gmail.example");
+    await 以身分(db3, 新申u, () => db3.query("select public.submit_application('新申人', '', '', '財政部國庫署', '', '', '', '')"));
+    const 申請 = (await db3.query("select id from public.applications where user_id = $1", [新申u.id])).rows[0].id;
+    檢查(await 應失敗(() => 辦3("select public.approve_application($1)", [申請]), "只有具管理權限"), "承辦人不能核准入會申請");
+    檢查(await 應失敗(() => 會3("select public.reject_application($1, '不符')", [申請]), "只有具管理權限"), "會計不能退回入會申請");
+    const 連u = await 新3("link13@gmail.example");
+    const 連申 = (await 以身分(db3, 連u, () => db3.query("select public.submit_link_request('連結甲', '', '', '', '', '', '') as id"))).rows[0].id;
+    檢查(await 應失敗(() => 會3("select public.approve_link_request($1, (select id from public.members where email = 'q1@x.org'))", [連申]), "只有具管理權限"), "會計不能核准連結申請");
+    檢查(await 應失敗(() => 辦3("select public.reject_link_request($1, '不符')", [連申]), "只有具管理權限"), "承辦人不能退回連結申請");
+    檢查(await 應失敗(() => 辦3("update public.applications set user_id = $1", [秘u.id]), "permission denied"), "承辦人不能直接改入會申請（連申請人的帳號都改不了）");
+    await 秘3("select public.reject_link_request($1, '名冊上查無此人')", [連申]);
+    檢查((await db3.query("select status, review_note from public.link_requests where id = $1", [連申])).rows[0].review_note === "名冊上查無此人", "管理者可以退回連結申請，原因留在申請單上");
+
+    // 退會（刪除）申請單
+    const 要退 = (await 入("要退會甲", "", "d1@x.org")).rows[0].id;
+    const 一般u = await 新3("plain13@gmail.example");
+    檢查(await 應失敗(() => 以身分(db3, 一般u, () => db3.query("select public.request_removal($1, '理由')", [要退])), "沒有權限"), "一般會員不能送出退會（刪除）申請");
+    檢查(await 應失敗(() => 會3("select public.request_removal($1, '  ')", [要退]), "請填寫"), "退會（刪除）一定要寫原因");
+    const 自己 = (await db3.query("select id from public.members where user_id = $1", [會u.id])).rows[0].id;
+    檢查(await 應失敗(() => 會3("select public.request_removal($1, '理由')", [自己]), "不能送出自己"), "不能送出自己的退會（刪除）申請");
+    const 退申 = (await 會3("select public.request_removal($1, '人事異動，已離職') as id", [要退])).rows[0].id;
+    檢查((await db3.query("select status, member_name, reason from public.removal_requests where id = $1", [退申])).rows[0].status === "待刪除", "人事窗口（會計）送出後，申請單是待刪除");
+    檢查(await 應失敗(() => 辦3("select public.request_removal($1, '重複')", [要退]), "已經有一件待刪除"), "同一位會員不能同時有兩件待刪除");
+    檢查((await 會3("select count(*)::int n from public.removal_requests")).rows[0].n === 1, "幹部看得到退會申請單");
+    檢查((await 以身分(db3, 一般u, () => db3.query("select count(*)::int n from public.removal_requests"))).rows[0].n === 0, "一般會員看不到退會申請單");
+    檢查(await 應失敗(() => 會3("select public.confirm_removal($1)", [退申]), "只有具管理權限"), "會計不能確認刪除");
+    檢查(await 應失敗(() => 辦3("select public.reject_removal($1, '不同意')", [退申]), "只有具管理權限"), "承辦人不能退回退會申請");
+    檢查(await 應失敗(() => 秘3("select public.reject_removal($1, ' ')", [退申]), "請填寫退回的原因"), "管理者退回時一定要寫原因");
+    await 秘3("select public.reject_removal($1, '請再確認是否真的離職')", [退申]);
+    檢查((await db3.query("select status from public.members where id = $1", [要退])).rows.length === 1 && (await db3.query("select status from public.removal_requests where id = $1", [退申])).rows[0].status === "退回", "退回後會員保留，申請單狀態為退回");
+    // 有繳費紀錄、有有效報名的會員不能直接刪
+    const 有收據 = (await 入("有收據乙", "", "d2@x.org")).rows[0].id;
+    await 秘3("select public.record_fees(array[$1::uuid], 2026, '常年會費', 600, current_date, '現金')", [有收據]);
+    const 收申 = (await 會3("select public.request_removal($1, '退會') as id", [有收據])).rows[0].id;
+    檢查(await 應失敗(() => 秘3("select public.confirm_removal($1)", [收申]), "繳費紀錄"), "有繳費紀錄的會員不能直接刪除（收據不能消失）");
+    await 秘3("select public.reject_removal($1, '改為退會')", [收申]);
+    const 有報 = (await 入("有報名丙", "", "d3@x.org")).rows[0].id;
+    const 活動 = (await 秘3("insert into public.activities (name, date) values ('退會測試活動', current_date + 30) returning id")).rows[0].id;
+    await 秘3("select public.staff_register($1, $2, '', '')", [活動, 有報]);
+    const 報申 = (await 會3("select public.request_removal($1, '退會') as id", [有報])).rows[0].id;
+    檢查(await 應失敗(() => 秘3("select public.confirm_removal($1)", [報申]), "有效的活動報名"), "有有效報名的會員要先取消報名才能刪除");
+    await 秘3("select public.reject_removal($1, '先取消報名')", [報申]);
+    // 確認刪除：只刪這一位，申請單保留紀錄
+    const 前 = (await db3.query("select count(*)::int n from public.members")).rows[0].n;
+    const 再申 = (await 會3("select public.request_removal($1, '人事異動，已離職') as id", [要退])).rows[0].id;
+    await 秘3("select public.confirm_removal($1)", [再申]);
+    檢查((await db3.query("select count(*)::int n from public.members")).rows[0].n === 前 - 1 && !(await db3.query("select 1 from public.members where id = $1", [要退])).rows.length, "管理者確認後真的刪除這一位會員，其他人都還在");
+    const 已 = (await db3.query("select status, member_id, member_name, reviewed_by from public.removal_requests where id = $1", [再申])).rows[0];
+    檢查(已.status === "已刪除" && 已.member_id === null && 已.member_name === "要退會甲" && 已.reviewed_by === "秘十三", "申請單保留姓名、狀態改為已刪除、記下確認的管理者");
+    檢查((await db3.query("select count(*)::int n from public.members where name = '理事長甲'")).rows[0].n === 1, "刪除一位不影響其他會員（含理事長）");
   }
 
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");

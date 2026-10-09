@@ -92,6 +92,35 @@ create policy staff_roles_select on public.staff_roles for select to authenticat
 drop policy if exists board_titles_select on public.board_titles;
 create policy board_titles_select on public.board_titles for select to authenticated using (true);
 
+-- 理監事名額（v2.4）：理事長、常務監事各 1 位；理事組（理事長、常務理事、理事…）15 位；監事組（常務監事、監事會召集人、監事…）5 位；
+-- 候補理事 5 位、候補監事 2 位（候補不占理監事名額）。max_count 為 null 表示沒有該職稱上限；只在升級時放入預設值，之後可在 SQL Editor 修改
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'board_titles' and column_name = 'max_count') then
+    alter table public.board_titles add column max_count int check (max_count is null or max_count >= 0);
+    alter table public.board_titles add column candidate boolean not null default false;
+    update public.board_titles set max_count = 1 where title in ('理事長', '常務監事');
+    insert into public.board_titles (title, board_role, sort) values ('候補理事', '理事', 7), ('候補監事', '監事', 8) on conflict do nothing;
+    update public.board_titles set max_count = 5, candidate = true where title = '候補理事';
+    update public.board_titles set max_count = 2, candidate = true where title = '候補監事';
+  end if;
+end $$;
+do $$
+begin
+  if to_regclass('public.board_limits') is null then
+    create table public.board_limits (
+      board_role text primary key check (board_role in ('理事', '監事')),
+      max_count int not null check (max_count >= 0)
+    );
+    insert into public.board_limits (board_role, max_count) values ('理事', 15), ('監事', 5);
+  end if;
+end $$;
+alter table public.board_limits enable row level security;
+revoke all on public.board_limits from anon, authenticated;
+grant select on public.board_limits to authenticated;
+drop policy if exists board_limits_select on public.board_limits;
+create policy board_limits_select on public.board_limits for select to authenticated using (true);
+
 -- 這筆的姓名、Email 或員工編號最後是不是由會計、承辦人（不具管理權限的幹部）新增或修改的（v2.2）。
 -- 是的話，具管理權限的幹部替他建立帳號或核准連結時不算「管理者連結」，要在會員資料「已向本人核對」後才能指派幹部
 -- （避免有人先把名冊上的 Email 改成自己分身的信箱，再讓管理者照著建立帳號）
@@ -209,7 +238,7 @@ $$;
 -- 不具管理權限的幹部不能指派幹部角色，也不能變更幹部那幾筆的會籍、Email、帳號連結
 create or replace function public.members_before_write() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare 類別 text;
+declare 類別 text; 職上限 int; 是候補 boolean; 組上限 int; 人數 int;
 begin
   new.email := lower(trim(new.email));
   new.board_title := btrim(coalesce(new.board_title, ''));
@@ -259,6 +288,27 @@ begin
       and new.user_id is not null and not new.linked_by_admin then
     raise exception '「%」的登入帳號還沒經具管理權限的幹部核對（例如由會計、承辦人核准連結、v1.8 以前就已連結，或姓名、Email、員工編號曾被會計、承辦人修改），不能直接指派幹部角色。請在會員資料看過「登入帳號」、向本人確認後，勾選「已向本人核對」並儲存，再指派', new.name;
   end if;
+  -- 理監事名額（v2.4）：有效會員新增、改了職稱、或改回有效時才檢查（停權、退會不占名額；修改其他欄位不受影響）
+  if new.status = '有效' and new.board_title <> '' and (tg_op = 'INSERT' or new.board_title is distinct from old.board_title or new.status is distinct from old.status) then
+    perform pg_advisory_xact_lock(hashtext('board_seats'));  -- 同時存檔時排隊計數，避免兩筆同時擠進最後一個名額
+    select max_count, candidate into 職上限, 是候補 from public.board_titles where title = new.board_title;
+    if 職上限 is not null then
+      select count(*) into 人數 from public.members where board_title = new.board_title and status = '有效' and id <> new.id;
+      if 人數 >= 職上限 then
+        raise exception '「%」最多 % 位，目前已有 % 位有效會員擔任（請先把原來的人改成其他職稱，或改為停權、退會）', new.board_title, 職上限, 人數;
+      end if;
+    end if;
+    if not coalesce(是候補, false) then
+      select max_count into 組上限 from public.board_limits where board_role = new.board_role;
+      if 組上限 is not null then
+        select count(*) into 人數 from public.members m join public.board_titles t on t.title = m.board_title
+          where m.board_role = new.board_role and m.status = '有效' and m.id <> new.id and not t.candidate;
+        if 人數 >= 組上限 then
+          raise exception '%組最多 % 位（候補不計入），目前已有 % 位有效會員', new.board_role, 組上限, 人數;
+        end if;
+      end if;
+    end if;
+  end if;
   return new;
 end $$;
 drop trigger if exists members_before_write on public.members;
@@ -284,8 +334,8 @@ grant update (member_no, name, gender, employee_no, agency, unit, title, email, 
   board_role, board_title, is_representative, staff_role, note) on public.members to authenticated;
 -- 報名：新增只能經由 register_activity（會員）或 staff_register（幹部），兩者都會檢查名額
 grant select, update, delete on public.registrations to authenticated;
--- 入會申請：新增只能經由 submit_application
-grant select, update, delete on public.applications to authenticated;
+-- 入會申請：新增只能經由 submit_application；核准、退回只能經由 approve_application、reject_application（v2.4 不再開放直接修改，避免改掉申請人的帳號）
+grant select, delete on public.applications to authenticated;
 
 drop policy if exists members_select on public.members;
 create policy members_select on public.members for select to authenticated using (user_id = auth.uid() or public.is_staff());
@@ -314,7 +364,6 @@ create policy fees_write on public.fees for all to authenticated using (public.i
 drop policy if exists applications_select on public.applications;
 create policy applications_select on public.applications for select to authenticated using (user_id = auth.uid() or public.is_staff());
 drop policy if exists applications_update on public.applications;
-create policy applications_update on public.applications for update to authenticated using (public.is_staff()) with check (public.is_staff());
 drop policy if exists applications_delete on public.applications;
 create policy applications_delete on public.applications for delete to authenticated using (public.is_staff());
 
@@ -440,7 +489,7 @@ create or replace function public.approve_application(p_application uuid)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare 申 public.applications; 新 uuid; 我名 text; 既有 text; 編號 text;
 begin
-  if not public.is_staff() then raise exception '沒有權限'; end if;
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以核准或退回申請'; end if;
   select * into 申 from public.applications where id = p_application and status = '待審' for update;
   if not found then raise exception '找不到待審的申請'; end if;
   if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結會員資料'; end if;
@@ -462,7 +511,7 @@ create or replace function public.reject_application(p_application uuid, p_reaso
 returns void language plpgsql security definer set search_path = public as $$
 declare 我名 text;
 begin
-  if not public.is_staff() then raise exception '沒有權限'; end if;
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以核准或退回申請'; end if;
   select name into 我名 from public.members where user_id = auth.uid();
   update public.applications set status = '退回', review_note = coalesce(p_reason, ''), reviewed_by = coalesce(我名, ''), reviewed_at = now()
     where id = p_application and status = '待審';
@@ -636,7 +685,7 @@ create or replace function public.approve_link_request(p_request uuid, p_member 
 returns void language plpgsql security definer set search_path = public as $$
 declare 申 public.link_requests; 我名 text;
 begin
-  if not public.is_staff() then raise exception '沒有權限'; end if;
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以核准或退回申請'; end if;
   select * into 申 from public.link_requests where id = p_request and status = '待審' for update;
   if not found then raise exception '找不到待審的連結申請'; end if;
   if exists (select 1 from public.members where user_id = 申.user_id) then raise exception '這個帳號已經連結其他會員資料'; end if;
@@ -651,7 +700,7 @@ create or replace function public.reject_link_request(p_request uuid, p_reason t
 returns void language plpgsql security definer set search_path = public as $$
 declare 我名 text;
 begin
-  if not public.is_staff() then raise exception '沒有權限'; end if;
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以核准或退回申請'; end if;
   select name into 我名 from public.members where user_id = auth.uid();
   update public.link_requests set status = '退回', review_note = coalesce(p_reason, ''), reviewed_by = coalesce(我名, ''), reviewed_at = now()
     where id = p_request and status = '待審';
@@ -743,7 +792,7 @@ returns void language plpgsql security definer set search_path = public, extensi
 declare 人 public.members;
 begin
   if not public.is_admin() then raise exception '只有具管理權限的幹部可以重設密碼'; end if;
-  if length(coalesce(p_password, '')) < 8 then raise exception '密碼至少 8 個字元'; end if;
+  if length(coalesce(p_password, '')) < 6 then raise exception '密碼至少 6 個字元'; end if;
   select * into 人 from public.members where id = p_member;
   if not found then raise exception '找不到這位會員'; end if;
   if 人.user_id is null then raise exception '「%」還沒有登入帳號，請改用「建立登入帳號」', 人.name; end if;
@@ -897,7 +946,91 @@ begin
     from public.members m join auth.users u on u.id = m.user_id where m.id = any(p_members));
 end $$;
 
+-- =====================================================================
+-- 退會（刪除）申請單（v2.4）：任何幹部（例如人事窗口）送出，寫明原因；
+-- 具管理權限的幹部在「退會申請」頁確認後才真的刪除會員，或退回（保留會員資料）
+-- =====================================================================
+create table if not exists public.removal_requests (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid references public.members (id) on delete set null,
+  member_no text not null default '',
+  member_name text not null default '',
+  member_agency text not null default '',
+  member_email text not null default '',
+  reason text not null check (length(trim(reason)) > 0),
+  status text not null default '待刪除' check (status in ('待刪除', '已刪除', '退回')),
+  requested_by uuid references auth.users (id) on delete set null,
+  requested_by_name text not null default '',
+  requested_at timestamptz not null default now(),
+  reviewed_by text not null default '',
+  reviewed_at timestamptz,
+  review_note text not null default ''
+);
+create unique index if not exists removal_requests_one_pending on public.removal_requests (member_id) where status = '待刪除';
+alter table public.removal_requests enable row level security;
+revoke all on public.removal_requests from anon, authenticated;
+grant select on public.removal_requests to authenticated;
+drop policy if exists removal_requests_select on public.removal_requests;
+create policy removal_requests_select on public.removal_requests for select to authenticated using (public.is_staff());
+
+-- 送出退會（刪除）申請：任何幹部；不能送自己；同一位會員只能有一件待刪除
+create or replace function public.request_removal(p_member uuid, p_reason text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare 人 public.members; 編號 uuid; 我名 text;
+begin
+  if not public.is_staff() then raise exception '沒有權限'; end if;
+  if btrim(coalesce(p_reason, '')) = '' then raise exception '請填寫退會（刪除）的原因'; end if;
+  select * into 人 from public.members where id = p_member;
+  if not found then raise exception '找不到這位會員'; end if;
+  if 人.id = public.my_member_id() then raise exception '不能送出自己的退會（刪除）申請'; end if;
+  if exists (select 1 from public.removal_requests where member_id = p_member and status = '待刪除') then
+    raise exception '「%」已經有一件待刪除的申請', 人.name;
+  end if;
+  select name into 我名 from public.members where user_id = auth.uid();
+  insert into public.removal_requests (member_id, member_no, member_name, member_agency, member_email, reason, requested_by, requested_by_name)
+    values (人.id, 人.member_no, 人.name, 人.agency, 人.email, btrim(p_reason), auth.uid(), coalesce(我名, ''))
+    returning id into 編號;
+  return 編號;
+end $$;
+
+-- 管理者確認退會（刪除）：真的刪除會員。有繳費紀錄（收據）或有效報名的人不直接刪，避免收據號碼重複或候補卡住
+create or replace function public.confirm_removal(p_request uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare 申 public.removal_requests; 人 public.members; 我名 text;
+begin
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以確認退會（刪除）'; end if;
+  select * into 申 from public.removal_requests where id = p_request and status = '待刪除' for update;
+  if not found then raise exception '找不到待刪除的申請'; end if;
+  if 申.member_id is null then raise exception '這位會員已經不在名冊上，請改為退回這件申請'; end if;
+  select * into 人 from public.members where id = 申.member_id;
+  if 人.id = public.my_member_id() then raise exception '不能刪除自己的會員資料'; end if;
+  if exists (select 1 from public.fees where member_id = 人.id) then
+    raise exception '「%」有繳費紀錄（收據），不能直接刪除。請退回這件申請，改把會籍設為「退會」保留紀錄', 人.name;
+  end if;
+  if exists (select 1 from public.registrations where member_id = 人.id and status <> '取消') then
+    raise exception '「%」還有有效的活動報名，請先取消報名再確認刪除', 人.name;
+  end if;
+  select name into 我名 from public.members where user_id = auth.uid();
+  update public.removal_requests set status = '已刪除', reviewed_by = coalesce(我名, ''), reviewed_at = now() where id = 申.id;
+  delete from public.members where id = 人.id;
+end $$;
+
+-- 管理者退回退會（刪除）申請：會員保留，申請單留下原因
+create or replace function public.reject_removal(p_request uuid, p_reason text)
+returns void language plpgsql security definer set search_path = public as $$
+declare 我名 text;
+begin
+  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以退回退會（刪除）申請'; end if;
+  if btrim(coalesce(p_reason, '')) = '' then raise exception '請填寫退回的原因'; end if;
+  select name into 我名 from public.members where user_id = auth.uid();
+  update public.removal_requests set status = '退回', review_note = btrim(p_reason), reviewed_by = coalesce(我名, ''), reviewed_at = now()
+    where id = p_request and status = '待刪除';
+  if not found then raise exception '找不到待刪除的申請'; end if;
+end $$;
+
 -- 函式執行權限：只開給登入者（函式內再檢查身分）
+revoke execute on function public.request_removal(uuid, text), public.confirm_removal(uuid), public.reject_removal(uuid, text) from public, anon;
+grant execute on function public.request_removal(uuid, text), public.confirm_removal(uuid), public.reject_removal(uuid, text) to authenticated;
 revoke execute on function public.end_sessions(uuid), public.members_keep_admin(), public.delete_one_at_a_time() from public, anon, authenticated;
 revoke execute on function public.member_login_email(uuid), public.member_login_emails(uuid[]), public.submit_link_request(text, text, text, text, text, text, text),
   public.approve_link_request(uuid, uuid), public.reject_link_request(uuid, text), public.unlink_member(uuid),

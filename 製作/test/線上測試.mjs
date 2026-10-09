@@ -251,7 +251,7 @@ try {
     "甲會員,0,財政部賦稅署,稽核組,專員,JIA@example.org,,是\n" +
     "乙理事長,1,財政部關務署,稽查組,科長,yi@example.org,理事長,是\n" +
     "丙監事,0,財政部國庫署,國庫管理組,科員,bing@example.org,監事,\n" +
-    "丁候補,1,財政部國庫署,國庫管理組,科員,ding@example.org,候補理事,\n" +
+    "丁候補,1,財政部國庫署,國庫管理組,科員,ding@example.org,顧問,\n" +
     "丙監事,0,財政部國庫署,國庫管理組,科員,BING@example.org,監事,\n" +
     Array.from({ length: 30 }, (_, i) => "批次會員" + (i + 1) + ",1,財政部財政資訊中心,系統組,科員,batch" + (i + 1) + "@example.org,,\n").join(""));
   const [fc] = await Promise.all([page.waitForEvent("filechooser"), page.click("#匯入名冊鈕")]);
@@ -259,7 +259,7 @@ try {
   await 框().waitFor();
   const 預覽 = await 框().innerText();
   檢查(預覽.includes("新增 33 人、更新 1 人"), "Email 相同者更新、其他新增（檔案內重複的人合併）");
-  檢查(預覽.includes("候補理事") && 預覽.includes("已合併"), "預覽列出看不懂的理監事與檔案內重複的列");
+  檢查(預覽.includes("顧問") && 預覽.includes("已合併"), "預覽列出看不懂的理監事與檔案內重複的列");
   await 框().locator("button", { hasText: "開始匯入" }).click();
   await page.waitForSelector("text=匯入完成：新增 33、更新 1");
   檢查(true, "混有看不懂理監事的列時，整批照樣匯入成功（欄位一致）");
@@ -268,10 +268,10 @@ try {
   檢查(乙.board_role === "理事" && 乙.board_title === "理事長" && 乙.is_representative, "匯入：理事長＋會員代表");
   檢查(丙.board_role === "監事" && !丙.is_representative, "匯入：監事");
   await page.waitForTimeout(300);
-  檢查((await page.locator("#內容").innerText()).includes("有效會員 35 人；理事 1 人、監事 1 人、會員代表 2 人"), "匯入後人數統計即時更新（超過單次回傳上限仍完整讀取）");
+  檢查((await page.locator("#內容").innerText()).includes("有效會員 35 人；理事 1 人（上限 15）、監事 1 人（上限 5）（候補不計入）、會員代表 2 人"), "匯入後人數統計即時更新（超過單次回傳上限仍完整讀取）");
   檢查((await page.locator(".分頁列").innerText()).includes("共 35 筆"), "會員列表分頁讀取全部 35 筆（模擬上限 25 筆）");
   await 截圖("專區_會員管理");
-  console.log("三之一、刪除會員：個人資料視窗沒有刪除鈕；勾選後按「刪除勾選的會員」只刪那一位");
+  console.log("三之一、退會（刪除）：個人資料視窗沒有刪除鈕；名冊勾選後送出申請，管理者在「退會申請」確認才真的刪除（只刪這一位）");
   {
     const 前 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
     const 搜尋框 = page.locator(".表工具列 input[type=search]");
@@ -282,31 +282,60 @@ try {
     檢查(!(await 框().innerText()).includes("刪除會員") && (await 框().locator("button", { hasText: "刪除" }).count()) === 0, "個人資料視窗裡沒有刪除按鈕");
     await 框().locator("button.關").click();
     await page.waitForTimeout(150);
+    // 勾選一位，按「申請退會（刪除）」，填原因送出：只是送出申請，會員還在
     await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).first().locator(".勾 input").check();
-    await page.locator(".批次列 button", { hasText: "刪除勾選的會員" }).click();
+    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
     await 框().waitFor();
-    const 確認文 = await 框().innerText();
-    檢查(確認文.includes("勾選的 1 位會員") && 確認文.includes("批次會員30") && !確認文.includes("批次會員29"), "刪除前列出勾選的人數與名字");
-    await 截圖("專區_刪除勾選會員");
-    await 框().locator("button", { hasText: "刪除 1 位會員" }).click();
-    await page.waitForSelector("text=已刪除 1 位會員");
-    const 後 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
-    檢查(後 === 前 - 1 && !(await db.query("select 1 from public.members where name = '批次會員30'")).rows.length && (await db.query("select 1 from public.members where name = '批次會員29'")).rows.length === 1,
-      "只刪除勾選的那一位（" + 前 + " → " + 後 + "），其他會員都還在");
-    檢查((await page.locator("#提示區").innerText()).includes("名冊目前共 " + 後 + " 人"), "刪除後提示名冊目前的人數");
+    檢查((await 框().innerText()).includes("批次會員30"), "申請退會前列出勾選的人名");
+    await 框().locator("[data-key='reason']").fill("人事異動，已離職");
+    await 框().locator("button", { hasText: "送出申請" }).click();
+    await page.waitForSelector("text=已送出 1 件退會（刪除）申請");
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "送出退會申請後會員還在名冊上（不會直接刪除）");
+    // 取消：什麼都不送出
+    await 搜尋框.fill("批次會員29");
     await page.waitForTimeout(200);
-    檢查((await page.locator("#內容").innerText()).includes("全部共 " + 後 + " 筆"), "搜尋結果變空時顯示全部筆數（不會誤以為全部被刪）");
-    await 搜尋框.fill("");
-    await page.waitForTimeout(200);
-    檢查((await page.locator(".分頁列").innerText()).includes("共 " + 後 + " 筆"), "清除搜尋後列出全部會員");
-    // 勾選兩位、取消確認：一位都沒刪
-    await page.locator("#內容 tbody tr").nth(0).locator(".勾 input").check();
-    await page.locator("#內容 tbody tr").nth(1).locator(".勾 input").check();
-    await page.locator(".批次列 button", { hasText: "刪除勾選的會員" }).click();
+    await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).first().locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
+    await 框().waitFor();
     await 框().locator("button", { hasText: "取消" }).click();
     await page.waitForTimeout(200);
-    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 後, "確認視窗按取消：一位都沒刪");
+    檢查((await db.query("select count(*)::int n from public.removal_requests")).rows[0].n === 1, "申請退會按取消：沒有送出任何申請");
+    await 搜尋框.fill("");
     await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
+    // 退會申請頁：管理者確認刪除，只刪這一位
+    await 選單("退會申請");
+    await page.waitForSelector("#內容 tbody tr");
+    檢查((await page.locator("#內容").innerText()).includes("人事異動，已離職") && (await page.locator("#內容").innerText()).includes("待刪除"), "退會申請頁列出原因與待刪除狀態");
+    await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).locator("button", { hasText: "確認刪除" }).click();
+    await 框().waitFor();
+    await 框().locator("button", { hasText: "刪除" }).last().click();
+    await page.waitForSelector("text=已刪除「批次會員30」");
+    const 後 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
+    檢查(後 === 前 - 1 && !(await db.query("select 1 from public.members where name = '批次會員30'")).rows.length && (await db.query("select 1 from public.members where name = '批次會員29'")).rows.length === 1,
+      "管理者確認後只刪除這一位（" + 前 + " → " + 後 + "），其他會員都還在");
+    檢查((await db.query("select status from public.removal_requests where member_name = '批次會員30'")).rows[0].status === "已刪除", "申請單狀態改為已刪除");
+    // 退回：會員保留，原因留在申請單上
+    await 選單("會員管理");
+    await 搜尋框.fill("批次會員29");
+    await page.waitForTimeout(200);
+    await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).first().locator(".勾 input").check();
+    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
+    await 框().waitFor();
+    await 框().locator("[data-key='reason']").fill("誤送，請保留");
+    await 框().locator("button", { hasText: "送出申請" }).click();
+    await page.waitForSelector("text=已送出 1 件退會（刪除）申請");
+    await 搜尋框.fill("");
+    await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
+    await 選單("退會申請");
+    await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).locator("button", { hasText: "退回" }).click();
+    await 框().waitFor();
+    await 框().locator("[data-key='原因']").fill("資料有誤，會員仍在職");
+    await 框().locator("button", { hasText: "退回" }).last().click();
+    await page.waitForSelector("text=保留在名冊上");
+    檢查((await db.query("select count(*)::int n from public.members where name = '批次會員29'")).rows[0].n === 1, "退回退會申請後會員保留");
+    檢查((await db.query("select status, review_note from public.removal_requests where member_name = '批次會員29'")).rows[0].review_note === "資料有誤，會員仍在職", "退回的原因留在申請單上");
+    await 選單("會員管理");
+    await 搜尋框.fill("");
   }
   // 同名同機關的不同人、沒有 Email 的重複列、兩列對應到名冊同一人
   await db.query(`insert into public.members (name, agency, employee_no, email) values ('王同名', '財政部臺北國稅局', 'E001', 'wang.same@example.org'), ('張重複', '財政部高雄國稅局', '', 'z@example.org')`);
@@ -482,6 +511,11 @@ try {
   檢查((await page.locator("#沒有登入帳號").innerText()).includes("批次會員1"), "沒有登入帳號的會員另外列出（沒有可寄信的 Email）");
   await 截圖("專區_收件者");
   await 框().locator(".框尾 button", { hasText: "關閉" }).click();
+  // 連點兩下「複製 Email 收件者」只開一個視窗
+  await page.locator(".批次列 button", { hasText: "複製 Email 收件者" }).dblclick();
+  await page.waitForTimeout(800);
+  檢查((await page.locator("dialog[open]").count()) === 1, "連點兩下「複製 Email 收件者」只開一個視窗");
+  await 框().locator(".框尾 button", { hasText: "關閉" }).click();
   await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
   await page.fill(".表工具列 input[type=search]", "");
   await 選單("申請審核");
@@ -515,6 +549,7 @@ try {
     await page.waitForSelector("text=已刪除 1 筆申請");
     const 剩 = (await db.query("select name from public.applications")).rows.map((r) => r.name);
     檢查(!剩.includes("舊申請甲") && 剩.includes("舊申請乙") && 剩.includes("新進同仁"), "入會申請勾選刪除：只刪勾選的那筆");
+    檢查((await page.locator(".頁籤 button[aria-selected='true']").innerText()).includes("入會申請"), "刪除後仍停在「入會申請」頁籤（不跳回第一個）");
     await page.waitForTimeout(300);
     await page.locator(".頁籤 button", { hasText: "帳號連結" }).click();
     await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator(".勾 input").check();
@@ -714,17 +749,33 @@ try {
 
   console.log("十一、系統設定：增刪幹部角色與理監事職稱");
   await 登入("sec@example.org", "staffpass1");
+  // 理監事名額：理事長已有 1 位，把甲改成理事長會被擋，表單顯示原因
+  await 選單("會員管理");
+  await page.fill(".表工具列 input[type=search]", "甲會員");
+  await page.locator("#內容 tbody tr", { hasText: "甲會員" }).first().click();
+  await 框().waitFor();
+  await 框().locator("[data-key='理監事']").selectOption("理事|理事長");
+  const 名額起點 = 主控台錯誤.length;
+  await 框().locator("button", { hasText: "儲存" }).click();
+  await page.waitForSelector("text=「理事長」最多 1 位");
+  const 名額錯誤 = 主控台錯誤.splice(名額起點);
+  檢查(名額錯誤.length === 1 && 名額錯誤[0].includes("400"), "第二位理事長會被擋，表單顯示名額已滿的原因（被拒絕的那次儲存只產生預期的 400）");
+  await 框().locator("button", { hasText: "取消" }).click();
+  await 框().waitFor({ state: "detached" }).catch(() => {});
+  await page.fill(".表工具列 input[type=search]", "");
   await 選單("系統設定");
   await page.waitForSelector("#角色表");
-  檢查((await page.locator("#角色表 tbody tr").count()) === 5 && (await page.locator("#職稱表 tbody tr").count()) === 6, "系統設定列出預設的 5 個幹部角色與 6 個理監事職稱");
+  檢查((await page.locator("#角色表 tbody tr").count()) === 5 && (await page.locator("#職稱表 tbody tr").count()) === 8, "系統設定列出預設的 5 個幹部角色與 8 個理監事職稱（含候補理事、候補監事）");
   await page.fill("#新角色", "副秘書長");
   await page.click("#新增角色鈕");
   await page.waitForSelector("#角色表 tr[data-role='副秘書長']");
-  await page.fill("#新職稱", "候補理事");
+  檢查((await page.locator("#職稱表 tr[data-title='候補理事']").innerText()).includes("候補，上限 5 位"), "候補理事的名額顯示上限 5 位");
+  檢查((await page.locator("#職稱表 tr[data-title='理事長']").innerText()).includes("上限 1 位"), "理事長的名額顯示上限 1 位");
+  await page.fill("#新職稱", "顧問理事");
   await page.locator("#新職稱類別").selectOption("理事");
   await page.click("#新增職稱鈕");
-  await page.waitForSelector("#職稱表 tr[data-title='候補理事']");
-  檢查((await db.query("select board_role from public.board_titles where title = '候補理事'")).rows[0].board_role === "理事", "新增角色「副秘書長」與職稱「候補理事（理事）」");
+  await page.waitForSelector("#職稱表 tr[data-title='顧問理事']");
+  檢查((await db.query("select board_role from public.board_titles where title = '顧問理事'")).rows[0].board_role === "理事", "新增職稱「顧問理事」（歸為理事）");
   await 截圖("專區_系統設定");
   // 新選項出現在會員編輯視窗
   await 選單("會員管理");
@@ -733,15 +784,15 @@ try {
   await 框().waitFor();
   const 角色選項 = await 框().locator("[data-key='staff_role'] option").allInnerTexts();
   檢查(角色選項.includes("副秘書長"), "會員編輯視窗的幹部角色選單出現新角色");
-  await 框().locator("[data-key='理監事']").selectOption("理事|候補理事");
+  await 框().locator("[data-key='理監事']").selectOption("理事|顧問理事");
   await 框().locator("button", { hasText: "儲存" }).click();
   await page.waitForTimeout(500);
   const 乙職 = (await db.query("select board_role, board_title from public.members where email = 'yi@example.org'")).rows[0];
-  檢查(乙職.board_role === "理事" && 乙職.board_title === "候補理事", "會員可以設成新職稱（自動歸為理事）");
+  檢查(乙職.board_role === "理事" && 乙職.board_title === "顧問理事", "會員可以設成新職稱（自動歸為理事）");
   // 使用中的職稱不能刪；沒人用的角色可以刪；調整順序；切換管理權限
   await 選單("系統設定");
-  await page.waitForSelector("#職稱表 tr[data-title='候補理事']");
-  檢查(await page.locator("#職稱表 tr[data-title='候補理事'] button", { hasText: "刪除" }).isDisabled(), "還有會員在用的職稱，刪除按鈕不能按");
+  await page.waitForSelector("#職稱表 tr[data-title='顧問理事']");
+  檢查(await page.locator("#職稱表 tr[data-title='顧問理事'] button", { hasText: "刪除" }).isDisabled(), "還有會員在用的職稱，刪除按鈕不能按");
   await page.locator("#角色表 tr[data-role='副秘書長'] button", { hasText: "刪除" }).click();
   await 框().locator("button", { hasText: "刪除" }).click();
   await page.waitForSelector("#角色表 tr[data-role='副秘書長']", { state: "detached" });
