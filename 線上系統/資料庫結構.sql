@@ -1145,7 +1145,8 @@ begin
     into 順序 from public.members;
   if 順序 is null then return 0; end if;
   -- 先全部改成暫時的編號（清空），再依序編號，才不會和還沒改到的人撞號
-  update public.members set member_no = 'TMP-' || id::text;
+  -- （Supabase 的 safeupdate 保護不允許沒有 WHERE 的 UPDATE／DELETE，所以一定要寫條件）
+  update public.members set member_no = 'TMP-' || id::text where id = any(順序);
   foreach 人 in array 順序 loop
     序 := 序 + 1;
     update public.members set member_no = 'M' || lpad(序::text, greatest(4, length(序::text)), '0') where id = 人;
@@ -1161,7 +1162,7 @@ grant execute on function public.request_my_removal(text), public.cancel_my_remo
 -- 資料庫結構的版本（v2.6）：網頁登入後比對，資料庫沒有更新到網頁需要的版本時，提醒管理者重新執行這份 SQL。
 -- 這份 SQL 有修改時，這裡與 製作/src/線上/02_登入.js 的「需要資料庫版本」要一起改（測試會檢查兩者一致）
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '2.8' $$;
+language sql immutable as $$ select '2.9' $$;
 revoke execute on function public.db_version() from public, anon;
 grant execute on function public.db_version() to authenticated;
 

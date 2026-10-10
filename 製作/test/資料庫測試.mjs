@@ -717,6 +717,18 @@ if (import.meta.url === "file://" + process.argv[1] || process.argv[1].endsWith(
     檢查(新號 === "M" + String(依日.length + 1).padStart(4, "0"), "重編後新增的會員接著編號");
   }
 
+  console.log("十六、Supabase 的 safeupdate 保護：每一個 UPDATE／DELETE 都要有 WHERE");
+  {
+    // Supabase 透過 PostgREST 執行的函式不允許沒有 WHERE 的 UPDATE／DELETE（會出現「UPDATE requires a WHERE clause」）；
+    // 測試用的 PGlite 沒有這個保護，所以直接檢查 SQL 原始碼
+    const 原始 = fs.readFileSync(path.join(根目錄, "線上系統", "資料庫結構.sql"), "utf8").replace(/--[^\n]*/g, "");
+    const 缺 = [];
+    for (const m of 原始.matchAll(/\b(update\s+(only\s+)?(public|auth)\.\w+|delete\s+from\s+(public|auth)\.\w+)[\s\S]*?;/gi)) {
+      if (!/\bwhere\b/i.test(m[0])) 缺.push(m[0].replace(/\s+/g, " ").slice(0, 80));
+    }
+    檢查(缺.length === 0, "資料庫結構裡每一個 UPDATE／DELETE 都有 WHERE" + (缺.length ? "（缺：" + 缺.join("；") + "）" : ""));
+  }
+
   console.log("\n資料庫測試：通過 " + 通過 + " 項，失敗 " + 失敗.length + " 項");
   失敗.forEach((f) => console.log("  ✘ " + f));
   process.exit(失敗.length ? 1 : 0);
