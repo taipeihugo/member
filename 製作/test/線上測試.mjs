@@ -297,10 +297,23 @@ try {
   檢查((await page.locator("#內容").innerText()).includes("有效會員 35 人；理事 1 人（上限 15）、監事 1 人（上限 5）（候補不計入）、會員代表 2 人"), "匯入後人數統計即時更新（超過單次回傳上限仍完整讀取）");
   檢查((await page.locator(".分頁列").innerText()).includes("共 35 筆"), "會員列表分頁讀取全部 35 筆（模擬上限 25 筆）");
   await 截圖("專區_會員管理");
-  console.log("三之一、退會（刪除）：個人資料視窗沒有刪除鈕；名冊勾選後送出申請，管理者在「退會申請」確認才真的刪除（只刪這一位）");
+  console.log("三之一、刪除會員：勾選按「刪除」、下拉選原因，就移到待審名單（不留在名冊）；管理者在「申請審核 → 退會申請」確認刪除或退回");
   {
     const 前 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
     const 搜尋框 = page.locator(".表工具列 input[type=search]");
+    const 刪除鈕 = () => page.locator(".批次列 button", { hasText: /^刪除$/ });
+    // 勾選後按「刪除」，從下拉選單選原因，按「刪除」：直接移到待審名單
+    const 刪除會員 = async (名, 原因, 其他) => {
+      await 搜尋框.fill(名);
+      await page.waitForTimeout(200);
+      await page.locator("#內容 tbody tr", { hasText: 名 }).first().locator(".勾 input").check();
+      await 刪除鈕().click();
+      await 框().waitFor();
+      await 框().locator("[data-key='reason']").selectOption(原因);
+      if (其他) await 框().locator("[data-key='其他']").fill(其他);
+      await 框().locator(".框尾 button", { hasText: "刪除" }).click();
+      await page.waitForTimeout(600);
+    };
     await 搜尋框.fill("批次會員30");
     await page.waitForTimeout(200);
     await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).first().click();
@@ -308,37 +321,46 @@ try {
     檢查(!(await 框().innerText()).includes("刪除會員") && (await 框().locator("button", { hasText: "刪除" }).count()) === 0, "個人資料視窗裡沒有刪除按鈕");
     await 框().locator("button.關").click();
     await page.waitForTimeout(150);
-    // 勾選一位，按「申請退會（刪除）」，填原因送出：只是送出申請，會員還在
+    // 原因用下拉選單；選「其他」要填文字
     await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).first().locator(".勾 input").check();
-    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
+    await 刪除鈕().click();
     await 框().waitFor();
-    檢查((await 框().innerText()).includes("批次會員30"), "申請退會前列出勾選的人名");
-    await 框().locator("[data-key='reason']").fill("人事異動，已離職");
-    await 框().locator("button", { hasText: "送出申請" }).click();
-    await page.waitForSelector("dialog[open] >> text=已送出 1 件退會（刪除）申請");
-    檢查((await 框().innerText()).includes("申請審核 → 退會申請") && (await 框().locator("button", { hasText: "前往確認刪除" }).count()) === 1, "管理者送出退會申請後，詢問要不要前往「申請審核 → 退會申請」確認");
-    await 框().locator("button", { hasText: "稍後再說" }).click();
-    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "送出退會申請後會員還在名冊上（不會直接刪除）");
-    // 取消：什麼都不送出
+    const 原因選項 = await 框().locator("[data-key='reason'] option").allInnerTexts();
+    檢查(["退休", "離職", "調他機關", "不續會", "亡故", "其他"].every((x) => 原因選項.includes(x)), "刪除原因用下拉選單選（退休、離職、調他機關、不續會、亡故、其他）");
+    await 框().locator("[data-key='reason']").selectOption("其他");
+    await 框().locator(".框尾 button", { hasText: "刪除" }).click();
+    await page.waitForTimeout(200);
+    檢查((await 框().innerText()).includes("請填寫其他原因"), "選「其他」沒有填文字時不能刪除");
+    await 截圖("專區_刪除原因");
+    await 框().locator("[data-key='其他']").fill("協會內部調整");
+    await 框().locator(".框尾 button", { hasText: "刪除" }).click();
+    await page.waitForTimeout(600);
+    檢查((await page.locator("dialog[open]").count()) === 0 && !(await page.locator("#提示區").innerText()).includes("已送出"), "選好原因按刪除後直接移到待審名單，不再跳出通知");
+    檢查((await db.query("select reason, status from public.removal_requests where member_name = '批次會員30'")).rows[0].reason === "其他：協會內部調整", "原因記為「其他：…」");
+    檢查((await db.query("select count(*)::int n from public.members")).rows[0].n === 前, "管理者確認前，會員資料仍在（只是移到待審名單）");
+    檢查(!(await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).count()) && (await page.locator("#內容").innerText()).includes("沒有符合"), "移到待審名單的會員不再顯示在會員名冊上");
+    // 取消：什麼都不做
     await 搜尋框.fill("批次會員29");
     await page.waitForTimeout(200);
     await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).first().locator(".勾 input").check();
-    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
+    await 刪除鈕().click();
     await 框().waitFor();
     await 框().locator("button", { hasText: "取消" }).click();
     await page.waitForTimeout(200);
-    檢查((await db.query("select count(*)::int n from public.removal_requests")).rows[0].n === 1, "申請退會按取消：沒有送出任何申請");
-    檢查(!(await page.locator("#提示區").innerText()).includes("已送出 0"), "申請退會按取消：不顯示成功提示");
-    await 搜尋框.fill("");
+    檢查((await db.query("select count(*)::int n from public.removal_requests")).rows[0].n === 1, "按取消：沒有移到待審名單");
     await page.locator(".批次列 button", { hasText: "取消勾選" }).click();
-    // 申請審核 → 退會申請頁籤：管理者確認刪除，只刪這一位
-    檢查(!(await page.locator("#側欄").innerText()).includes("退會申請"), "退會申請不再是獨立的選單項目（改在申請審核的頁籤）");
+    await 搜尋框.fill("");
+    // 申請審核 → 退會申請：清空清單接在匯出 Excel 後面；每列只有「確認刪除」「退回」
+    檢查(!(await page.locator("#側欄").innerText()).includes("退會申請"), "退會申請不是獨立的選單項目（在申請審核的頁籤）");
     await 選單("申請審核");
     await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
     await page.waitForSelector("#內容 tbody tr");
-    檢查((await page.locator("#內容").innerText()).includes("退會申請（待刪除）1 件"), "申請審核上方列出待刪除的退會申請件數");
+    檢查((await page.locator("#內容").innerText()).includes("退會申請（待刪除）1 件"), "申請審核上方列出待刪除的件數");
+    const 右上 = await page.locator("#內容 .資料表 .右側 button").allInnerTexts();
+    檢查(右上.indexOf("清空清單") === 右上.indexOf("匯出 Excel") + 1 && 右上.indexOf("清空清單") > 0, "「清空清單」接在「匯出 Excel」後面（" + 右上.join("、") + "）");
+    const 列鈕 = await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).locator("button").allInnerTexts();
+    檢查(列鈕.join() === "確認刪除,退回", "待刪除的每一列只有「確認刪除」與「退回」（沒有改為退會）");
     await 截圖("專區_退會申請頁籤");
-    檢查((await page.locator("#內容").innerText()).includes("人事異動，已離職") && (await page.locator("#內容").innerText()).includes("待刪除"), "退會申請頁列出原因與待刪除狀態");
     await page.locator("#內容 tbody tr", { hasText: "批次會員30" }).locator("button", { hasText: "確認刪除" }).click();
     await 框().waitFor();
     await 框().locator("button", { hasText: "刪除" }).last().click();
@@ -348,41 +370,28 @@ try {
     const 後 = (await db.query("select count(*)::int n from public.members")).rows[0].n;
     檢查(後 === 前 - 1 && !(await db.query("select 1 from public.members where name = '批次會員30'")).rows.length && (await db.query("select 1 from public.members where name = '批次會員29'")).rows.length === 1,
       "管理者確認後只刪除這一位（" + 前 + " → " + 後 + "），其他會員都還在");
-    檢查((await db.query("select status from public.removal_requests where member_name = '批次會員30'")).rows[0].status === "已刪除", "申請單狀態改為已刪除");
-    // 退回：會員保留，原因留在申請單上
+    // 退回：不用填理由，會員回到名冊
+    await 選單("會員管理");
+    await 刪除會員("批次會員29", "離職");
+    await 選單("申請審核");
+    await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
+    await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).locator("button", { hasText: "退回" }).click();
+    await page.waitForSelector("text=回到名冊");
+    檢查((await page.locator("dialog[open]").count()) === 0 && (await db.query("select status from public.removal_requests where member_name = '批次會員29'")).rows[0].status === "退回", "退回不用填理由");
     await 選單("會員管理");
     await 搜尋框.fill("批次會員29");
     await page.waitForTimeout(200);
-    await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).first().locator(".勾 input").check();
-    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
-    await 框().waitFor();
-    await 框().locator("[data-key='reason']").fill("誤送，請保留");
-    await 框().locator("button", { hasText: "送出申請" }).click();
-    await page.waitForSelector("dialog[open] >> text=已送出 1 件退會（刪除）申請");
-    await 框().locator("button", { hasText: "前往確認刪除" }).click();
-    await page.waitForSelector(".頁籤 button[aria-selected='true'] >> text=退會申請");
-    檢查(true, "按「前往確認刪除」直接打開「申請審核 → 退會申請」");
-    await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).locator("button", { hasText: "退回" }).click();
-    await 框().waitFor();
-    await 框().locator("[data-key='原因']").fill("資料有誤，會員仍在職");
-    await 框().locator("button", { hasText: "退回" }).last().click();
-    await page.waitForSelector("text=保留在名冊上");
-    檢查((await db.query("select count(*)::int n from public.members where name = '批次會員29'")).rows[0].n === 1, "退回退會申請後會員保留");
-    檢查((await db.query("select status, review_note from public.removal_requests where member_name = '批次會員29'")).rows[0].review_note === "資料有誤，會員仍在職", "退回的原因留在申請單上");
-    // 改為退會：不刪除，只把會籍改為退會
-    await 選單("會員管理");
-    await 搜尋框.fill("批次會員28");
-    await page.waitForTimeout(200);
-    await page.locator("#內容 tbody tr", { hasText: "批次會員28" }).first().locator(".勾 input").check();
-    await page.locator(".批次列 button", { hasText: "申請退會（刪除）" }).click();
-    await 框().locator("[data-key='reason']").fill("本人表示退會");
-    await 框().locator("button", { hasText: "送出申請" }).click();
-    await 框().locator("button", { hasText: "前往確認刪除" }).click();
-    await page.waitForSelector("#內容 tbody tr >> text=批次會員28");
-    await page.locator("#內容 tbody tr", { hasText: "批次會員28" }).locator("button", { hasText: "改為退會" }).click();
-    await 框().locator("button", { hasText: "改為退會" }).last().click();
-    await page.waitForSelector("text=會籍改為退會");
-    檢查((await db.query("select status from public.members where name = '批次會員28'")).rows[0].status === "退會" && (await db.query("select status from public.removal_requests where member_name = '批次會員28'")).rows[0].status === "已退會", "改為退會：會員保留、會籍改為退會，申請單為已退會");
+    檢查((await page.locator("#內容 tbody tr", { hasText: "批次會員29" }).count()) === 1, "退回後會員回到名冊");
+    // 管理者把自己刪除：移到待審名單，並說明要由另一位管理者處理
+    await 刪除會員("陳秘書", "退休");
+    await page.waitForSelector("dialog[open] >> text=管理者不能處理自己的退會申請");
+    檢查((await 框().innerText()).includes("管理者不能處理自己的退會申請，要由另一位管理者處理"), "管理者刪除自己時，說明「管理者不能處理自己的退會申請，要由另一位管理者處理」");
+    await 框().locator(".框尾 button", { hasText: "關閉" }).click();
+    await 選單("申請審核");
+    await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
+    const 自己列 = page.locator("#內容 tbody tr", { hasText: "陳秘書（本人申請）" });
+    檢查((await 自己列.innerText()).includes("管理者不能處理自己的退會申請，要由另一位管理者處理") && (await 自己列.locator("button").count()) === 0, "待審名單裡自己的那一列不能按，並說明原因");
+    await db.query("delete from public.removal_requests where member_name = '陳秘書'");  // 還原，後面的測試還要用秘書長
     // 重編會員編號：清空後依目前順序重新編成 M0001 起（批次會員30 刪除留下的空號補上）
     await 選單("會員管理");
     await 搜尋框.fill("");
@@ -519,7 +528,8 @@ try {
   await page.waitForSelector("#申請退會鈕");
   // 會員本人申請退會：要寫原因；審核中可以撤回；再送一次留給幹部處理
   await page.click("#申請退會鈕");
-  await 框().locator("[data-key='原因']").fill("工作異動，想先退出");
+  檢查(!(await 框().locator("[data-key='reason'] option").allInnerTexts()).includes("亡故") && (await 框().locator("[data-key='reason'] option").allInnerTexts()).includes("調他機關"), "會員本人申請退會也用下拉選單選原因（沒有「亡故」）");
+  await 框().locator("[data-key='reason']").selectOption("調他機關");
   await 框().locator("button", { hasText: "送出退會申請" }).click();
   await page.waitForSelector("#撤回退會鈕");
   const 本人申 = (await db.query("select by_self, status, requested_by_name from public.removal_requests where member_name = '甲會員'")).rows;
@@ -531,7 +541,7 @@ try {
   await page.waitForSelector("#申請退會鈕");
   檢查(!(await db.query("select 1 from public.removal_requests where member_name = '甲會員'")).rows.length, "審核前可以撤回退會申請");
   await page.click("#申請退會鈕");
-  await 框().locator("[data-key='原因']").fill("工作異動");
+  await 框().locator("[data-key='reason']").selectOption("不續會");
   await 框().locator("button", { hasText: "送出退會申請" }).click();
   await page.waitForSelector("#撤回退會鈕");
   await 選單("活動報名");
@@ -569,6 +579,21 @@ try {
 
   console.log("六、幹部：審核、葷素統計、簽到、會費");
   await 登入("sec@example.org", "staffpass1");
+  // 會員本人送出的退會申請：申請審核 → 退會申請，標示「本人申請」；這裡退回（甲之後還要用）
+  {
+    // 待審中的會員不在會員名冊上
+    await 選單("會員管理");
+    await page.fill(".表工具列 input[type=search]", "甲會員");
+    await page.waitForTimeout(200);
+    檢查(!(await page.locator("#內容 tbody tr", { hasText: "甲會員" }).count()), "會員本人送出退會申請後，待審期間不在會員名冊上");
+    await page.fill(".表工具列 input[type=search]", "");
+    await 選單("申請審核");
+    await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
+    await page.waitForSelector("#內容 tbody tr >> text=甲會員");
+    檢查((await page.locator("#內容 tbody tr", { hasText: "甲會員" }).innerText()).includes("本人申請"), "退會申請頁籤標示會員本人送出的申請");
+    await page.locator("#內容 tbody tr", { hasText: "甲會員" }).locator("button", { hasText: "退回" }).click();
+    await page.waitForSelector("text=回到名冊");
+  }
   // 管理者編輯會員時看得到他連結的登入帳號（指派幹部前核對）
   await 選單("會員管理");
   await page.fill(".表工具列 input[type=search]", "甲會員");
@@ -648,21 +673,12 @@ try {
     await page.locator("#內容 tbody tr", { hasText: "乙理事長" }).locator(".勾 input").check();
     await page.locator(".批次列 button", { hasText: "刪除勾選的申請" }).click();
     await 框().locator("button", { hasText: "刪除 1 筆申請" }).click();
-    await page.waitForSelector("text=已刪除 1 筆申請");
+    // 前一步的「已刪除 1 筆申請」提示可能還在畫面上，改成等資料真的刪掉
+    for (let i = 0; i < 50 && (await db.query("select 1 from public.link_requests where login_email = 'yi.home@gmail.example'")).rows.length; i++) await page.waitForTimeout(100);
     檢查(!(await db.query("select 1 from public.link_requests where login_email = 'yi.home@gmail.example'")).rows.length &&
       (await db.query("select u.email from public.members m join auth.users u on u.id = m.user_id where m.email = 'yi@example.org'")).rows[0].email === "yi.home@gmail.example",
       "刪除已核准的連結申請，不影響已連結的會員帳號");
     await db.query("delete from public.applications where name = '舊申請乙'");
-  }
-  // 會員本人送出的退會申請：申請審核 → 退會申請，標示「本人申請」；這裡退回（甲之後還要用）
-  {
-    await page.locator(".頁籤 button", { hasText: "退會申請" }).click();
-    await page.waitForSelector("#內容 tbody tr >> text=甲會員");
-    檢查((await page.locator("#內容 tbody tr", { hasText: "甲會員" }).innerText()).includes("本人申請"), "退會申請頁籤標示會員本人送出的申請");
-    await page.locator("#內容 tbody tr", { hasText: "甲會員" }).locator("button", { hasText: "退回" }).click();
-    await 框().locator("[data-key='原因']").fill("請先繳清本年度會費再辦理");
-    await 框().locator("button", { hasText: "退回" }).last().click();
-    await page.waitForSelector("text=保留在名冊上");
   }
   // 清空清單：預設只清已處理的；勾選後連待審的一起清
   {
@@ -714,7 +730,7 @@ try {
 
   console.log("七、會員看繳費紀錄、新會員登入");
   await 登入("jia.home@gmail.example", "memberpass1");
-  檢查((await page.locator("#退會卡").innerText()).includes("請先繳清本年度會費再辦理") && (await page.locator("#申請退會鈕").count()) === 1, "退會申請被退回後，會員看得到原因，也可以再申請");
+  檢查((await page.locator("#退會卡").innerText()).includes("已於") && (await page.locator("#退會卡").innerText()).includes("退回") && (await page.locator("#申請退會鈕").count()) === 1, "退會申請被退回後，會員看得到原因，也可以再申請");
   await 選單("繳費紀錄");
   await page.waitForSelector("text=115-0001");
   檢查(true, "會員看得到自己的繳費紀錄與收據號");

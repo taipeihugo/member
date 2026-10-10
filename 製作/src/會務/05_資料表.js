@@ -5,7 +5,7 @@
 //   資料()：回傳要顯示的紀錄陣列
 //   篩選：[{標題, 選項()→陣列, 取值(r)→值或值陣列}]
 //   批次：[{文字, 動作(已選紀錄們), 危:bool（紅色按鈕）, 可見()→bool（不設定＝都看得到）}]（有設定才顯示勾選欄）
-//   點列(r)、工具(額外按鈕陣列)、匯出檔名、每頁（預設 20）、預設排序 {key, 反向}
+//   點列(r)、工具(額外按鈕陣列，放在匯出鈕前面)、後工具(額外按鈕陣列，放在「匯出 Excel」後面)、匯出檔名、每頁（預設 20）、預設排序 {key, 反向}
 function 資料表(設定) {
   const 狀 = { 搜尋: "", 篩選: {}, 排序: 設定.預設排序 ? 設定.預設排序.key : null, 反向: 設定.預設排序 ? !!設定.預設排序.反向 : false, 頁: 0, 已選: new Set() };
   const 每頁 = 設定.每頁 || 20;
@@ -22,7 +22,8 @@ function 資料表(設定) {
   const 工具列 = h("div", { class: "表工具列" }, 搜尋框, 篩選們,
     h("div", { class: "右側" }, 設定.工具 || [],
       設定.不匯出 ? null : h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(false, "csv"); } }, "匯出 CSV"),
-      設定.不匯出 ? null : h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(false, "xlsx"); } }, "匯出 Excel")));
+      設定.不匯出 ? null : h("button", { class: "鈕 小", type: "button", onclick: function () { 匯出(false, "xlsx"); } }, "匯出 Excel"),
+      設定.後工具 || []));
   const 批次列 = h("div", { class: "批次列 隱藏" });
   const 表區 = h("div", { class: "表捲" });
   const 分頁列 = h("div", { class: "分頁列" });

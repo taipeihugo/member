@@ -114,7 +114,7 @@ function 翻譯錯誤(資料, 狀態碼) {
     [/rate limit|too many/i, "操作太頻繁，請稍後再試"],
     [/JWT expired/i, "登入已逾時，請重新登入"],
     [/row-level security|permission denied/i, "沒有權限執行這個動作"],
-    [/duplicate key.*members_email/i, "已有相同 Email 的會員"],
+    [/duplicate key.*members_email/i, "已有相同 Email 的會員（也可能是在退會待審名單裡的人）"],
     [/duplicate key/i, "資料重複"],
     [/members_board_title_ok/i, "理監事職稱與身分不符（理事、監事只能擇一）"]
   ];

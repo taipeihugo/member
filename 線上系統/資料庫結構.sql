@@ -174,6 +174,13 @@ create table if not exists public.fees (
   created_at timestamptz not null default now()
 );
 create unique index if not exists fees_one_per_year on public.fees (member_id, year, item);
+-- v2.8：會員刪除後收據保留（帳務紀錄不能消失，收據號碼也不會再發給別人），收據上記下當時的姓名與會員編號
+alter table public.fees add column if not exists member_name text not null default '';
+alter table public.fees add column if not exists member_no text not null default '';
+update public.fees f set member_name = m.name, member_no = coalesce(m.member_no, '') from public.members m where m.id = f.member_id and f.member_name = '';
+alter table public.fees alter column member_id drop not null;
+alter table public.fees drop constraint if exists fees_member_id_fkey;
+alter table public.fees add constraint fees_member_id_fkey foreign key (member_id) references public.members (id) on delete set null;
 
 -- 線上入會申請
 create table if not exists public.applications (
@@ -238,7 +245,7 @@ $$;
 -- 不具管理權限的幹部不能指派幹部角色，也不能變更幹部那幾筆的會籍、Email、帳號連結
 create or replace function public.members_before_write() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare 類別 text; 職上限 int; 是候補 boolean; 組上限 int; 人數 int;
+declare 類別 text; 職上限 int; 是候補 boolean; 組上限 int; 人數 int; 待審 int := 0;
 begin
   new.email := lower(trim(new.email));
   new.board_title := btrim(coalesce(new.board_title, ''));
@@ -295,7 +302,13 @@ begin
     if 職上限 is not null then
       select count(*) into 人數 from public.members where board_title = new.board_title and status = '有效' and id <> new.id;
       if 人數 >= 職上限 then
-        raise exception '「%」最多 % 位，目前已有 % 位有效會員擔任（請先把原來的人改成其他職稱，或改為停權、退會）', new.board_title, 職上限, 人數;
+        -- 佔名額的人如果在退會待審名單（名冊上看不到），一併說明
+        if to_regclass('public.removal_requests') is not null then
+          select count(*) into 待審 from public.members m where m.board_title = new.board_title and m.status = '有效' and m.id <> new.id
+            and exists (select 1 from public.removal_requests r where r.member_id = m.id and r.status = '待刪除');
+        end if;
+        raise exception '「%」最多 % 位，目前已有 % 位有效會員擔任（請先把原來的人改成其他職稱，或改為停權、退會）%', new.board_title, 職上限, 人數,
+          case when 待審 > 0 then '。其中 ' || 待審 || ' 位在退會待審名單，請先到「申請審核 → 退會申請」確認刪除或退回' else '' end;
       end if;
     end if;
     if not coalesce(是候補, false) then
@@ -304,7 +317,13 @@ begin
         select count(*) into 人數 from public.members m join public.board_titles t on t.title = m.board_title
           where m.board_role = new.board_role and m.status = '有效' and m.id <> new.id and not t.candidate;
         if 人數 >= 組上限 then
-          raise exception '%組最多 % 位（候補不計入），目前已有 % 位有效會員', new.board_role, 組上限, 人數;
+          if to_regclass('public.removal_requests') is not null then
+            select count(*) into 待審 from public.members m join public.board_titles t on t.title = m.board_title
+              where m.board_role = new.board_role and m.status = '有效' and m.id <> new.id and not t.candidate
+                and exists (select 1 from public.removal_requests r where r.member_id = m.id and r.status = '待刪除');
+          end if;
+          raise exception '%組最多 % 位（候補不計入），目前已有 % 位有效會員%', new.board_role, 組上限, 人數,
+            case when 待審 > 0 then '。其中 ' || 待審 || ' 位在退會待審名單，請先到「申請審核 → 退會申請」確認刪除或退回' else '' end;
         end if;
       end if;
     end if;
@@ -536,10 +555,12 @@ begin
     from public.fees where receipt_no like 前綴 || '%' and substring(receipt_no from length(前綴) + 1) ~ '^\d+$';
   select name into 我名 from public.members where user_id = auth.uid();
   foreach 人 in array p_members loop
-    if not exists (select 1 from public.fees where member_id = 人 and year = p_year and item = p_item) then
+    -- 會員已經被刪除（例如畫面還沒更新）就略過，不計入登記人數
+    if exists (select 1 from public.members where id = 人) and not exists (select 1 from public.fees where member_id = 人 and year = p_year and item = p_item) then
       序 := 序 + 1;
-      insert into public.fees (member_id, year, item, amount, paid_date, method, receipt_no, recorded_by)
-        values (人, p_year, p_item, p_amount, coalesce(p_date, current_date), coalesce(p_method, '現金'), 前綴 || lpad(序::text, 4, '0'), coalesce(我名, ''));
+      insert into public.fees (member_id, member_name, member_no, year, item, amount, paid_date, method, receipt_no, recorded_by)
+        select 人, m.name, coalesce(m.member_no, ''), p_year, p_item, p_amount, coalesce(p_date, current_date), coalesce(p_method, '現金'), 前綴 || lpad(序::text, 4, '0'), coalesce(我名, '')
+        from public.members m where m.id = 人;
       筆數 := 筆數 + 1;
     end if;
   end loop;
@@ -989,7 +1010,7 @@ drop policy if exists removal_requests_select on public.removal_requests;
 -- 會員看得到「自己這筆會員資料」的本人申請（以會員判斷，不以送件帳號判斷：換了登入帳號的會員照樣看得到，舊帳號看不到）
 create policy removal_requests_select on public.removal_requests for select to authenticated using (public.is_staff() or (by_self and member_id = public.my_member_id()));
 
--- 送出退會（刪除）申請：任何幹部；不能送自己；同一位會員只能有一件待刪除
+-- 送出退會（刪除）申請：任何幹部；同一位會員只能有一件待刪除（幹部送自己時標示為本人申請）
 create or replace function public.request_removal(p_member uuid, p_reason text)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare 人 public.members; 編號 uuid; 我名 text;
@@ -998,21 +1019,21 @@ begin
   if btrim(coalesce(p_reason, '')) = '' then raise exception '請填寫退會（刪除）的原因'; end if;
   select * into 人 from public.members where id = p_member;
   if not found then raise exception '找不到這位會員'; end if;
-  if 人.id = public.my_member_id() then raise exception '不能送出自己的退會（刪除）申請'; end if;
   if exists (select 1 from public.removal_requests where member_id = p_member and status = '待刪除') then
-    raise exception '「%」已經有一件待刪除的申請', 人.name;
+    raise exception '「%」已經在待審名單裡', 人.name;
   end if;
   select name into 我名 from public.members where user_id = auth.uid();
-  insert into public.removal_requests (member_id, member_no, member_name, member_agency, member_email, reason, requested_by, requested_by_name)
-    values (人.id, 人.member_no, 人.name, 人.agency, 人.email, btrim(p_reason), auth.uid(), coalesce(我名, ''))
+  -- 幹部把自己送進待審名單：標示為本人申請（v2.8）；管理者不能處理自己的申請，要由另一位管理者處理
+  insert into public.removal_requests (member_id, member_no, member_name, member_agency, member_email, reason, requested_by, requested_by_name, by_self)
+    values (人.id, coalesce(人.member_no, ''), 人.name, 人.agency, 人.email, btrim(p_reason), auth.uid(), coalesce(我名, ''), 人.id = public.my_member_id())
     returning id into 編號;
   return 編號;
 end $$;
 
--- 管理者確認退會（刪除）：真的刪除會員。有繳費紀錄（收據）或有效報名的人不直接刪，避免收據號碼重複或候補卡住
+-- 管理者確認退會（刪除）：真的刪除會員。收據保留（號碼不會重複使用）；還沒舉辦的活動報名先取消，候補自動遞補
 create or replace function public.confirm_removal(p_request uuid)
 returns void language plpgsql security definer set search_path = public as $$
-declare 申 public.removal_requests; 人 public.members; 我名 text;
+declare 申 public.removal_requests; 人 public.members; 我名 text; 報 record;
 begin
   if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以確認退會（刪除）'; end if;
   select * into 申 from public.removal_requests where id = p_request and status = '待刪除' for update;
@@ -1020,27 +1041,29 @@ begin
   if 申.member_id is null then raise exception '這位會員已經不在名冊上，請改為退回這件申請'; end if;
   -- 先鎖住會員列：收據或報名若在檢查之後才寫入，會被擋在這把鎖後面，寫入時會因會員已刪除而失敗（v2.5）
   select * into 人 from public.members where id = 申.member_id for update;
-  if 人.id = public.my_member_id() then raise exception '不能刪除自己的會員資料'; end if;
-  if exists (select 1 from public.fees where member_id = 人.id) then
-    raise exception '「%」有繳費紀錄（收據），不能直接刪除。請退回這件申請，改把會籍設為「退會」保留紀錄', 人.name;
-  end if;
-  if exists (select 1 from public.registrations where member_id = 人.id and status <> '取消') then
-    raise exception '「%」還有有效的活動報名，請先取消報名再確認刪除', 人.name;
-  end if;
+  if 人.id = public.my_member_id() then raise exception '管理者不能處理自己的退會申請，要由另一位管理者處理'; end if;
+  -- 還沒舉辦的活動：有效報名先取消（正取取消時候補自動遞補），名額才不會空著（v2.8）
+  for 報 in select r.id from public.registrations r join public.activities a on a.id = r.activity_id
+      where r.member_id = 人.id and r.status <> '取消' and a.date >= current_date loop
+    perform public.cancel_registration(報.id);
+  end loop;
+  -- 收據保留（會員欄改為空，收據上記著當時的姓名與編號），其他報名紀錄隨會員一起刪除
   select name into 我名 from public.members where user_id = auth.uid();
   update public.removal_requests set status = '已刪除', reviewed_by = coalesce(我名, ''), reviewed_at = now() where id = 申.id;
   delete from public.members where id = 人.id;
 end $$;
 
--- 管理者退回退會（刪除）申請：會員保留，申請單留下原因
+-- 管理者退回退會（刪除）申請：會員回到名冊（v2.8 起不用填理由）
 create or replace function public.reject_removal(p_request uuid, p_reason text)
 returns void language plpgsql security definer set search_path = public as $$
 declare 我名 text;
 begin
   if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以退回退會（刪除）申請'; end if;
-  if btrim(coalesce(p_reason, '')) = '' then raise exception '請填寫退回的原因'; end if;
+  if exists (select 1 from public.removal_requests where id = p_request and member_id = public.my_member_id()) then
+    raise exception '管理者不能處理自己的退會申請，要由另一位管理者處理';
+  end if;
   select name into 我名 from public.members where user_id = auth.uid();
-  update public.removal_requests set status = '退回', review_note = btrim(p_reason), reviewed_by = coalesce(我名, ''), reviewed_at = now()
+  update public.removal_requests set status = '退回', review_note = btrim(coalesce(p_reason, '')), reviewed_by = coalesce(我名, ''), reviewed_at = now()
     where id = p_request and status = '待刪除';
   if not found then raise exception '找不到待刪除的申請'; end if;
 end $$;
@@ -1073,21 +1096,8 @@ begin
   if not found then raise exception '沒有可以撤回的退會申請'; end if;
 end $$;
 
--- 管理者把退會申請處理為「改為退會」（v2.7）：只把會籍改為退會，會員資料、收據、報名紀錄都保留（有繳費紀錄的人用這個）
-create or replace function public.retire_removal(p_request uuid)
-returns void language plpgsql security definer set search_path = public as $$
-declare 申 public.removal_requests; 我名 text;
-begin
-  if not public.is_admin() then raise exception '沒有權限：只有具管理權限的幹部可以處理退會申請'; end if;
-  select * into 申 from public.removal_requests where id = p_request and status = '待刪除' for update;
-  if not found then raise exception '找不到待刪除的申請'; end if;
-  if 申.member_id is null then raise exception '這位會員已經不在名冊上，請改為退回這件申請'; end if;
-  if 申.member_id = public.my_member_id() then raise exception '不能處理自己的退會申請，請由另一位具管理權限的幹部處理'; end if;
-  update public.members set status = '退會' where id = 申.member_id;
-  select name into 我名 from public.members where user_id = auth.uid();
-  update public.removal_requests set status = '已退會', review_note = '會籍改為退會，資料保留', reviewed_by = coalesce(我名, ''), reviewed_at = now()
-    where id = 申.id;
-end $$;
+-- v2.7 的「改為退會」在 v2.8 取消（申請審核只留確認刪除與退回）
+drop function if exists public.retire_removal(uuid);
 
 -- 清空「申請審核」的清單（v2.7，只有具管理權限的幹部）：預設只清已處理的紀錄（核准、退回、已刪除、已退會）；
 -- p_with_pending 為真時連待審（待刪除）的一起清。一筆一筆刪（配合「一次只能刪一筆」的保護），回傳刪了幾筆
@@ -1105,7 +1115,9 @@ begin
       delete from public.applications where id = 列.id; 筆數 := 筆數 + 1;
     end loop;
   elsif p_list = 'removal_requests' then
-    for 列 in select id from public.removal_requests where coalesce(p_with_pending, false) or status <> '待刪除' loop
+    -- 管理者自己的待審申請不會被清掉（要由另一位管理者處理）
+    for 列 in select id from public.removal_requests where (coalesce(p_with_pending, false) or status <> '待刪除')
+        and not (status = '待刪除' and coalesce(member_id = public.my_member_id(), false)) loop
       delete from public.removal_requests where id = 列.id; 筆數 := 筆數 + 1;
     end loop;
   else
@@ -1124,7 +1136,9 @@ begin
   if coalesce(p_order, '') not in ('編號', '入會日期', '機關姓名') then raise exception '排序方式只能是：編號、入會日期、機關姓名'; end if;
   -- 重編期間不讓別人新增或修改會員（避免撞號）
   lock table public.members in share row exclusive mode;
+  -- 退會待審名單裡的人排在最後（名冊上看得到的人編號連續）
   select array_agg(id order by
+      exists (select 1 from public.removal_requests r where r.member_id = members.id and r.status = '待刪除'),
       case when p_order = '入會日期' then join_date end nulls last,
       case when p_order = '機關姓名' then agency end, case when p_order = '機關姓名' then name end,
       nullif(regexp_replace(coalesce(member_no, ''), '\D', '', 'g'), '')::numeric nulls last, member_no, created_at, id)
@@ -1139,15 +1153,15 @@ begin
   return 序;
 end $$;
 
-revoke execute on function public.request_my_removal(text), public.cancel_my_removal(), public.retire_removal(uuid),
+revoke execute on function public.request_my_removal(text), public.cancel_my_removal(),
   public.clear_review_list(text, boolean), public.renumber_members(text) from public, anon;
-grant execute on function public.request_my_removal(text), public.cancel_my_removal(), public.retire_removal(uuid),
+grant execute on function public.request_my_removal(text), public.cancel_my_removal(),
   public.clear_review_list(text, boolean), public.renumber_members(text) to authenticated;
 
 -- 資料庫結構的版本（v2.6）：網頁登入後比對，資料庫沒有更新到網頁需要的版本時，提醒管理者重新執行這份 SQL。
 -- 這份 SQL 有修改時，這裡與 製作/src/線上/02_登入.js 的「需要資料庫版本」要一起改（測試會檢查兩者一致）
 create or replace function public.db_version() returns text
-language sql immutable as $$ select '2.7' $$;
+language sql immutable as $$ select '2.8' $$;
 revoke execute on function public.db_version() from public, anon;
 grant execute on function public.db_version() to authenticated;
 
